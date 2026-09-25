@@ -163,7 +163,7 @@ export default function Cargos() {
 
         <Button
           onClick={handleOpenCreate}
-          className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm h-10 px-4 shadow-sm"
+          className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-4 shadow-sm border-0 hover:brightness-110"
         >
           <Plus className="w-4 h-4 mr-2" />
           Novo Cargo
@@ -174,7 +174,7 @@ export default function Cargos() {
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-8 h-8 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : cargos.length === 0 ? (
           <div className="py-16 text-center">
@@ -213,7 +213,7 @@ export default function Cargos() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenEdit(cargo)}
-                        className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#2563EB]"
+                        className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#D4AF37]"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
@@ -271,7 +271,7 @@ export default function Cargos() {
               <Button
                 type="submit"
                 disabled={saving}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
                 {saving ? 'Salvando...' : 'Salvar Cargo'}
               </Button>

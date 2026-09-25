@@ -339,7 +339,7 @@ export default function AdminLayout() {
               >
                 Abrir Terminal de Ponto ↗
               </a>
-              <span className="text-slate-500">• Etapa 6 — Portal do Funcionário</span>
+              <span className="text-slate-500">• Etapa 7 — Homologação Final Concluída</span>
             </div>
           </div>
         </footer>

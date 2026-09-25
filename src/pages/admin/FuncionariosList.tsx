@@ -144,8 +144,8 @@ export default function FuncionariosList() {
         )
       case 'em_ferias':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#2563EB] border border-blue-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#2563EB] mr-1.5" />
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-900 border border-purple-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-600 mr-1.5" />
             Em Férias
           </span>
         )
@@ -173,22 +173,21 @@ export default function FuncionariosList() {
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">Funcionários</h2>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-[#2563EB] border border-blue-200">
-                {totalAtivos} ativos
-              </span>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
+                {stats.ativos} ativos
+              </span>{' '}
             </div>
             <p className="text-xs text-slate-500 mt-1">
               Gerencie cadastros, informações contratuais e dados dos colaboradores
             </p>
           </div>
-
           <Button
             onClick={() => navigate('/admin/funcionarios/novo')}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm h-10 px-4 shadow-sm shrink-0"
+            className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-4 shadow-sm shrink-0 border-0 hover:brightness-110"
           >
-            <UserPlus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 mr-1.5" />
             Novo Funcionário
-          </Button>
+          </Button>{' '}
         </div>
 
         {/* Filters and Search Bar */}
@@ -218,7 +217,7 @@ export default function FuncionariosList() {
                 Filtros
               </span>
               {(selectedSituacao !== 'todos' || selectedDepartamento !== 'todos') && (
-                <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
+                <span className="w-2 h-2 rounded-full bg-[#D4AF37]" />
               )}
             </Button>
           </div>
@@ -293,7 +292,7 @@ export default function FuncionariosList() {
             {funcionarios.length === 0 ? (
               <Button
                 onClick={() => navigate('/admin/funcionarios/novo')}
-                className="mt-5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-semibold h-10 px-4"
+                className="mt-5 bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-10 px-4 border-0 hover:brightness-110"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Cadastrar o primeiro funcionário
@@ -349,7 +348,7 @@ export default function FuncionariosList() {
                                 className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
                               />
                             ) : (
-                              <div className="w-9 h-9 rounded-full bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center font-bold text-xs shrink-0">
+                              <div className="w-9 h-9 rounded-full bg-[#D4AF37]/20 text-amber-900 border border-[#D4AF37]/30 flex items-center justify-center font-bold text-xs shrink-0">
                                 {initial}
                               </div>
                             )}
@@ -377,7 +376,7 @@ export default function FuncionariosList() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 px-2.5 text-xs border-slate-200 text-slate-700 hover:text-[#2563EB] hover:bg-blue-50"
+                              className="h-8 px-2.5 text-xs border-slate-200 text-slate-700 hover:text-[#D4AF37] hover:bg-amber-50"
                             >
                               <Eye className="w-3.5 h-3.5 mr-1" />
                               Ver ficha
@@ -399,7 +398,7 @@ export default function FuncionariosList() {
                   <div key={func.id} className="p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center font-bold text-xs shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-[#D4AF37]/20 text-amber-900 border border-[#D4AF37]/30 flex items-center justify-center font-bold text-xs shrink-0">
                           {initial}
                         </div>
                         <div>

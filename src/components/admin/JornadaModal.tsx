@@ -178,7 +178,7 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#2563EB] flex items-center justify-center mb-1">
+          <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center mb-1">
             <Clock className="w-5 h-5" />
           </div>
           <DialogTitle>{jornada ? 'Editar Jornada' : 'Nova Jornada de Trabalho'}</DialogTitle>
@@ -231,7 +231,7 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
           <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800">Horários Previstos (24h)</span>
-              <span className="text-xs font-mono font-semibold text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+              <span className="text-xs font-mono font-semibold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-300">
                 Líquido: {minutesToHoursText(duracaoMin)} ({duracaoMin} min)
               </span>
             </div>
@@ -321,7 +321,7 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                     onClick={() => toggleDiaTrabalho(dia.id)}
                     className={`py-2 text-xs font-bold rounded-lg border transition-all ${
                       ativo
-                        ? 'bg-[#2563EB] text-white border-[#2563EB] shadow-xs'
+                        ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA820A] text-slate-950 font-bold border-[#D4AF37] shadow-xs'
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
@@ -346,11 +346,11 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
             </Button>
             <Button
               type="submit"
-              disabled={saving}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+              disabled={salvando}
+              className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0"
             >
-              {saving ? 'Salvando...' : 'Salvar Jornada'}
-            </Button>
+              {salvando ? 'Salvando...' : jornada ? 'Salvar Alterações' : 'Cadastrar Jornada'}
+            </Button>{' '}
           </DialogFooter>
         </form>
       </DialogContent>

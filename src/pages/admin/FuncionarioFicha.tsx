@@ -318,8 +318,8 @@ export default function FuncionarioFicha() {
 
   if (loading || !funcionario) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -347,8 +347,8 @@ export default function FuncionarioFicha() {
         )
       case 'em_ferias':
         return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-[#2563EB] border border-blue-200">
-            <span className="w-2 h-2 rounded-full bg-[#2563EB] mr-2" />
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-900 border border-purple-300">
+            <span className="w-2 h-2 rounded-full bg-purple-600 mr-2" />
             Em Férias
           </span>
         )
@@ -388,7 +388,7 @@ export default function FuncionarioFicha() {
                   className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-xs shrink-0"
                 />
               ) : (
-                <div className="w-16 h-16 rounded-2xl bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center font-bold text-2xl shrink-0">
+                <div className="w-16 h-16 rounded-2xl bg-[#D4AF37]/20 text-amber-900 border border-[#D4AF37]/30 flex items-center justify-center font-bold text-2xl shrink-0">
                   {initial}
                 </div>
               )}
@@ -418,7 +418,7 @@ export default function FuncionarioFicha() {
             <Link to={`/admin/funcionarios/${funcionario.id}/editar`}>
               <Button
                 variant="outline"
-                className="h-9 text-xs sm:text-sm border-slate-200 text-slate-700 hover:text-[#2563EB]"
+                className="h-9 text-xs sm:text-sm border-slate-200 text-slate-700 hover:text-[#D4AF37]"
               >
                 <Edit3 className="w-4 h-4 mr-1.5" />
                 Editar
@@ -455,11 +455,11 @@ export default function FuncionarioFicha() {
             onClick={() => setActiveTab('pessoais')}
             className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'pessoais'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <User className="w-4 h-4" />
+            <User className="w-4 h-4 text-[#D4AF37]" />
             Dados Pessoais
           </button>
 
@@ -467,11 +467,11 @@ export default function FuncionarioFicha() {
             onClick={() => setActiveTab('profissionais')}
             className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'profissionais'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Briefcase className="w-4 h-4" />
+            <Briefcase className="w-4 h-4 text-[#D4AF37]" />
             Dados Profissionais
           </button>
 
@@ -479,11 +479,11 @@ export default function FuncionarioFicha() {
             onClick={() => setActiveTab('jornada')}
             className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'jornada'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Clock className="w-4 h-4" />
+            <Clock className="w-4 h-4 text-[#D4AF37]" />
             Jornada & Escala
           </button>
 
@@ -491,11 +491,11 @@ export default function FuncionarioFicha() {
             onClick={() => setActiveTab('banco_horas')}
             className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'banco_horas'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <History className="w-4 h-4" />
+            <History className="w-4 h-4 text-[#D4AF37]" />
             Banco de Horas
           </button>
 
@@ -504,11 +504,11 @@ export default function FuncionarioFicha() {
               onClick={() => setActiveTab('contratuais')}
               className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === 'contratuais'
-                  ? 'border-[#2563EB] text-[#2563EB]'
+                  ? 'border-[#D4AF37] text-amber-900 font-bold'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
-              <FileCheck2 className="w-4 h-4" />
+              <FileCheck2 className="w-4 h-4 text-[#D4AF37]" />
               Dados Contratuais
             </button>
           )}
@@ -517,11 +517,11 @@ export default function FuncionarioFicha() {
             onClick={() => setActiveTab('documentos')}
             className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'documentos'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <FolderOpen className="w-4 h-4" />
+            <FolderOpen className="w-4 h-4 text-[#D4AF37]" />
             Documentos
           </button>
 
@@ -529,11 +529,11 @@ export default function FuncionarioFicha() {
             onClick={() => setActiveTab('ferias')}
             className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'ferias'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <CalendarDays className="w-4 h-4" />
+            <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
             Férias e Ausências
           </button>
 
@@ -541,11 +541,11 @@ export default function FuncionarioFicha() {
             onClick={() => setActiveTab('historico')}
             className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
               activeTab === 'historico'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <History className="w-4 h-4" />
+            <History className="w-4 h-4 text-[#D4AF37]" />
             Histórico
           </button>
         </div>
@@ -685,7 +685,7 @@ export default function FuncionarioFicha() {
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 col-span-1 md:col-span-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+                      <div className="w-9 h-9 rounded-lg bg-[#D4AF37]/20 text-[#D4AF37] flex items-center justify-center shrink-0">
                         <KeyRound className="w-5 h-5" />
                       </div>
                       <div>
@@ -835,7 +835,7 @@ export default function FuncionarioFicha() {
                       setDataInicioJornada(new Date().toISOString().split('T')[0])
                       setTrocaJornadaModalOpen(true)
                     }}
-                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-9 px-3.5 shadow-xs"
+                    className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-9 px-3.5 shadow-xs border-0 hover:brightness-110"
                   >
                     <Clock className="w-3.5 h-3.5 mr-1.5" />
                     Alterar Jornada (Vigência)
@@ -854,7 +854,7 @@ export default function FuncionarioFicha() {
                       {(funcionario.expand.jornada_atual.dias_trabalho || []).map((d) => (
                         <span
                           key={d}
-                          className="bg-blue-50 text-[#2563EB] text-xs font-bold uppercase px-2 py-0.5 rounded"
+                          className="bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold uppercase px-2 py-0.5 rounded"
                         >
                           {d}
                         </span>
@@ -1006,7 +1006,7 @@ export default function FuncionarioFicha() {
                     setBhTipo('credito')
                     setBhModalOpen(true)
                   }}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-9 px-3.5 shadow-xs"
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-9 px-3.5 shadow-xs border-0 hover:brightness-110"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1.5" />
                   Novo Lançamento
@@ -1076,7 +1076,7 @@ export default function FuncionarioFicha() {
           {isAdmin && activeTab === 'contratuais' && (
             <div className="space-y-6">
               <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-xl flex items-start gap-3 text-xs text-blue-900">
-                <ShieldCheck className="w-5 h-5 text-[#2563EB] shrink-0 mt-0.5" />
+                <ShieldCheck className="w-5 h-5 text-[#D4AF37] shrink-0 mt-0.5" />
                 <p>
                   Estes dados são protegidos por regras de controle de acesso (RLS) no backend e
                   visíveis exclusivamente para administradores.
@@ -1121,7 +1121,7 @@ export default function FuncionarioFicha() {
                   <Button
                     size="sm"
                     onClick={() => setAltSalarialModalOpen(true)}
-                    className="bg-[#2563EB] text-white text-xs h-8 px-3"
+                    className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-8 px-3 border-0 hover:brightness-110"
                   >
                     <Plus className="w-3.5 h-3.5 mr-1" />
                     Registrar alteração salarial
@@ -1188,7 +1188,7 @@ export default function FuncionarioFicha() {
                       setDocArquivo(null)
                       setUploadDocModalOpen(true)
                     }}
-                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-9 font-semibold shadow-xs"
+                    className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-9 shadow-xs border-0 hover:brightness-110"
                   >
                     <Plus className="w-3.5 h-3.5 mr-1.5" />
                     Novo Documento
@@ -1210,7 +1210,7 @@ export default function FuncionarioFicha() {
                   <Button
                     onClick={() => setUploadDocModalOpen(true)}
                     size="sm"
-                    className="mt-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-8"
+                    className="mt-4 bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-8 border-0 hover:brightness-110"
                   >
                     <Plus className="w-3.5 h-3.5 mr-1" />
                     Fazer Upload Agora
@@ -1298,7 +1298,7 @@ export default function FuncionarioFicha() {
                                     })
                                   }
                                 }}
-                                className="h-7 text-xs text-[#2563EB] hover:bg-blue-50"
+                                className="h-7 text-xs text-[#D4AF37] hover:bg-amber-50"
                               >
                                 Baixar
                               </Button>
@@ -1324,7 +1324,7 @@ export default function FuncionarioFicha() {
                   </span>
                   <p className="text-sm font-bold text-slate-800 mt-0.5">
                     Admissão: {formatBRDate(funcionario.data_admissao)} • Situação:{' '}
-                    <span className="capitalize font-semibold text-[#2563EB]">
+                    <span className="capitalize font-semibold text-amber-900">
                       {funcionario.situacao === 'em_ferias' ? 'Em Férias' : funcionario.situacao}
                     </span>
                   </p>
@@ -1334,7 +1334,7 @@ export default function FuncionarioFicha() {
                   <Link to={`/admin/ferias?funcionarioId=${funcionario.id}`}>
                     <Button
                       variant="outline"
-                      className="text-xs h-8 border-slate-200 text-[#2563EB] hover:bg-blue-50"
+                      className="text-xs h-8 border-slate-200 text-[#D4AF37] hover:bg-amber-50"
                     >
                       <CalendarDays className="w-3.5 h-3.5 mr-1" />
                       Ver Períodos Aquisitivos & Gozos
@@ -1357,15 +1357,15 @@ export default function FuncionarioFicha() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-[#2563EB]" />
+                    <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
                     Histórico Completo de Férias
                   </h4>
                   <Link to={`/admin/ferias?funcionarioId=${funcionario.id}`}>
                     <Button
                       size="sm"
-                      className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-7 px-2.5"
+                      className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-7 px-2.5 border-0 hover:brightness-110"
                     >
-                      <Plus className="w-3 h-3 mr-1" />
+                      <Plus className="w-3.5 h-3.5 mr-1" />
                       Programar Férias
                     </Button>
                   </Link>
@@ -1439,7 +1439,7 @@ export default function FuncionarioFicha() {
                   <Link to={`/admin/ausencias?funcionarioId=${funcionario.id}`}>
                     <Button
                       size="sm"
-                      className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-7 px-2.5"
+                      className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-7 px-2.5 border-0 hover:brightness-110"
                     >
                       <Plus className="w-3 h-3 mr-1" />
                       Nova Ausência
@@ -1621,9 +1621,9 @@ export default function FuncionarioFicha() {
       <Dialog open={uploadDocModalOpen} onOpenChange={setUploadDocModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2563EB] flex items-center justify-center mb-2">
-              <FolderOpen className="w-5 h-5" />
-            </div>
+            <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 text-[#D4AF37] flex items-center justify-center mb-2">
+              <Calendar className="w-5 h-5" />
+            </div>{' '}
             <DialogTitle>Anexar Documento ao Prontuário</DialogTitle>
             <DialogDescription>
               Vincule um novo arquivo ao funcionário <strong>{funcionario.nome}</strong>.
@@ -1787,10 +1787,10 @@ export default function FuncionarioFicha() {
               <Button
                 type="submit"
                 disabled={salvandoDoc || !docNome || !docArquivo}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
-                {salvandoDoc ? 'Salvando...' : 'Salvar Documento'}
-              </Button>
+                {salvandoPin ? 'Salvando...' : 'Salvar Novo PIN'}
+              </Button>{' '}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1800,7 +1800,7 @@ export default function FuncionarioFicha() {
       <Dialog open={pinModalOpen} onOpenChange={setPinModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2563EB] flex items-center justify-center mb-2">
+            <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 text-[#D4AF37] flex items-center justify-center mb-2">
               <KeyRound className="w-5 h-5" />
             </div>
             <DialogTitle>PIN do Terminal Coletivo</DialogTitle>
@@ -1867,10 +1867,10 @@ export default function FuncionarioFicha() {
               <Button
                 type="submit"
                 disabled={salvandoPin || !novoPin || !confirmaPin}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
-                {salvandoPin ? 'Gravando PIN...' : 'Salvar PIN'}
-              </Button>
+                {salvandoDoc ? 'Enviando...' : 'Fazer Upload'}
+              </Button>{' '}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -1985,10 +1985,10 @@ export default function FuncionarioFicha() {
               <Button
                 type="submit"
                 disabled={salvandoJornada || !novaJornadaId}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
-                {salvandoJornada ? 'Salvando...' : 'Confirmar Alteração'}
-              </Button>
+                {salvandoJornada ? 'Vinculando...' : 'Confirmar Vinculação'}
+              </Button>{' '}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -2119,10 +2119,10 @@ export default function FuncionarioFicha() {
               <Button
                 type="submit"
                 disabled={salvandoBh || !bhMotivo.trim()}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
-                {salvandoBh ? 'Gravando...' : 'Salvar Lançamento'}
-              </Button>
+                {salvandoBanco ? 'Lançando...' : 'Confirmar Lançamento'}
+              </Button>{' '}
             </DialogFooter>
           </form>
         </DialogContent>
@@ -2194,10 +2194,10 @@ export default function FuncionarioFicha() {
               <Button
                 type="submit"
                 disabled={salvandoSalario}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
-                {salvandoSalario ? 'Salvando...' : 'Salvar Alteração'}
-              </Button>
+                {salvandoFerias ? 'Salvando...' : 'Confirmar Férias'}
+              </Button>{' '}
             </DialogFooter>
           </form>
         </DialogContent>

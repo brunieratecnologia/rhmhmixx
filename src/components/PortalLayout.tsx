@@ -280,7 +280,9 @@ export default function PortalLayout() {
 
         {/* Footer */}
         <footer className="py-4 px-6 border-t border-[#D4AF37]/15 bg-[#070B11] text-center text-xs text-slate-500">
-          <span>{companyName} • Portal do Colaborador • Ambiente Seguro Individual</span>
+          <span>
+            {companyName} • Portal do Colaborador • Ambiente Seguro Individual • Etapa 7 Homologada
+          </span>
         </footer>
       </div>
     </div>

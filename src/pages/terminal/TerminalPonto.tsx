@@ -317,21 +317,21 @@ export default function TerminalPonto() {
                   <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                     Horário Oficial (SP)
                   </span>
-                  <span className="text-lg sm:text-xl font-extrabold font-mono text-[#2563EB] mt-1 block">
+                  <span className="text-lg sm:text-xl font-extrabold font-mono text-[#D4AF37] mt-1 block">
                     {confirmation.horario_formatado || `${hours}:${minutes}:${seconds}`}
                   </span>
                 </div>
               </div>
 
               {/* Identificador Único */}
-              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-left">
-                <div className="flex items-center justify-between text-xs text-[#1E3A8A] font-semibold">
+              <div className="p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl text-left">
+                <div className="flex items-center justify-between text-xs text-amber-200 font-semibold">
                   <span>Identificador Único:</span>
-                  <span className="font-mono text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-blue-200">
+                  <span className="font-mono text-[11px] text-slate-200 bg-black/40 px-2 py-0.5 rounded border border-[#D4AF37]/30">
                     {confirmation.identificador || 'N/A'}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">
+                <div className="text-[11px] text-slate-400 mt-1">
                   Fuso horário oficial: {confirmation.fuso_horario || 'America/Sao_Paulo'} (UTC:{' '}
                   {confirmation.timestamp_utc?.slice(11, 19)})
                 </div>
@@ -339,15 +339,15 @@ export default function TerminalPonto() {
 
               {/* Automatic Countdown return */}
               <div className="pt-2 flex flex-col items-center gap-3">
-                <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-[#2563EB] animate-spin" />
+                <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[#D4AF37] animate-spin" />
                   Retornando à tela inicial em{' '}
-                  <span className="font-mono text-sm font-bold text-[#2563EB]">{countdown}s</span>
+                  <span className="font-mono text-sm font-bold text-[#D4AF37]">{countdown}s</span>
                 </p>
 
                 <Button
                   onClick={resetForm}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-sm px-6 h-10 shadow-sm"
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-sm px-6 h-10 shadow-sm border-0 hover:brightness-110"
                 >
                   Novo Registro Agora
                   <ArrowRight className="w-4 h-4 ml-1.5" />

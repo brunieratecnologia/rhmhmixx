@@ -358,8 +358,8 @@ export default function FuncionarioForm() {
 
   if (loadingInitial) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -391,7 +391,7 @@ export default function FuncionarioForm() {
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm h-10 px-4 shadow-sm"
+            className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-4 shadow-sm border-0 hover:brightness-110"
           >
             <Save className="w-4 h-4 mr-2" />
             {saving ? 'Salvando...' : 'Salvar Funcionário'}
@@ -408,11 +408,11 @@ export default function FuncionarioForm() {
             onClick={() => setActiveTab('pessoais')}
             className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors duration-150 ${
               activeTab === 'pessoais'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <User className="w-4 h-4" />
+            <User className="w-4 h-4 text-[#D4AF37]" />
             Dados Pessoais
           </button>
           <button
@@ -420,11 +420,11 @@ export default function FuncionarioForm() {
             onClick={() => setActiveTab('profissionais')}
             className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors duration-150 ${
               activeTab === 'profissionais'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Briefcase className="w-4 h-4" />
+            <Briefcase className="w-4 h-4 text-[#D4AF37]" />
             Dados Profissionais
           </button>
         </div>
@@ -617,7 +617,7 @@ export default function FuncionarioForm() {
                 <Button
                   type="button"
                   onClick={() => setActiveTab('profissionais')}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-semibold h-10 px-4"
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-10 px-4 border-0 hover:brightness-110"
                 >
                   Avançar para Dados Profissionais
                 </Button>
@@ -702,12 +702,12 @@ export default function FuncionarioForm() {
                     </Label>
                     <button
                       type="button"
-                      onClick={() => setNewCargoModal(true)}
-                      className="text-[11px] font-medium text-[#2563EB] hover:underline flex items-center"
+                      onClick={() => setCargoModalOpen(true)}
+                      className="text-[11px] font-bold text-[#D4AF37] hover:underline flex items-center"
                     >
                       <Plus className="w-3 h-3 mr-0.5" />
                       Novo cargo
-                    </button>
+                    </button>{' '}
                   </div>
                   <Select value={cargoId} onValueChange={(val) => setCargoId(val)}>
                     <SelectTrigger className="h-10 text-xs sm:text-sm border-slate-200">
@@ -737,12 +737,12 @@ export default function FuncionarioForm() {
                     </Label>
                     <button
                       type="button"
-                      onClick={() => setNewDepModal(true)}
-                      className="text-[11px] font-medium text-[#2563EB] hover:underline flex items-center"
+                      onClick={() => setDeptoModalOpen(true)}
+                      className="text-[11px] font-bold text-[#D4AF37] hover:underline flex items-center"
                     >
                       <Plus className="w-3 h-3 mr-0.5" />
-                      Novo departamento
-                    </button>
+                      Novo depto.
+                    </button>{' '}
                   </div>
                   <Select value={departamentoId} onValueChange={(val) => setDepartamentoId(val)}>
                     <SelectTrigger className="h-10 text-xs sm:text-sm border-slate-200">
@@ -767,9 +767,9 @@ export default function FuncionarioForm() {
 
               {/* PIN Inicial do Terminal (quando for novo funcionário) */}
               {!isEditing && (
-                <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-200 space-y-3">
+                <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200 space-y-3">
                   <div className="flex items-center gap-2">
-                    <KeyRound className="w-4 h-4 text-[#2563EB]" />
+                    <KeyRound className="w-4 h-4 text-[#D4AF37]" />
                     <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                       PIN do Terminal Coletivo (Opcional no cadastro)
                     </span>
@@ -916,15 +916,14 @@ export default function FuncionarioForm() {
                 >
                   Voltar para Dados Pessoais
                 </Button>
-
                 <Button
                   type="submit"
                   disabled={saving}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm h-10 px-5 shadow-sm"
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-5 shadow-sm border-0 hover:brightness-110"
                 >
-                  <Save className="w-4 h-4 mr-2" />
-                  {saving ? 'Salvando...' : 'Salvar Funcionário'}
-                </Button>
+                  <Save className="w-4 h-4 mr-1.5" />
+                  {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Cadastrar Funcionário'}
+                </Button>{' '}
               </div>
             </div>
           )}
@@ -936,7 +935,7 @@ export default function FuncionarioForm() {
         <Button
           onClick={handleSubmit}
           disabled={saving}
-          className="w-full bg-[#2563EB] text-white font-semibold h-11"
+          className="w-full bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold h-11 border-0 hover:brightness-110"
         >
           <Save className="w-4 h-4 mr-2" />
           {saving ? 'Salvando...' : 'Salvar Funcionário'}
@@ -967,7 +966,10 @@ export default function FuncionarioForm() {
               <Button type="button" variant="outline" onClick={() => setNewCargoModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-[#2563EB] text-white">
+              <Button
+                type="submit"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
+              >
                 Cadastrar Cargo
               </Button>
             </DialogFooter>
@@ -999,7 +1001,10 @@ export default function FuncionarioForm() {
               <Button type="button" variant="outline" onClick={() => setNewDepModal(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="bg-[#2563EB] text-white">
+              <Button
+                type="submit"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
+              >
                 Cadastrar Departamento
               </Button>
             </DialogFooter>

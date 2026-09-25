@@ -327,37 +327,35 @@ export default function Configuracoes() {
             onClick={() => setActiveTab('empresa')}
             className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
               activeTab === 'empresa'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Building2 className="w-4 h-4" />
-            Empresa
+            <Building2 className="w-4 h-4 mr-2 text-[#D4AF37]" />
+            Dados da Empresa
           </button>
-
-          <button
-            onClick={() => setActiveTab('usuarios')}
-            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'usuarios'
-                ? 'border-[#2563EB] text-[#2563EB]'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Usuários Administrativos
-          </button>
-
           <button
             onClick={() => setActiveTab('jornadas')}
-            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
               activeTab === 'jornadas'
-                ? 'border-[#2563EB] text-[#2563EB]'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Clock className="w-4 h-4" />
-            Jornadas Padrão & Flexíveis
+            <Clock className="w-4 h-4 mr-2 text-[#D4AF37]" />
+            Jornadas de Trabalho
           </button>
+          <button
+            onClick={() => setActiveTab('usuarios')}
+            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+              activeTab === 'usuarios'
+                ? 'border-[#D4AF37] text-amber-900 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Users className="w-4 h-4 mr-2 text-[#D4AF37]" />
+            Acessos Administrativos
+          </button>{' '}
         </div>
 
         {/* TAB 1: EMPRESA */}
@@ -535,7 +533,7 @@ export default function Configuracoes() {
               <Button
                 type="submit"
                 disabled={savingEmpresa}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-xs sm:text-sm h-10 px-5 shadow-sm"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-5 shadow-sm border-0 hover:brightness-110"
               >
                 <Save className="w-4 h-4 mr-2" />
                 {savingEmpresa ? 'Salvando...' : 'Salvar Alterações'}
@@ -557,17 +555,16 @@ export default function Configuracoes() {
                   individualizadas
                 </p>
               </div>
-
               <Button
                 onClick={() => {
                   setEditingJornada(null)
                   setJornadaModalOpen(true)
                 }}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs sm:text-sm font-semibold h-9 px-3.5 shadow-sm"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-9 px-3.5 shadow-sm border-0 hover:brightness-110"
               >
-                <Plus className="w-4 h-4 mr-1.5" />
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
                 Nova Jornada
-              </Button>
+              </Button>{' '}
             </div>
 
             {jornadasList.length === 0 ? (
@@ -602,7 +599,7 @@ export default function Configuracoes() {
                               </span>
                             )}
                             {j.tipo_escala && j.tipo_escala !== 'semanal_fixa' && (
-                              <span className="text-[10px] bg-blue-50 text-[#2563EB] border border-blue-200 px-2 py-0.5 rounded-full font-medium capitalize">
+                              <span className="text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-medium capitalize">
                                 {j.tipo_escala.replace('_', ' ')}
                               </span>
                             )}
@@ -640,7 +637,7 @@ export default function Configuracoes() {
                                 setEditingJornada(j)
                                 setJornadaModalOpen(true)
                               }}
-                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#2563EB]"
+                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#D4AF37]"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </Button>
@@ -676,14 +673,13 @@ export default function Configuracoes() {
                   Usuários com privilégio de acesso total ao painel administrativo
                 </p>
               </div>
-
               <Button
                 onClick={handleOpenNewUser}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs sm:text-sm font-semibold h-9 px-3.5 shadow-sm"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-9 px-3.5 shadow-sm border-0 hover:brightness-110"
               >
-                <UserPlus className="w-4 h-4 mr-1.5" />
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
                 Novo Usuário
-              </Button>
+              </Button>{' '}
             </div>
 
             {/* Table */}
@@ -705,7 +701,7 @@ export default function Configuracoes() {
                         <td className="py-3 px-4 font-semibold text-slate-900">
                           {u.name || u.nome}
                           {isCurrent && (
-                            <span className="ml-2 text-[10px] font-normal bg-blue-100 text-[#2563EB] px-2 py-0.5 rounded-full">
+                            <span className="ml-2 text-[10px] font-bold bg-[#D4AF37]/20 text-amber-900 border border-[#D4AF37]/40 px-2 py-0.5 rounded-full">
                               Você
                             </span>
                           )}
@@ -724,7 +720,7 @@ export default function Configuracoes() {
                               size="sm"
                               onClick={() => handleResetPassword(u)}
                               title="Redefinir Senha"
-                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#2563EB]"
+                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#D4AF37]"
                             >
                               <KeyRound className="w-3.5 h-3.5" />
                             </Button>
@@ -735,7 +731,7 @@ export default function Configuracoes() {
                               size="sm"
                               onClick={() => handleOpenEditUser(u)}
                               title="Editar"
-                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#2563EB]"
+                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#D4AF37]"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </Button>
@@ -940,7 +936,7 @@ export default function Configuracoes() {
               <Button
                 type="submit"
                 disabled={savingUser}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
                 {savingUser ? 'Salvando...' : 'Salvar Usuário'}
               </Button>

@@ -185,18 +185,25 @@ export interface Ferias {
   data_inicio: string
   data_fim: string
   dias?: number
+  dias_abono?: number
   tipo?: 'integral' | 'fracionada'
-  status: 'solicitado' | 'aprovado' | 'concluido'
+  status: 'programada' | 'em_gozo' | 'concluida' | 'cancelada' | 'solicitado' | 'aprovado'
   periodo_aquisitivo_inicio?: string
   periodo_aquisitivo_fim?: string
   periodo_concessivo_fim?: string
   saldo_dias?: number
   dias_usufruidos?: number
   solicitado_por?: string
+  usuario_responsavel?: string
+  observacoes?: string
+  justificativa_rh?: string
+  faltas_injustificadas_periodo?: number
   created: string
   updated: string
   expand?: {
     funcionario?: Funcionario
+    usuario_responsavel?: User
+    solicitado_por?: User
   }
 }
 
@@ -210,14 +217,20 @@ export interface Ausencia {
     | 'afastamento'
     | 'licenca'
     | 'folga_compensatoria'
+  situacao?: 'informada' | 'justificada' | 'abonada' | 'nao_justificada'
   data_inicio: string
   data_fim?: string
   justificativa?: string
   documentos?: string
+  usuario_responsavel?: string
+  impacta_aquisitivo?: boolean
+  observacoes?: string
   created: string
   updated: string
   expand?: {
     funcionario?: Funcionario
+    documentos?: Documento
+    usuario_responsavel?: User
   }
 }
 

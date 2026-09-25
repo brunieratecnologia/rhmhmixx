@@ -467,6 +467,8 @@ export function construirEspelhoMensal(params: {
     if (ausenciaMatch) {
       totalOcorrencias++
       const ehAtestado = ausenciaMatch.categoria === 'atestado'
+      const ehAbonada = ausenciaMatch.situacao === 'abonada'
+      const ehJustificada = ausenciaMatch.situacao === 'justificada' || ehAtestado
       if (ehAtestado) {
         totalAtestados++
       }
@@ -474,9 +476,9 @@ export function construirEspelhoMensal(params: {
       const docExpand = (ausenciaMatch as any).expand?.documentos
       ocorrencias.push({
         tipo: ehAtestado ? 'atestado' : 'ausencia',
-        descricao: `${ehAtestado ? 'Atestado médico' : 'Ausência'}: ${ausenciaMatch.justificativa || ausenciaMatch.categoria}`,
-        severidade: ehAtestado ? 'baixo' : 'atencao',
-        justificado: true,
+        descricao: `${ehAtestado ? 'Atestado médico' : `Ausência (${ausenciaMatch.categoria.replace('_', ' ')})`}: ${ausenciaMatch.justificativa || 'Registrada'}`,
+        severidade: ehAbonada || ehAtestado ? 'baixo' : ehJustificada ? 'atencao' : 'alerta',
+        justificado: ehJustificada || ehAbonada,
         atestadoId: docExpand?.id,
         atestadoNome: docExpand?.nome,
         atestadoArquivo: docExpand?.arquivo,

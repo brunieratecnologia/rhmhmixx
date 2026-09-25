@@ -178,20 +178,20 @@ export default function Dashboard() {
 
           <Button
             variant="outline"
-            onClick={() => navigate('/admin/funcionarios')}
+            onClick={() => navigate('/admin/ferias')}
             className="h-9 px-3 border-slate-200 text-slate-700 hover:bg-slate-50 text-xs sm:text-sm font-medium"
           >
             <Calendar className="w-4 h-4 mr-1.5 text-slate-500" />
-            Cadastrar Férias
+            Gestão de Férias
           </Button>
 
           <Button
             variant="outline"
-            onClick={() => navigate('/admin/funcionarios')}
+            onClick={() => navigate('/admin/ausencias')}
             className="h-9 px-3 border-slate-200 text-slate-700 hover:bg-slate-50 text-xs sm:text-sm font-medium"
           >
-            <Upload className="w-4 h-4 mr-1.5 text-slate-500" />
-            Enviar Holerites
+            <Clock className="w-4 h-4 mr-1.5 text-slate-500" />
+            Registrar Ausência
           </Button>
         </div>
       </div>

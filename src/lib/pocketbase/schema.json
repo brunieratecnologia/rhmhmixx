@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-25T00:58:05.811Z",
+  "generatedAt": "2026-09-25T01:12:43.280Z",
   "collections": [
     {
       "name": "users",
@@ -695,11 +695,11 @@
       "name": "ferias",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },
       "fields": [
         {
@@ -739,7 +739,14 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["solicitado", "aprovado", "concluido"]
+          "selectValues": [
+            "programada",
+            "em_gozo",
+            "concluida",
+            "cancelada",
+            "solicitado",
+            "aprovado"
+          ]
         },
         {
           "name": "periodo_aquisitivo_inicio",
@@ -791,6 +798,37 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "dias_abono",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "justificativa_rh",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "faltas_injustificadas_periodo",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "usuario_responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
       "indexes": [
@@ -901,11 +939,11 @@
       "name": "ausencias",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },
       "fields": [
         {
@@ -967,6 +1005,32 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "situacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["informada", "justificada", "abonada", "nao_justificada"]
+        },
+        {
+          "name": "usuario_responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "impacta_aquisitivo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

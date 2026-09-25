@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { funcionariosService, historicoService, historicoJornadasService } from '@/services/rh'
+import {
+  funcionariosService,
+  historicoService,
+  historicoJornadasService,
+  feriasService,
+  ausenciasService,
+} from '@/services/rh'
 import type {
   Funcionario,
   HistoricoFuncionario,
@@ -34,6 +40,7 @@ import {
   KeyRound,
   Lock,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { terminalService, jornadasService, bancoHorasService } from '@/services/rh'
 import type { Jornada, BancoHorasLancamento } from '@/types/rh'
 import { minutesToHoursText } from '@/lib/calculoHoras'
@@ -149,22 +156,13 @@ export default function FuncionarioFicha() {
       setBancoHorasLancamentos(bhList)
       setBancoHorasSaldo(bhSaldo)
 
-      // Load Ferias and Ausencias if any
+      // Load Ferias and Ausencias with expand
       try {
-        const ferRes = await pb.collection('ferias').getFullList<Ferias>({
-          filter: `funcionario = "${id}"`,
-          sort: '-data_inicio',
-        })
+        const [ferRes, ausRes] = await Promise.all([
+          feriasService.listByFuncionario(id),
+          ausenciasService.listByFuncionario(id),
+        ])
         setFeriasList(ferRes)
-      } catch {
-        /* intentionally ignored */
-      }
-
-      try {
-        const ausRes = await pb.collection('ausencias').getFullList<Ausencia>({
-          filter: `funcionario = "${id}"`,
-          sort: '-data_inicio',
-        })
         setAusenciasList(ausRes)
       } catch {
         /* intentionally ignored */
@@ -1136,49 +1134,140 @@ export default function FuncionarioFicha() {
             </div>
           )}
 
-          {/* TAB: FÉRIAS E AUSÊNCIAS */}
+          {/* TAB: FÉRIAS E AUSÊNCIAS (COMPLETO ETAPA 4) */}
           {activeTab === 'ferias' && (
             <div className="space-y-8">
+              {/* Ações e Atalhos */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500 uppercase block">
+                    Gestão Integrada de Férias e Ausências
+                  </span>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">
+                    Admissão: {formatBRDate(funcionario.data_admissao)} • Situação:{' '}
+                    <span className="capitalize font-semibold text-[#2563EB]">
+                      {funcionario.situacao === 'em_ferias' ? 'Em Férias' : funcionario.situacao}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link to={`/admin/ferias?funcionarioId=${funcionario.id}`}>
+                    <Button
+                      variant="outline"
+                      className="text-xs h-8 border-slate-200 text-[#2563EB] hover:bg-blue-50"
+                    >
+                      <CalendarDays className="w-3.5 h-3.5 mr-1" />
+                      Ver Períodos Aquisitivos & Gozos
+                    </Button>
+                  </Link>
+
+                  <Link to={`/admin/ausencias?funcionarioId=${funcionario.id}`}>
+                    <Button
+                      variant="outline"
+                      className="text-xs h-8 border-slate-200 text-slate-700 hover:bg-slate-100"
+                    >
+                      <Clock className="w-3.5 h-3.5 mr-1" />
+                      Filtrar Ausências
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
               {/* Seção Férias */}
               <div>
-                <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-slate-500" />
-                  Períodos de Férias
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-[#2563EB]" />
+                    Histórico Completo de Férias
+                  </h4>
+                  <Link to={`/admin/ferias?funcionarioId=${funcionario.id}`}>
+                    <Button
+                      size="sm"
+                      className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-7 px-2.5"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Programar Férias
+                    </Button>
+                  </Link>
+                </div>
+
                 {feriasList.length === 0 ? (
                   <div className="py-8 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
                     <p className="text-xs text-slate-500">Nenhum período de férias cadastrado.</p>
                   </div>
                 ) : (
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 font-semibold">
-                        <th className="py-2">Início</th>
-                        <th className="py-2">Fim</th>
-                        <th className="py-2">Dias</th>
-                        <th className="py-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {feriasList.map((f) => (
-                        <tr key={f.id}>
-                          <td className="py-2.5 font-medium">{formatBRDate(f.data_inicio)}</td>
-                          <td className="py-2.5">{formatBRDate(f.data_fim)}</td>
-                          <td className="py-2.5">{f.dias || '-'}</td>
-                          <td className="py-2.5 capitalize">{f.status}</td>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                          <th className="py-2.5 px-3">Período de Gozo</th>
+                          <th className="py-2.5 px-3 text-center">Dias Gozo</th>
+                          <th className="py-2.5 px-3 text-center">Dias Abono</th>
+                          <th className="py-2.5 px-3">Tipo</th>
+                          <th className="py-2.5 px-3">Situação</th>
+                          <th className="py-2.5 px-3">Observações</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {feriasList.map((f) => (
+                          <tr key={f.id} className="hover:bg-slate-50/60">
+                            <td className="py-2.5 px-3 font-mono font-medium text-slate-800">
+                              {formatBRDate(f.data_inicio)} a {formatBRDate(f.data_fim)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                              {f.dias} dias
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-600">
+                              {f.dias_abono ? `${f.dias_abono}d` : '—'}
+                            </td>
+                            <td className="py-2.5 px-3 capitalize text-slate-700">
+                              {f.tipo || 'integral'}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <Badge
+                                className={
+                                  f.status === 'em_gozo'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : f.status === 'concluida'
+                                      ? 'bg-slate-100 text-slate-700'
+                                      : f.status === 'programada' || f.status === 'aprovado'
+                                        ? 'bg-blue-100 text-[#1E3A8A]'
+                                        : 'bg-red-50 text-red-700'
+                                }
+                              >
+                                {f.status}
+                              </Badge>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-500 max-w-xs truncate">
+                              {f.observacoes || f.justificativa_rh || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
 
               {/* Seção Ausências */}
               <div className="pt-4 border-t border-slate-100">
-                <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-slate-500" />
-                  Registro de Ausências e Afastamentos
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-slate-500" />
+                    Registro de Ausências, Atestados e Afastamentos
+                  </h4>
+                  <Link to={`/admin/ausencias?funcionarioId=${funcionario.id}`}>
+                    <Button
+                      size="sm"
+                      className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-7 px-2.5"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Nova Ausência
+                    </Button>
+                  </Link>
+                </div>
+
                 {ausenciasList.length === 0 ? (
                   <div className="py-8 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
                     <p className="text-xs text-slate-500">
@@ -1186,31 +1275,55 @@ export default function FuncionarioFicha() {
                     </p>
                   </div>
                 ) : (
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 font-semibold">
-                        <th className="py-2">Categoria</th>
-                        <th className="py-2">Início</th>
-                        <th className="py-2">Fim</th>
-                        <th className="py-2">Justificativa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {ausenciasList.map((a) => (
-                        <tr key={a.id}>
-                          <td className="py-2.5 capitalize font-medium">{a.categoria}</td>
-                          <td className="py-2.5">{formatBRDate(a.data_inicio)}</td>
-                          <td className="py-2.5">{a.data_fim ? formatBRDate(a.data_fim) : '-'}</td>
-                          <td className="py-2.5 text-slate-600">{a.justificativa || '-'}</td>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                          <th className="py-2.5 px-3">Categoria</th>
+                          <th className="py-2.5 px-3">Período</th>
+                          <th className="py-2.5 px-3">Situação</th>
+                          <th className="py-2.5 px-3">Justificativa</th>
+                          <th className="py-2.5 px-3 text-center">Impacto CLT</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {ausenciasList.map((a) => (
+                          <tr key={a.id} className="hover:bg-slate-50/60">
+                            <td className="py-2.5 px-3 capitalize font-semibold text-slate-800">
+                              {a.categoria.replace('_', ' ')}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-slate-700">
+                              {formatBRDate(a.data_inicio)}
+                              {a.data_fim && a.data_fim !== a.data_inicio
+                                ? ` a ${formatBRDate(a.data_fim)}`
+                                : ''}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <Badge variant="outline" className="capitalize text-[11px]">
+                                {a.situacao || 'informada'}
+                              </Badge>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate">
+                              {a.justificativa || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {a.impacta_aquisitivo ? (
+                                <span className="text-red-600 font-semibold text-[11px]">
+                                  Desconta aquisitivo
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>
           )}
-
           {/* TAB: HISTÓRICO */}
           {activeTab === 'historico' && (
             <div className="space-y-4">

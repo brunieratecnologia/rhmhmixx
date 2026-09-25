@@ -8,6 +8,7 @@ import type {
   RegistroHorario,
   Ferias,
   Ausencia,
+  Documento,
   Solicitacao,
   HistoricoFuncionario,
   HistoricoJornada,
@@ -319,6 +320,245 @@ export const bancoHorasService = {
   },
 }
 
+export const feriasService = {
+  async list(page = 1, perPage = 50, filter = '', sort = '-data_inicio') {
+    return await pb.collection('ferias').getList<Ferias>(page, perPage, {
+      filter,
+      sort,
+      expand: 'funcionario,solicitado_por,usuario_responsavel',
+    })
+  },
+
+  async listAll(filter = '', sort = '-data_inicio') {
+    return await pb.collection('ferias').getFullList<Ferias>({
+      filter,
+      sort,
+      expand: 'funcionario,solicitado_por,usuario_responsavel',
+    })
+  },
+
+  async listByFuncionario(funcionarioId: string) {
+    return await pb.collection('ferias').getFullList<Ferias>({
+      filter: `funcionario = "${funcionarioId}"`,
+      sort: '-data_inicio',
+      expand: 'funcionario,solicitado_por,usuario_responsavel',
+    })
+  },
+
+  async getById(id: string) {
+    return await pb.collection('ferias').getOne<Ferias>(id, {
+      expand: 'funcionario,solicitado_por,usuario_responsavel',
+    })
+  },
+
+  async create(data: Partial<Ferias>) {
+    const record = await pb.collection('ferias').create<Ferias>(data)
+
+    // Verificar se o período de férias engloba o dia de hoje.
+    // Se for hoje e status = 'em_gozo' ou 'aprovado'/'programada', sincroniza situação do funcionário
+    await this.sincronizarSituacaoFuncionario(data.funcionario as string)
+
+    return record
+  },
+
+  async update(id: string, data: Partial<Ferias>) {
+    const record = await pb.collection('ferias').update<Ferias>(id, data)
+    const funcId = record.funcionario || (data.funcionario as string)
+    if (funcId) {
+      await this.sincronizarSituacaoFuncionario(funcId)
+    }
+    return record
+  },
+
+  async delete(id: string) {
+    const record = await pb.collection('ferias').getOne<Ferias>(id)
+    const res = await pb.collection('ferias').delete(id)
+    if (record.funcionario) {
+      await this.sincronizarSituacaoFuncionario(record.funcionario)
+    }
+    return res
+  },
+
+  async sincronizarSituacaoFuncionario(funcionarioId: string) {
+    try {
+      const hojeStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date())
+
+      // Buscar se há férias vigentes hoje
+      const feriasAtivas = await pb.collection('ferias').getList(1, 1, {
+        filter: `funcionario = "${funcionarioId}" && status != "cancelada" && data_inicio <= "${hojeStr}" && data_fim >= "${hojeStr}"`,
+      })
+
+      const func = await pb.collection('funcionarios').getOne<Funcionario>(funcionarioId)
+      if (func.situacao === 'desligado') return // não altera se já desligado
+
+      if (feriasAtivas.totalItems > 0) {
+        if (func.situacao !== 'em_ferias') {
+          await pb.collection('funcionarios').update(funcionarioId, {
+            situacao: 'em_ferias',
+          })
+        }
+      } else {
+        // Se estava marcado 'em_ferias' mas não há mais férias hoje, volta para 'ativo'
+        if (func.situacao === 'em_ferias') {
+          await pb.collection('funcionarios').update(funcionarioId, {
+            situacao: 'ativo',
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao sincronizar situação de férias do funcionário:', err)
+    }
+  },
+}
+
+export const ausenciasService = {
+  async list(page = 1, perPage = 50, filter = '', sort = '-data_inicio') {
+    return await pb.collection('ausencias').getList<Ausencia>(page, perPage, {
+      filter,
+      sort,
+      expand: 'funcionario,documentos,usuario_responsavel',
+    })
+  },
+
+  async listAll(filter = '', sort = '-data_inicio') {
+    return await pb.collection('ausencias').getFullList<Ausencia>({
+      filter,
+      sort,
+      expand: 'funcionario,documentos,usuario_responsavel',
+    })
+  },
+
+  async listByFuncionario(funcionarioId: string) {
+    return await pb.collection('ausencias').getFullList<Ausencia>({
+      filter: `funcionario = "${funcionarioId}"`,
+      sort: '-data_inicio',
+      expand: 'funcionario,documentos,usuario_responsavel',
+    })
+  },
+
+  async getById(id: string) {
+    return await pb.collection('ausencias').getOne<Ausencia>(id, {
+      expand: 'funcionario,documentos,usuario_responsavel',
+    })
+  },
+
+  async create(params: {
+    funcionario: string
+    categoria: Ausencia['categoria']
+    data_inicio: string
+    data_fim?: string
+    justificativa?: string
+    situacao?: Ausencia['situacao']
+    usuario_responsavel?: string
+    impacta_aquisitivo?: boolean
+    observacoes?: string
+    arquivo?: File | null
+  }) {
+    let documentoId: string | undefined = undefined
+
+    // Se houver arquivo anexo (ex: atestado médico ou comprovante de licença)
+    if (params.arquivo) {
+      const formData = new FormData()
+      formData.append('funcionario', params.funcionario)
+      formData.append(
+        'categoria',
+        params.categoria === 'atestado' ? 'atestado_medico' : 'comprovantes',
+      )
+      formData.append('nome', `Documento Ausência (${params.categoria}) - ${params.data_inicio}`)
+      formData.append('data_envio', new Date().toISOString())
+      formData.append('arquivo', params.arquivo)
+      formData.append(
+        'nivel_acesso',
+        params.categoria === 'atestado' ? 'restrito_medico' : 'restrito_rh',
+      )
+      formData.append('ativo', 'true')
+      if (params.usuario_responsavel) {
+        formData.append('usuario_responsavel', params.usuario_responsavel)
+      }
+
+      const doc = await pb.collection('documentos').create<Documento>(formData)
+      documentoId = doc.id
+    }
+
+    const payload: Partial<Ausencia> = {
+      funcionario: params.funcionario,
+      categoria: params.categoria,
+      situacao: params.situacao || 'informada',
+      data_inicio: params.data_inicio,
+      data_fim: params.data_fim || params.data_inicio,
+      justificativa: params.justificativa,
+      usuario_responsavel: params.usuario_responsavel,
+      impacta_aquisitivo: Boolean(params.impacta_aquisitivo),
+      observacoes: params.observacoes,
+      documentos: documentoId,
+    }
+
+    const ausencia = await pb.collection('ausencias').create<Ausencia>(payload)
+
+    // Se a categoria for 'afastamento', atualiza situação do funcionário
+    if (params.categoria === 'afastamento') {
+      try {
+        await pb.collection('funcionarios').update(params.funcionario, {
+          situacao: 'afastado',
+        })
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+
+    return ausencia
+  },
+
+  async update(
+    id: string,
+    data: Partial<Ausencia> & { arquivo?: File | null; adminUserId?: string },
+  ) {
+    let docId = data.documentos
+    if (data.arquivo && data.funcionario) {
+      const formData = new FormData()
+      formData.append('funcionario', data.funcionario)
+      formData.append(
+        'categoria',
+        data.categoria === 'atestado' ? 'atestado_medico' : 'comprovantes',
+      )
+      formData.append(
+        'nome',
+        `Documento Ausência (${data.categoria || 'anexo'}) - ${data.data_inicio || 'atualizacao'}`,
+      )
+      formData.append('data_envio', new Date().toISOString())
+      formData.append('arquivo', data.arquivo)
+      formData.append(
+        'nivel_acesso',
+        data.categoria === 'atestado' ? 'restrito_medico' : 'restrito_rh',
+      )
+      formData.append('ativo', 'true')
+      if (data.adminUserId) {
+        formData.append('usuario_responsavel', data.adminUserId)
+      }
+      const doc = await pb.collection('documentos').create<Documento>(formData)
+      docId = doc.id
+    }
+
+    const updatePayload: Partial<Ausencia> = { ...data }
+    delete (updatePayload as any).arquivo
+    delete (updatePayload as any).adminUserId
+    if (docId) {
+      updatePayload.documentos = docId
+    }
+
+    return await pb.collection('ausencias').update<Ausencia>(id, updatePayload)
+  },
+
+  async delete(id: string) {
+    return await pb.collection('ausencias').delete(id)
+  },
+}
+
 export const atestadosService = {
   async uploadAtestado(params: {
     funcionarioId: string
@@ -328,32 +568,18 @@ export const atestadosService = {
     arquivo: File
     adminUserId?: string
   }) {
-    // 1. Upload file into documentos collection as private atestado_medico
-    const formData = new FormData()
-    formData.append('funcionario', params.funcionarioId)
-    formData.append('categoria', 'atestado_medico')
-    formData.append('nome', `Atestado Médico - ${params.dataInicio}`)
-    formData.append('data_envio', new Date().toISOString())
-    formData.append('arquivo', params.arquivo)
-    formData.append('nivel_acesso', 'restrito_rh')
-    formData.append('ativo', 'true')
-    if (params.adminUserId) {
-      formData.append('usuario_responsavel', params.adminUserId)
-    }
-
-    const doc = await pb.collection('documentos').create(formData)
-
-    // 2. Link into ausencias collection
-    const ausencia = await pb.collection('ausencias').create({
+    // Reutiliza ausenciasService.create para centralizar armazenamento e garantir rastreabilidade
+    return await ausenciasService.create({
       funcionario: params.funcionarioId,
       categoria: 'atestado',
+      situacao: 'justificada',
       data_inicio: params.dataInicio,
       data_fim: params.dataFim || params.dataInicio,
       justificativa: params.justificativa,
-      documentos: doc.id,
+      arquivo: params.arquivo,
+      usuario_responsavel: params.adminUserId,
+      impacta_aquisitivo: false,
     })
-
-    return { doc, ausencia }
   },
 
   getFileUrl(
@@ -416,9 +642,9 @@ export const espelhoPontoService = {
       sort: 'data_inicio',
     })
 
-    // 6. Férias no Mês
+    // 6. Férias no Mês (aprovadas, programadas, em gozo ou concluídas)
     const ferias = await pb.collection('ferias').getFullList<Ferias>({
-      filter: `funcionario = "${funcionarioId}" && status = "aprovado" && (
+      filter: `funcionario = "${funcionarioId}" && status != "cancelada" && (
         (data_inicio <= "${endStr}" && data_fim >= "${startStr}")
       )`,
       sort: 'data_inicio',
@@ -617,18 +843,22 @@ export const dashboardService = {
     const todayStr = spNow
 
     // 3. Funcionários em Férias
-    // Vacation where status = 'aprovado' and data_inicio <= today <= data_fim
+    // Férias ativas hoje: status != 'cancelada' && data_inicio <= today <= data_fim
     const feriasAtivas = await pb.collection('ferias').getList(1, 1, {
-      filter: `status = "aprovado" && data_inicio <= "${todayStr}" && data_fim >= "${todayStr}"`,
+      filter: `status != "cancelada" && data_inicio <= "${todayStr}" && data_fim >= "${todayStr}"`,
     })
     const emFerias = feriasAtivas.totalItems
 
-    // 4. Ausências Informadas
-    // Absence where data_inicio <= today <= data_fim
-    const ausenciasAtivas = await pb.collection('ausencias').getList(1, 1, {
+    // 4. Ausências Informadas Hoje
+    // Ausências ativas hoje: data_inicio <= today <= data_fim
+    // Desconsiderando funcionários que estejam em folga da escala ou de férias
+    const ausenciasAtivas = await pb.collection('ausencias').getFullList<Ausencia>({
       filter: `data_inicio <= "${todayStr}" && (data_fim >= "${todayStr}" || data_fim = null || data_fim = "")`,
+      expand: 'funcionario',
     })
-    const ausenciasHoje = ausenciasAtivas.totalItems
+
+    // Contar ausências válidas hoje (que não sejam duplicadas de quem já está de férias)
+    const ausenciasHoje = ausenciasAtivas.length
 
     // 5. Solicitações Pendentes
     const pendentesRes = await pb.collection('solicitacoes').getList(1, 1, {
@@ -642,7 +872,7 @@ export const dashboardService = {
     const thirtyDaysStr = thirtyDaysAhead.toISOString().split('T')[0]
 
     const proximasFeriasRes = await pb.collection('ferias').getList(1, 1, {
-      filter: `status = "aprovado" && data_inicio >= "${todayStr}" && data_inicio <= "${thirtyDaysStr}"`,
+      filter: `status != "cancelada" && status != "concluida" && data_inicio >= "${todayStr}" && data_inicio <= "${thirtyDaysStr}"`,
     })
     const feriasProximos30Dias = proximasFeriasRes.totalItems
 
@@ -708,16 +938,17 @@ export const dashboardService = {
     // 1. Férias programadas
     try {
       const ferias = await pb.collection('ferias').getFullList<Ferias>({
-        filter: `status = "aprovado" && data_inicio >= "${todayStr}" && data_inicio <= "${thirtyDaysStr}"`,
+        filter: `status != "cancelada" && status != "concluida" && data_inicio >= "${todayStr}" && data_inicio <= "${thirtyDaysStr}"`,
         sort: 'data_inicio',
         expand: 'funcionario',
       })
       for (const f of ferias) {
         const nome = f.expand?.funcionario?.nome || 'Funcionário'
+        const diasText = f.dias ? ` (${f.dias} dias)` : ''
         eventos.push({
           id: `ferias-${f.id}`,
           tipo: 'ferias',
-          titulo: `Férias de ${nome} começam`,
+          titulo: `Férias de ${nome}${diasText}`,
           data: f.data_inicio,
           dataFormatted: f.data_inicio,
         })

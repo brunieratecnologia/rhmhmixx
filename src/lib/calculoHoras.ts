@@ -4,9 +4,10 @@ export interface MarcacaoInterpreta {
   id?: string
   horario: string // HH:MM
   tipo: 'entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida' | 'avulsa'
-  origem: 'terminal' | 'tratamento_fechamento' | 'admin'
+  origem: 'terminal' | 'tratamento_fechamento' | 'admin' | 'intervalo_automatico'
   registroOriginal?: RegistroHorario
   tratamento?: TratamentoPonto
+  automatico?: boolean
 }
 
 export interface DiaEspelhoCalculado {
@@ -23,6 +24,12 @@ export interface DiaEspelhoCalculado {
   marcacoesOriginais: RegistroHorario[]
   tratamentosDoDia: TratamentoPonto[]
   todasMarcacoes: MarcacaoInterpreta[]
+  intervaloAutomaticoAplicado: boolean
+  intervaloInfo?: {
+    inicio: string
+    retorno: string
+    duracaoMinutos: number
+  }
   realizadoMinutos: number
   realizadoFormatado: string // Ex: "08:12"
   diferencaMinutos: number // realizado - previsto
@@ -230,19 +237,28 @@ export function calcularHorasRealizadas(
   marcacoesOriginais: RegistroHorario[],
   tratamentosDoDia: TratamentoPonto[],
   jornada: Jornada | null,
+  opcoes?: {
+    ehDiaFolga?: boolean
+  },
 ): {
   minutosTrabalhados: number
   todasMarcacoes: MarcacaoInterpreta[]
   isIncompleto: boolean
+  intervaloAutomaticoAplicado: boolean
+  intervaloInfo?: {
+    inicio: string
+    retorno: string
+    duracaoMinutos: number
+  }
 } {
-  const lista: MarcacaoInterpreta[] = []
+  const listaFisica: MarcacaoInterpreta[] = []
 
-  // 1. Marcações originais
+  // 1. Marcações originais batidas no terminal
   for (const reg of marcacoesOriginais) {
     const horario = reg.timestamp_utc
       ? getSPTimeFromUtc(reg.timestamp_utc)
       : reg.hora_utc.slice(0, 5)
-    lista.push({
+    listaFisica.push({
       id: reg.id,
       horario,
       tipo: 'avulsa',
@@ -254,7 +270,7 @@ export function calcularHorasRealizadas(
   // 2. Marcações adicionadas em tratamentos de fechamento
   for (const trat of tratamentosDoDia) {
     if (trat.hora_registro) {
-      lista.push({
+      listaFisica.push({
         id: trat.id,
         horario: trat.hora_registro.slice(0, 5),
         tipo: (trat.tipo_marcacao as any) || 'avulsa',
@@ -265,51 +281,209 @@ export function calcularHorasRealizadas(
   }
 
   // Ordena cronologicamente por horário
-  lista.sort((a, b) => {
+  listaFisica.sort((a, b) => {
     return timeStringToMinutes(a.horario) - timeStringToMinutes(b.horario)
   })
 
-  // Interpreta tipos sequencialmente se não tiverem tipo explícito do fechamento
-  const tiposOrdem: ('entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida')[] = [
-    'entrada',
-    'inicio_intervalo',
-    'retorno_intervalo',
-    'saida',
-  ]
+  const totalBatidasReais = listaFisica.length
 
-  lista.forEach((item, idx) => {
-    if (item.tipo === 'avulsa') {
-      item.tipo = tiposOrdem[idx % tiposOrdem.length]
-    }
-  })
-
-  // Cálculo de minutos trabalhados por pares de entrada/saída:
-  // Par 1: lista[0] a lista[1] (ou saída do primeiro bloco)
-  // Par 2: lista[2] a lista[3]
-  // Se houver número ímpar, a última fica em aberto (marcação incompleta)
-  let minutosTrabalhados = 0
-  const ehNoturno = Boolean(jornada?.atravessa_meia_noite)
-
-  for (let i = 0; i < lista.length - 1; i += 2) {
-    const tInicio = timeStringToMinutes(lista[i].horario)
-    let tFim = timeStringToMinutes(lista[i + 1].horario)
-
-    if (tFim < tInicio || (ehNoturno && i === 0 && tFim < tInicio)) {
-      tFim += 24 * 60
-    }
-
-    const diff = tFim - tInicio
-    if (diff > 0) {
-      minutosTrabalhados += diff
+  // Casos sem batidas:
+  if (totalBatidasReais === 0) {
+    return {
+      minutosTrabalhados: 0,
+      todasMarcacoes: [],
+      isIncompleto: false,
+      intervaloAutomaticoAplicado: false,
     }
   }
 
-  const isIncompleto = lista.length % 2 !== 0
+  const ehNoturno = Boolean(jornada?.atravessa_meia_noite)
+  const ehDiaFolga = Boolean(opcoes?.ehDiaFolga)
+
+  // Verifica se a jornada possui intervalo previsto configurado
+  const temIntervaloConfigurado = Boolean(
+    jornada &&
+    jornada.hora_inicio_intervalo &&
+    jornada.hora_retorno_intervalo &&
+    jornada.hora_inicio_intervalo.trim() !== '' &&
+    jornada.hora_retorno_intervalo.trim() !== '',
+  )
+
+  let intIniMin = 0
+  let intFimMin = 0
+  let duracaoIntervaloMin = 0
+
+  if (temIntervaloConfigurado && jornada) {
+    intIniMin = timeStringToMinutes(jornada.hora_inicio_intervalo)
+    intFimMin = timeStringToMinutes(jornada.hora_retorno_intervalo)
+    if (intFimMin < intIniMin || (ehNoturno && intFimMin < intIniMin)) {
+      intFimMin += 24 * 60
+    }
+    duracaoIntervaloMin = Math.max(0, intFimMin - intIniMin)
+  }
+
+  // REGRA DE INTERVALO AUTOMÁTICO vs BATIDAS REAIS:
+  // Se o funcionário tiver 4 ou mais marcações (ou se tiver registrado saídas/retornos de intervalo):
+  // Usamos as batidas reais sem adicionar intervalo automático, evitando duplo desconto.
+  //
+  // Se o funcionário tiver exatamente 2 marcações (ex: 08:00 Entrada e 17:00 Saída sem batida de almoço)
+  // e for um dia com jornada de trabalho e intervalo configurado:
+  // Aplicamos o intervalo automático previsto da jornada vigente do funcionário.
+  //
+  // Casos de borda:
+  // - O intervalo automático só se aplica se o período trabalhado (entrada -> saída) englobar
+  //   ou sobrepor o período do intervalo previsto. Se o funcionário saiu antes do almoço
+  //   (ex: 08:00 às 11:30 e o almoço é 12:00-13:00), não se desconta intervalo automático!
+  // - Em dia de folga/DSR, não se aplica intervalo automático a menos que explicitamente solicitado.
+  // - Se houver marcação incompleta (1 batida ou 3 batidas), o dia fica com pendência de marcação incompleta.
+
+  let aplicarIntervaloAutomatico = false
+  let intervaloInfo:
+    | {
+        inicio: string
+        retorno: string
+        duracaoMinutos: number
+      }
+    | undefined = undefined
+
+  const listaFinal: MarcacaoInterpreta[] = []
+
+  if (
+    totalBatidasReais === 2 &&
+    temIntervaloConfigurado &&
+    duracaoIntervaloMin > 0 &&
+    !ehDiaFolga
+  ) {
+    const entMin = timeStringToMinutes(listaFisica[0].horario)
+    let saiMin = timeStringToMinutes(listaFisica[1].horario)
+
+    if (saiMin < entMin || (ehNoturno && saiMin < entMin)) {
+      saiMin += 24 * 60
+    }
+
+    // Normaliza horários de intervalo para a linha temporal da jornada
+    let intIniAjustado = intIniMin
+    let intFimAjustado = intFimMin
+
+    if (ehNoturno) {
+      // Se jornada noturna (ex: 22:00 às 06:00, almoço 02:00 às 03:00)
+      const horaEntradaJornada = timeStringToMinutes(jornada?.hora_entrada)
+      if (intIniAjustado < horaEntradaJornada) {
+        intIniAjustado += 24 * 60
+        intFimAjustado += 24 * 60
+      }
+    }
+
+    // Verifica se o intervalo cai dentro do período em que o funcionário esteve presente
+    // (com tolerância de 15 minutos se a pessoa saiu ligeiramente antes ou após)
+    const periodoPresencaMin = saiMin - entMin
+    const intervaloCaiDentroDaPresenca = entMin <= intIniAjustado && saiMin >= intFimAjustado
+
+    // Se o colaborador trabalhou tempo suficiente (superior à duração do intervalo + margem de trabalho)
+    // e o intervalo cai dentro da sua permanência:
+    if (intervaloCaiDentroDaPresenca && periodoPresencaMin > duracaoIntervaloMin) {
+      aplicarIntervaloAutomatico = true
+      intervaloInfo = {
+        inicio: jornada!.hora_inicio_intervalo.slice(0, 5),
+        retorno: jornada!.hora_retorno_intervalo.slice(0, 5),
+        duracaoMinutos: duracaoIntervaloMin,
+      }
+
+      // Constrói a lista com as 4 marcações: Entrada, Início Int (Auto), Retorno Int (Auto), Saída
+      listaFinal.push({
+        ...listaFisica[0],
+        tipo: 'entrada',
+      })
+
+      listaFinal.push({
+        id: `auto-int-ini-${listaFisica[0].id || 'dia'}`,
+        horario: jornada!.hora_inicio_intervalo.slice(0, 5),
+        tipo: 'inicio_intervalo',
+        origem: 'intervalo_automatico',
+        automatico: true,
+      })
+
+      listaFinal.push({
+        id: `auto-int-fim-${listaFisica[1].id || 'dia'}`,
+        horario: jornada!.hora_retorno_intervalo.slice(0, 5),
+        tipo: 'retorno_intervalo',
+        origem: 'intervalo_automatico',
+        automatico: true,
+      })
+
+      listaFinal.push({
+        ...listaFisica[1],
+        tipo: 'saida',
+      })
+    }
+  }
+
+  // Se não aplicou automático (por ter 4 batidas, ou ser dia sem intervalo, ou não englobar o intervalo):
+  if (!aplicarIntervaloAutomatico) {
+    const tiposOrdem: ('entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida')[] = [
+      'entrada',
+      'inicio_intervalo',
+      'retorno_intervalo',
+      'saida',
+    ]
+
+    listaFisica.forEach((item, idx) => {
+      listaFinal.push({
+        ...item,
+        tipo: item.tipo === 'avulsa' ? tiposOrdem[idx % tiposOrdem.length] : item.tipo,
+      })
+    })
+  }
+
+  // Cálculo de minutos trabalhados por blocos de entrada/saída
+  let minutosTrabalhados = 0
+
+  if (aplicarIntervaloAutomatico) {
+    // Bloco 1: Entrada até Início do Intervalo
+    const ent1 = timeStringToMinutes(listaFinal[0].horario)
+    let int1 = timeStringToMinutes(listaFinal[1].horario)
+    if (int1 < ent1 || (ehNoturno && int1 < ent1)) {
+      int1 += 24 * 60
+    }
+    const bloco1 = Math.max(0, int1 - ent1)
+
+    // Bloco 2: Retorno do Intervalo até Saída
+    let int2 = timeStringToMinutes(listaFinal[2].horario)
+    let sai = timeStringToMinutes(listaFinal[3].horario)
+    if (int2 < ent1 || (ehNoturno && int2 < ent1)) {
+      int2 += 24 * 60
+    }
+    if (sai < int2 || (ehNoturno && sai < int2)) {
+      sai += 24 * 60
+    }
+    const bloco2 = Math.max(0, sai - int2)
+
+    minutosTrabalhados = bloco1 + bloco2
+  } else {
+    for (let i = 0; i < listaFinal.length - 1; i += 2) {
+      const tInicio = timeStringToMinutes(listaFinal[i].horario)
+      let tFim = timeStringToMinutes(listaFinal[i + 1].horario)
+
+      if (tFim < tInicio || (ehNoturno && i === 0 && tFim < tInicio)) {
+        tFim += 24 * 60
+      }
+
+      const diff = tFim - tInicio
+      if (diff > 0) {
+        minutosTrabalhados += diff
+      }
+    }
+  }
+
+  // É incompleto se o número de batidas REAIS (físicas/ajustes) for ímpar
+  const isIncompleto = totalBatidasReais % 2 !== 0
 
   return {
     minutosTrabalhados,
-    todasMarcacoes: lista,
+    todasMarcacoes: listaFinal,
     isIncompleto,
+    intervaloAutomaticoAplicado: aplicarIntervaloAutomatico,
+    intervaloInfo,
   }
 }
 
@@ -408,12 +582,14 @@ export function construirEspelhoMensal(params: {
     const regsDoDia = registrosPorDia.get(dataStr) || []
     const tratamentosDoDia = tratamentosPorDia.get(dataStr) || []
 
-    // Calcula realizado
-    const { minutosTrabalhados, todasMarcacoes, isIncompleto } = calcularHorasRealizadas(
-      regsDoDia,
-      tratamentosDoDia,
-      jornadaVigente,
-    )
+    // Calcula realizado (considerando intervalo automático para a jornada individual vigente)
+    const {
+      minutosTrabalhados,
+      todasMarcacoes,
+      isIncompleto,
+      intervaloAutomaticoAplicado,
+      intervaloInfo,
+    } = calcularHorasRealizadas(regsDoDia, tratamentosDoDia, jornadaVigente, { ehDiaFolga })
 
     if (minutosTrabalhados > 0) {
       totalDiasTrabalhados++
@@ -526,6 +702,8 @@ export function construirEspelhoMensal(params: {
       marcacoesOriginais: regsDoDia,
       tratamentosDoDia,
       todasMarcacoes,
+      intervaloAutomaticoAplicado,
+      intervaloInfo,
       realizadoMinutos: minutosTrabalhados,
       realizadoFormatado: minutesToTimeString(minutosTrabalhados),
       diferencaMinutos,

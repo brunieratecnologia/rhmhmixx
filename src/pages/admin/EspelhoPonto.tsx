@@ -14,6 +14,7 @@ import {
   ResumoEspelhoMensal,
   minutesToHoursText,
 } from '@/lib/calculoHoras'
+import { executarTestesIntervaloAutomatico } from '@/lib/calculoHoras.test'
 import { formatBRDate } from '@/lib/formatters'
 import { useToast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
@@ -115,6 +116,21 @@ export default function EspelhoPonto() {
   const [atestadoMotivo, setAtestadoMotivo] = useState('')
   const [atestadoArquivo, setAtestadoArquivo] = useState<File | null>(null)
   const [salvandoAtestado, setSalvandoAtestado] = useState(false)
+
+  // Execução de validação dos testes de regressão do cálculo de ponto e intervalo automático
+  useEffect(() => {
+    try {
+      const suite = executarTestesIntervaloAutomatico()
+      if (!suite.todosPassaram) {
+        console.warn(
+          '[EspelhoPonto] Testes de intervalo automático reportaram falhas:',
+          suite.resultados,
+        )
+      }
+    } catch (err) {
+      console.error('[EspelhoPonto] Erro ao validar suite de intervalo:', err)
+    }
+  }, [])
 
   // Carregar lista de funcionários
   useEffect(() => {
@@ -225,13 +241,25 @@ export default function EspelhoPonto() {
 
     for (const d of diasEspelho) {
       const batidasStr = d.todasMarcacoes
-        .map(
-          (m) =>
-            `${m.horario} (${m.origem === 'tratamento_fechamento' ? 'Aj. Fechamento' : 'Terminal'})`,
-        )
+        .map((m) => {
+          const origemLabel =
+            m.origem === 'tratamento_fechamento'
+              ? 'Aj. Fechamento'
+              : m.origem === 'intervalo_automatico'
+                ? 'Intervalo Auto'
+                : 'Terminal'
+          return `${m.horario} (${origemLabel})`
+        })
         .join(' | ')
 
-      const ocorrenciasStr = d.ocorrencias.map((o) => o.descricao).join('; ')
+      const ocorrenciasStr = [
+        ...(d.intervaloAutomaticoAplicado
+          ? [
+              `Intervalo automático aplicado (${d.intervaloInfo?.inicio || ''} às ${d.intervaloInfo?.retorno || ''})`,
+            ]
+          : []),
+        ...d.ocorrencias.map((o) => o.descricao),
+      ].join('; ')
 
       rows.push([
         formatBRDate(d.data),
@@ -743,31 +771,64 @@ export default function EspelhoPonto() {
                         {dia.todasMarcacoes.length === 0 ? (
                           <span className="text-slate-300 italic text-[11px]">Sem batidas</span>
                         ) : (
-                          <div className="flex items-center gap-1.5 flex-wrap font-mono">
-                            {dia.todasMarcacoes.map((m, idx) => {
-                              const ehAjuste = m.origem === 'tratamento_fechamento'
-                              return (
-                                <span
-                                  key={idx}
-                                  title={`${m.tipo.replace('_', ' ')} (${ehAjuste ? 'Ajuste Fechamento Folha' : 'Terminal Coletivo Imutável'})`}
-                                  className={`px-2 py-0.5 rounded text-xs font-semibold border flex items-center gap-1 ${
-                                    ehAjuste
-                                      ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                      : 'bg-slate-100 text-slate-800 border-slate-200'
-                                  }`}
-                                >
-                                  {m.horario}
-                                  {ehAjuste && (
-                                    <span
-                                      className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded"
-                                      title="Incluído pelo gestor no fechamento"
-                                    >
-                                      AJ
-                                    </span>
-                                  )}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap font-mono">
+                              {dia.todasMarcacoes.map((m, idx) => {
+                                const ehAjuste = m.origem === 'tratamento_fechamento'
+                                const ehAuto = m.origem === 'intervalo_automatico'
+                                return (
+                                  <span
+                                    key={idx}
+                                    title={`${m.tipo.replace('_', ' ')} (${
+                                      ehAuto
+                                        ? 'Intervalo Automático derivado da jornada'
+                                        : ehAjuste
+                                          ? 'Ajuste Fechamento Folha'
+                                          : 'Terminal Coletivo Imutável'
+                                    })`}
+                                    className={`px-2 py-0.5 rounded text-xs font-semibold border flex items-center gap-1 ${
+                                      ehAuto
+                                        ? 'bg-purple-50 text-purple-900 border-purple-300 shadow-xs'
+                                        : ehAjuste
+                                          ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                          : 'bg-slate-100 text-slate-800 border-slate-200'
+                                    }`}
+                                  >
+                                    {m.horario}
+                                    {ehAuto && (
+                                      <span
+                                        className="text-[9px] bg-purple-200 text-purple-950 font-bold px-1 rounded uppercase tracking-wider"
+                                        title="Intervalo automático da jornada"
+                                      >
+                                        Auto
+                                      </span>
+                                    )}
+                                    {ehAjuste && (
+                                      <span
+                                        className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded font-bold"
+                                        title="Incluído pelo gestor no fechamento"
+                                      >
+                                        AJ
+                                      </span>
+                                    )}
+                                  </span>
+                                )
+                              })}
+                            </div>
+
+                            {/* Indicador auditável de intervalo automático */}
+                            {dia.intervaloAutomaticoAplicado && dia.intervaloInfo && (
+                              <div className="flex items-center gap-1 text-[10px] text-purple-700 font-medium">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
+                                <span>
+                                  Intervalo automático da jornada:{' '}
+                                  <strong className="font-mono text-purple-900">
+                                    {dia.intervaloInfo.inicio} às {dia.intervaloInfo.retorno}
+                                  </strong>{' '}
+                                  (-{dia.intervaloInfo.duracaoMinutos}m)
                                 </span>
-                              )
-                            })}
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>

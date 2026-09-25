@@ -249,24 +249,45 @@ export default function PortalMeuEspelho() {
                           {dia.todasMarcacoes.length === 0 ? (
                             <span className="text-slate-600">---</span>
                           ) : (
-                            <div className="flex flex-wrap gap-1.5">
-                              {dia.todasMarcacoes.map((m, idx) => (
-                                <span
-                                  key={idx}
-                                  className={`px-1.5 py-0.5 rounded text-[11px] font-semibold border ${
-                                    m.origem === 'tratamento_fechamento'
-                                      ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
-                                      : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
-                                  }`}
-                                  title={
-                                    m.origem === 'tratamento_fechamento'
-                                      ? 'Ajuste de fechamento'
-                                      : 'Batida registrada'
-                                  }
-                                >
-                                  {m.horario}
-                                </span>
-                              ))}
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap gap-1.5">
+                                {dia.todasMarcacoes.map((m, idx) => {
+                                  const ehAuto = m.origem === 'intervalo_automatico'
+                                  const ehAjuste = m.origem === 'tratamento_fechamento'
+                                  return (
+                                    <span
+                                      key={idx}
+                                      className={`px-1.5 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 ${
+                                        ehAuto
+                                          ? 'bg-[#7C3AED]/20 text-purple-300 border-[#7C3AED]/40'
+                                          : ehAjuste
+                                            ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
+                                            : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
+                                      }`}
+                                      title={
+                                        ehAuto
+                                          ? 'Intervalo automático da jornada'
+                                          : ehAjuste
+                                            ? 'Ajuste de fechamento'
+                                            : 'Batida registrada'
+                                      }
+                                    >
+                                      {m.horario}
+                                      {ehAuto && (
+                                        <span className="text-[9px] bg-[#7C3AED]/40 text-purple-200 px-1 rounded uppercase tracking-wider">
+                                          Auto
+                                        </span>
+                                      )}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                              {dia.intervaloAutomaticoAplicado && dia.intervaloInfo && (
+                                <div className="text-[10px] text-purple-300/80 font-sans">
+                                  Intervalo auto: {dia.intervaloInfo.inicio} às{' '}
+                                  {dia.intervaloInfo.retorno} (-{dia.intervaloInfo.duracaoMinutos}m)
+                                </div>
+                              )}
                             </div>
                           )}
                         </td>

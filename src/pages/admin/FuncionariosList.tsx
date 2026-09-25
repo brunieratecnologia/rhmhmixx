@@ -11,6 +11,7 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Plus,
   Eye,
   SlidersHorizontal,
 } from 'lucide-react'
@@ -37,6 +38,15 @@ export default function FuncionariosList() {
   const [selectedSituacao, setSelectedSituacao] = useState<string>('todos')
   const [selectedDepartamento, setSelectedDepartamento] = useState<string>('todos')
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+
+  const stats = useMemo(() => {
+    const total = funcionarios.length
+    const ativos = funcionarios.filter((f) => f.situacao === 'ativo').length
+    const afastados = funcionarios.filter((f) => f.situacao === 'afastado').length
+    const ferias = funcionarios.filter((f) => f.situacao === 'em_ferias').length
+    const desligados = funcionarios.filter((f) => f.situacao === 'desligado').length
+    return { total, ativos, afastados, ferias, desligados }
+  }, [funcionarios])
 
   // Pagination
   const [page, setPage] = useState(1)

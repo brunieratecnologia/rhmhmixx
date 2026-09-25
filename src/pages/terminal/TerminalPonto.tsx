@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { terminalService, type TerminalInfo, type RegistroPontoResult } from '@/services/rh'
 import pb from '@/lib/pocketbase/client'
+import { getSPDateTimeParts } from '@/lib/formatters'
 import {
   Clock,
   Wifi,
@@ -23,6 +24,9 @@ export default function TerminalPonto() {
   const [isOnline, setIsOnline] = useState<boolean>(true)
   const [checkingConnection, setCheckingConnection] = useState<boolean>(false)
 
+  // Clock offset in ms between server time (UTC) and client clock (Date.now())
+  const serverOffsetRef = useRef<number>(0)
+
   // Clock
   const [currentTime, setCurrentTime] = useState<Date>(new Date())
 
@@ -39,19 +43,40 @@ export default function TerminalPonto() {
   const pinInputRef = useRef<HTMLInputElement>(null)
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // 1. Digital Clock update every second
+  // 1. Digital Clock update every second using server offset
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
+    const updateTick = () => {
+      const nowMs = Date.now() + serverOffsetRef.current
+      setCurrentTime(new Date(nowMs))
+    }
+    updateTick()
+    const timer = setInterval(updateTick, 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // 2. Fetch Terminal Info & check connection
+  // 2. Fetch Terminal Info & sync server time offset & check connection
   const checkStatus = useCallback(async () => {
     try {
       setCheckingConnection(true)
+      const clientReqTime = Date.now()
       const info = await terminalService.getInfo()
+      const clientResTime = Date.now()
+      const roundTripLatency = (clientResTime - clientReqTime) / 2
+
+      let serverTimestampMs = 0
+      if (typeof info.server_time_ms === 'number' && !isNaN(info.server_time_ms)) {
+        serverTimestampMs = info.server_time_ms
+      } else if (info.server_time_utc) {
+        serverTimestampMs = new Date(info.server_time_utc).getTime()
+      }
+
+      if (serverTimestampMs > 0) {
+        // Calculate offset: serverTime = clientNow + offset
+        // Estimated server time at response arrival: serverTimestampMs + roundTripLatency
+        serverOffsetRef.current = serverTimestampMs + roundTripLatency - clientResTime
+        setCurrentTime(new Date(Date.now() + serverOffsetRef.current))
+      }
+
       setTerminalInfo(info)
       setIsOnline(true)
     } catch {
@@ -205,21 +230,15 @@ export default function TerminalPonto() {
     }
   }
 
-  // Formatting Clock display (24h)
-  const hours = String(currentTime.getHours()).padStart(2, '0')
-  const minutes = String(currentTime.getMinutes()).padStart(2, '0')
-  const seconds = String(currentTime.getSeconds()).padStart(2, '0')
-  const dateFormatted = new Intl.DateTimeFormat('pt-BR', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  }).format(currentTime)
-  const shortDateBR = new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(currentTime)
+  // Formatting Clock display (24h) explicitly in America/Sao_Paulo timezone
+  const targetTimeZone = terminalInfo?.empresa?.fuso_horario || 'America/Sao_Paulo'
+  const {
+    hours,
+    minutes,
+    seconds,
+    shortDate: shortDateBR,
+    longDate: dateFormatted,
+  } = getSPDateTimeParts(currentTime, targetTimeZone)
 
   const companyLogoUrl =
     terminalInfo?.empresa?.logotipo && terminalInfo.empresa.id
@@ -264,7 +283,7 @@ export default function TerminalPonto() {
             </div>
           </div>
 
-          {/* Large Digital Clock */}
+          {/* Large Digital Clock com Fuso de São Paulo e Hora Oficial do Servidor */}
           <div className="flex flex-col items-end">
             <div className="flex items-center gap-1.5 font-mono text-2xl sm:text-4xl font-extrabold text-[#D4AF37] tracking-wider drop-shadow-xs">
               <span>{hours}</span>
@@ -275,6 +294,13 @@ export default function TerminalPonto() {
             </div>
             <div className="text-[11px] sm:text-xs text-slate-400 font-medium capitalize mt-0.5">
               {shortDateBR} • <span className="capitalize">{dateFormatted}</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-[#D4AF37]/90 font-medium mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] inline-block animate-pulse" />
+              <span>
+                Horário oficial (servidor) •{' '}
+                {targetTimeZone === 'America/Sao_Paulo' ? 'São Paulo (UTC-3)' : targetTimeZone}
+              </span>
             </div>
           </div>
         </div>

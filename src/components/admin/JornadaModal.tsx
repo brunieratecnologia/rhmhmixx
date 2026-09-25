@@ -40,6 +40,7 @@ const DIAS_SEMANA = [
 ] as const
 
 export default function JornadaModal({ open, onOpenChange, jornada, onSave }: JornadaModalProps) {
+  const [salvando, setSalvando] = useState(false)
   const [nome, setNome] = useState(jornada?.nome || '')
   const [horaEntrada, setHoraEntrada] = useState(jornada?.hora_entrada || '08:00')
   const [horaInicioIntervalo, setHoraInicioIntervalo] = useState(

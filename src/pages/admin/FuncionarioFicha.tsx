@@ -27,6 +27,7 @@ import {
   UserCheck,
   User,
   Briefcase,
+  Calendar,
   FileCheck2,
   FolderOpen,
   CalendarDays,
@@ -96,6 +97,8 @@ export default function FuncionarioFicha() {
   const [bhDataRef, setBhDataRef] = useState(new Date().toISOString().split('T')[0])
   const [bhMotivo, setBhMotivo] = useState('')
   const [salvandoBh, setSalvandoBh] = useState(false)
+  const [salvandoBanco, setSalvandoBanco] = useState(false)
+  const [salvandoFerias, setSalvandoFerias] = useState(false)
 
   // Tab State
   type TabType =

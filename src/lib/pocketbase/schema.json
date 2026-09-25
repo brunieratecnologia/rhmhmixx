@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-25T09:55:15.422Z",
+  "generatedAt": "2026-09-25T10:13:24.338Z",
   "collections": [
     {
       "name": "users",
@@ -528,7 +528,7 @@
         "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
         "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
         "update": null,
-        "delete": null
+        "delete": "@request.auth.role = \"admin\""
       },
       "fields": [
         {
@@ -841,8 +841,8 @@
       "name": "documentos",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_rh' && nivel_acesso != 'restrito_medico' && ativo = true))",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_rh' && nivel_acesso != 'restrito_medico' && ativo = true))",
+        "list": "@request.auth.id != \"\" && (@request.auth.role = \"admin\" || @request.auth.role = \"rh\" || (funcionario.user = @request.auth.id && nivel_acesso != \"restrito_medico\"))",
+        "view": "@request.auth.id != \"\" && (@request.auth.role = \"admin\" || @request.auth.role = \"rh\" || (funcionario.user = @request.auth.id && nivel_acesso != \"restrito_medico\"))",
         "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
         "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
         "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
@@ -1206,9 +1206,9 @@
       "name": "logs_auditoria",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "view": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "list": "@request.auth.role = \"admin\"",
+        "view": "@request.auth.role = \"admin\"",
+        "create": null,
         "update": null,
         "delete": null
       },

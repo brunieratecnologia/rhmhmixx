@@ -218,7 +218,9 @@ export default function PortalInicio() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-mono font-bold text-amber-300 text-sm">
-                        {reg.hora_utc || formatBRTime(reg.timestamp_utc)}
+                        {reg.timestamp_utc
+                          ? formatBRTime(reg.timestamp_utc)
+                          : reg.hora_utc?.slice(0, 5) || '--:--'}
                       </span>
                       <Badge
                         variant="outline"

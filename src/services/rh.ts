@@ -1361,8 +1361,9 @@ export const usersService = {
 }
 
 export interface TerminalInfo {
-  status: 'online' | 'offline'
+  status: string
   server_time_utc: string
+  server_time_ms?: number
   empresa: {
     id: string
     nome_fantasia: string

@@ -702,12 +702,12 @@ export default function FuncionarioForm() {
                     </Label>
                     <button
                       type="button"
-                      onClick={() => setCargoModalOpen(true)}
+                      onClick={() => setNewCargoModal(true)}
                       className="text-[11px] font-bold text-[#D4AF37] hover:underline flex items-center"
                     >
                       <Plus className="w-3 h-3 mr-0.5" />
                       Novo cargo
-                    </button>{' '}
+                    </button>
                   </div>
                   <Select value={cargoId} onValueChange={(val) => setCargoId(val)}>
                     <SelectTrigger className="h-10 text-xs sm:text-sm border-slate-200">
@@ -737,13 +737,13 @@ export default function FuncionarioForm() {
                     </Label>
                     <button
                       type="button"
-                      onClick={() => setDeptoModalOpen(true)}
+                      onClick={() => setNewDepModal(true)}
                       className="text-[11px] font-bold text-[#D4AF37] hover:underline flex items-center"
                     >
                       <Plus className="w-3 h-3 mr-0.5" />
                       Novo depto.
-                    </button>{' '}
-                  </div>
+                    </button>
+                  </div>{' '}
                   <Select value={departamentoId} onValueChange={(val) => setDepartamentoId(val)}>
                     <SelectTrigger className="h-10 text-xs sm:text-sm border-slate-200">
                       <SelectValue placeholder="Selecione o departamento" />
@@ -922,7 +922,11 @@ export default function FuncionarioForm() {
                   className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-5 shadow-sm border-0 hover:brightness-110"
                 >
                   <Save className="w-4 h-4 mr-1.5" />
-                  {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Cadastrar Funcionário'}
+                  {saving
+                    ? 'Salvando...'
+                    : isEditing
+                      ? 'Salvar Alterações'
+                      : 'Cadastrar Funcionário'}
                 </Button>{' '}
               </div>
             </div>

@@ -17,7 +17,13 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Clock,
+  Plus,
 } from 'lucide-react'
+import JornadaModal from '@/components/admin/JornadaModal'
+import { jornadasService } from '@/services/rh'
+import type { Jornada } from '@/types/rh'
+import { minutesToHoursText } from '@/lib/calculoHoras'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,7 +47,13 @@ export default function Configuracoes() {
   const { user: currentUser } = useAuth()
   const { toast } = useToast()
 
-  const [activeTab, setActiveTab] = useState<'empresa' | 'usuarios'>('empresa')
+  const [activeTab, setActiveTab] = useState<'empresa' | 'usuarios' | 'jornadas'>('empresa')
+  const [jornadasList, setJornadasList] = useState<Jornada[]>([])
+  const [jornadaModalOpen, setJornadaModalOpen] = useState(false)
+  const [editingJornada, setEditingJornada] = useState<Jornada | null>(null)
+  const [jornadaToDelete, setJornadaToDelete] = useState<Jornada | null>(null)
+  const [deletingJornadaModal, setDeletingJornadaModal] = useState(false)
+  const [deletingJornada, setDeletingJornada] = useState(false)
 
   // Empresa Form State
   const [empresa, setEmpresa] = useState<Empresa | null>(null)
@@ -111,9 +123,19 @@ export default function Configuracoes() {
     }
   }
 
+  const loadJornadas = async () => {
+    try {
+      const list = await jornadasService.list()
+      setJornadasList(list)
+    } catch (err) {
+      console.error('Erro ao carregar jornadas:', err)
+    }
+  }
+
   useEffect(() => {
     loadEmpresa()
     loadUsers()
+    loadJornadas()
   }, [])
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -324,6 +346,18 @@ export default function Configuracoes() {
             <Users className="w-4 h-4" />
             Usuários Administrativos
           </button>
+
+          <button
+            onClick={() => setActiveTab('jornadas')}
+            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+              activeTab === 'jornadas'
+                ? 'border-[#2563EB] text-[#2563EB]'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Jornadas Padrão & Flexíveis
+          </button>
         </div>
 
         {/* TAB 1: EMPRESA */}
@@ -510,6 +544,128 @@ export default function Configuracoes() {
           </form>
         )}
 
+        {/* TAB 3: JORNADAS DE TRABALHO */}
+        {activeTab === 'jornadas' && (
+          <div className="p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Jornadas e Escalas Cadastradas
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Modelos de jornadas flexíveis, com suporte a turnos noturnos e escalas
+                  individualizadas
+                </p>
+              </div>
+
+              <Button
+                onClick={() => {
+                  setEditingJornada(null)
+                  setJornadaModalOpen(true)
+                }}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs sm:text-sm font-semibold h-9 px-3.5 shadow-sm"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Nova Jornada
+              </Button>
+            </div>
+
+            {jornadasList.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                <Clock className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700">Nenhuma jornada cadastrada</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Cadastre jornadas para associar aos funcionários da empresa.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-semibold text-xs">
+                      <th className="py-3 px-4">Nome da Jornada</th>
+                      <th className="py-3 px-4">Horários Previstos</th>
+                      <th className="py-3 px-4">Dias de Trabalho</th>
+                      <th className="py-3 px-4">Carga Diária</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {jornadasList.map((j) => (
+                      <tr key={j.id} className="hover:bg-slate-50/80">
+                        <td className="py-3 px-4">
+                          <p className="font-semibold text-slate-900">{j.nome}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {j.atravessa_meia_noite && (
+                              <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full font-medium">
+                                Turno Noturno (Virada de Dia)
+                              </span>
+                            )}
+                            {j.tipo_escala && j.tipo_escala !== 'semanal_fixa' && (
+                              <span className="text-[10px] bg-blue-50 text-[#2563EB] border border-blue-200 px-2 py-0.5 rounded-full font-medium capitalize">
+                                {j.tipo_escala.replace('_', ' ')}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-slate-700 font-mono text-xs">
+                          {j.hora_entrada || '--:--'} às {j.hora_saida || '--:--'}
+                          {j.hora_inicio_intervalo && j.hora_retorno_intervalo && (
+                            <span className="text-slate-400 block text-[11px]">
+                              Int: {j.hora_inicio_intervalo} - {j.hora_retorno_intervalo}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 text-xs">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {(j.dias_trabalho || []).map((d) => (
+                              <span
+                                key={d}
+                                className="bg-slate-100 text-slate-700 font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded"
+                              >
+                                {d}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-800 text-xs">
+                          {minutesToHoursText(j.duracao_jornada_min || 0)}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingJornada(j)
+                                setJornadaModalOpen(true)
+                              }}
+                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#2563EB]"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setJornadaToDelete(j)
+                                setDeletingJornadaModal(true)
+                              }}
+                              className="h-8 w-8 p-0 border-slate-200 text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* TAB 2: USUÁRIOS ADMINISTRATIVOS */}
         {activeTab === 'usuarios' && (
           <div className="p-6 space-y-6">
@@ -611,6 +767,79 @@ export default function Configuracoes() {
           </div>
         )}
       </div>
+
+      {/* Jornada Modal (Criar / Editar) */}
+      <JornadaModal
+        open={jornadaModalOpen}
+        onOpenChange={setJornadaModalOpen}
+        jornada={editingJornada}
+        onSave={async (data) => {
+          if (editingJornada) {
+            await jornadasService.update(editingJornada.id, data)
+            toast({
+              title: 'Jornada atualizada.',
+              className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+            })
+          } else {
+            await jornadasService.create(data)
+            toast({
+              title: 'Jornada criada com sucesso.',
+              className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+            })
+          }
+          loadJornadas()
+        }}
+      />
+
+      {/* Modal Excluir Jornada */}
+      <Dialog open={deletingJornadaModal} onOpenChange={setDeletingJornadaModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir Jornada</DialogTitle>
+            <DialogDescription>
+              Deseja remover a jornada <strong>{jornadaToDelete?.nome}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deletingJornada}
+              onClick={() => setDeletingJornadaModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={deletingJornada}
+              onClick={async () => {
+                if (!jornadaToDelete) return
+                setDeletingJornada(true)
+                try {
+                  await jornadasService.delete(jornadaToDelete.id)
+                  toast({
+                    title: 'Jornada excluída com sucesso.',
+                    className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                  })
+                  setDeletingJornadaModal(false)
+                  loadJornadas()
+                } catch (err: any) {
+                  toast({
+                    title: 'Erro ao excluir jornada',
+                    description: err?.message,
+                    variant: 'destructive',
+                  })
+                } finally {
+                  setDeletingJornada(false)
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deletingJornada ? 'Excluindo...' : 'Confirmar Exclusão'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Criar / Editar Usuário */}
       <Dialog open={userModalOpen} onOpenChange={setUserModalOpen}>

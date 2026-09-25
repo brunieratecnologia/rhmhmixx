@@ -178,8 +178,268 @@ export const jornadasService = {
     })
   },
 
+  async getById(id: string) {
+    return await pb.collection('jornadas').getOne<Jornada>(id)
+  },
+
   async create(data: Partial<Jornada>) {
     return await pb.collection('jornadas').create<Jornada>(data)
+  },
+
+  async update(id: string, data: Partial<Jornada>) {
+    return await pb.collection('jornadas').update<Jornada>(id, data)
+  },
+
+  async delete(id: string) {
+    // Check if linked to any employee
+    const linked = await pb.collection('funcionarios').getList(1, 1, {
+      filter: `jornada_atual = "${id}"`,
+    })
+    if (linked.totalItems > 0) {
+      throw new Error(
+        'Não é possível excluir esta jornada: existem colaboradores vinculados a ela.',
+      )
+    }
+    return await pb.collection('jornadas').delete(id)
+  },
+}
+
+export const fechamentoFolhaService = {
+  async getStatus(ano: number, mes: number): Promise<import('@/types/rh').FechamentoFolha | null> {
+    const list = await pb
+      .collection('fechamentos_folha')
+      .getList<import('@/types/rh').FechamentoFolha>(1, 1, {
+        filter: `competencia_ano = ${ano} && competencia_mes = ${mes}`,
+        sort: '-created',
+        expand: 'responsavel_abertura,responsavel_encerramento',
+      })
+    return list.items.length > 0 ? list.items[0] : null
+  },
+
+  async listAll(): Promise<import('@/types/rh').FechamentoFolha[]> {
+    return await pb
+      .collection('fechamentos_folha')
+      .getFullList<import('@/types/rh').FechamentoFolha>({
+        sort: '-competencia_ano,-competencia_mes',
+        expand: 'responsavel_abertura,responsavel_encerramento',
+      })
+  },
+
+  async alterarStatus(params: {
+    competencia_ano: number
+    competencia_mes: number
+    acao: 'abrir_fechamento' | 'encerrar_fechamento' | 'reabrir_fechamento'
+    observacoes?: string
+  }): Promise<{ success: boolean; message: string; record?: any }> {
+    return await pb.send('/backend/v1/rh/fechamento/status', {
+      method: 'POST',
+      body: params,
+    })
+  },
+
+  async ajustarPonto(params: {
+    funcionario: string
+    data_registro: string
+    hora_registro?: string
+    tipo?: 'justificativa' | 'correcao' | 'classificacao'
+    tipo_marcacao?: 'entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida' | 'outro'
+    justificativa: string
+    registro?: string
+  }): Promise<{ success: boolean; message: string; tratamento_id?: string }> {
+    return await pb.send('/backend/v1/rh/fechamento/ajustar-ponto', {
+      method: 'POST',
+      body: params,
+    })
+  },
+}
+
+export const bancoHorasService = {
+  async listByFuncionario(
+    funcionarioId: string,
+  ): Promise<import('@/types/rh').BancoHorasLancamento[]> {
+    return await pb
+      .collection('banco_horas')
+      .getFullList<import('@/types/rh').BancoHorasLancamento>({
+        filter: `funcionario = "${funcionarioId}"`,
+        sort: '-data_referencia,-created',
+        expand: 'usuario_responsavel',
+      })
+  },
+
+  async lancar(data: {
+    funcionario: string
+    data_referencia: string
+    tipo: 'credito' | 'debito' | 'ajuste_manual'
+    minutos: number
+    motivo: string
+  }): Promise<{ success: boolean; message: string }> {
+    return await pb.send('/backend/v1/rh/banco-horas/lancar', {
+      method: 'POST',
+      body: data,
+    })
+  },
+
+  async getSaldoFuncionario(funcionarioId: string): Promise<{
+    minutos: number
+    horasFormatadas: string
+    totalCredito: number
+    totalDebito: number
+  }> {
+    const list = await this.listByFuncionario(funcionarioId)
+    let saldoMin = 0
+    let totalCredito = 0
+    let totalDebito = 0
+
+    for (const item of list) {
+      if (item.tipo === 'credito') {
+        saldoMin += item.minutos
+        totalCredito += item.minutos
+      } else if (item.tipo === 'debito') {
+        saldoMin -= item.minutos
+        totalDebito += item.minutos
+      } else if (item.tipo === 'ajuste_manual') {
+        // Se motivo indicar crédito ou débito, ou padrão positivo
+        saldoMin += item.minutos
+        totalCredito += item.minutos
+      }
+    }
+
+    const sign = saldoMin < 0 ? '-' : saldoMin > 0 ? '+' : ''
+    const absMin = Math.abs(saldoMin)
+    const h = Math.floor(absMin / 60)
+    const m = absMin % 60
+    const horasFormatadas = `${sign}${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+
+    return {
+      minutos: saldoMin,
+      horasFormatadas,
+      totalCredito,
+      totalDebito,
+    }
+  },
+}
+
+export const atestadosService = {
+  async uploadAtestado(params: {
+    funcionarioId: string
+    dataInicio: string
+    dataFim?: string
+    justificativa: string
+    arquivo: File
+    adminUserId?: string
+  }) {
+    // 1. Upload file into documentos collection as private atestado_medico
+    const formData = new FormData()
+    formData.append('funcionario', params.funcionarioId)
+    formData.append('categoria', 'atestado_medico')
+    formData.append('nome', `Atestado Médico - ${params.dataInicio}`)
+    formData.append('data_envio', new Date().toISOString())
+    formData.append('arquivo', params.arquivo)
+    formData.append('nivel_acesso', 'restrito_rh')
+    formData.append('ativo', 'true')
+    if (params.adminUserId) {
+      formData.append('usuario_responsavel', params.adminUserId)
+    }
+
+    const doc = await pb.collection('documentos').create(formData)
+
+    // 2. Link into ausencias collection
+    const ausencia = await pb.collection('ausencias').create({
+      funcionario: params.funcionarioId,
+      categoria: 'atestado',
+      data_inicio: params.dataInicio,
+      data_fim: params.dataFim || params.dataInicio,
+      justificativa: params.justificativa,
+      documentos: doc.id,
+    })
+
+    return { doc, ausencia }
+  },
+
+  getFileUrl(
+    record: { id: string; collectionId: string; collectionName?: string },
+    fileName: string,
+  ) {
+    return pb.files.getURL(record, fileName)
+  },
+}
+
+export const espelhoPontoService = {
+  async getDadosEspelho(funcionarioId: string, ano: number, mes: number) {
+    const padMes = String(mes).padStart(2, '0')
+    const startStr = `${ano}-${padMes}-01`
+    const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate()
+    const endStr = `${ano}-${padMes}-${String(ultimoDia).padStart(2, '0')}`
+
+    // 1. Funcionario
+    const func = await pb.collection('funcionarios').getOne<Funcionario>(funcionarioId, {
+      expand: 'cargo,departamento,jornada_atual',
+    })
+
+    // 2. Historico Jornadas
+    const histJornadas = await pb
+      .collection('historico_jornadas')
+      .getFullList<import('@/types/rh').HistoricoJornada>({
+        filter: `funcionario = "${funcionarioId}"`,
+        expand: 'jornada',
+        sort: '-data_inicio',
+      })
+
+    // 3. Registros de Horário (timestamp_utc >= startStr && timestamp_utc <= endStr 23:59:59 OR data_utc)
+    // Filter safely covering timezone boundary: 2 days before to 2 days after
+    const prevDate = new Date(ano, mes - 1, 0).toISOString().split('T')[0]
+    const nextDate = new Date(ano, mes, 2).toISOString().split('T')[0]
+
+    const registros = await pb.collection('registros_horario').getFullList<RegistroHorario>({
+      filter: `funcionario = "${funcionarioId}" && (
+        (data_utc >= "${startStr}" && data_utc <= "${endStr}") ||
+        (timestamp_utc >= "${prevDate} 00:00:00" && timestamp_utc <= "${nextDate} 23:59:59")
+      )`,
+      sort: 'timestamp_utc,hora_utc',
+    })
+
+    // 4. Tratamentos do Mês
+    const tratamentos = await pb
+      .collection('tratamentos_ponto')
+      .getFullList<import('@/types/rh').TratamentoPonto>({
+        filter: `funcionario = "${funcionarioId}" && (data_registro >= "${startStr}" && data_registro <= "${endStr}")`,
+        sort: 'data_registro,hora_registro',
+        expand: 'usuario_responsavel',
+      })
+
+    // 5. Ausências no Mês
+    const ausencias = await pb.collection('ausencias').getFullList<Ausencia>({
+      filter: `funcionario = "${funcionarioId}" && (
+        (data_inicio <= "${endStr}" && (data_fim >= "${startStr}" || data_fim = "" || data_fim = null))
+      )`,
+      expand: 'documentos',
+      sort: 'data_inicio',
+    })
+
+    // 6. Férias no Mês
+    const ferias = await pb.collection('ferias').getFullList<Ferias>({
+      filter: `funcionario = "${funcionarioId}" && status = "aprovado" && (
+        (data_inicio <= "${endStr}" && data_fim >= "${startStr}")
+      )`,
+      sort: 'data_inicio',
+    })
+
+    // 7. Status do fechamento da competência
+    const fechamento = await fechamentoFolhaService.getStatus(ano, mes)
+
+    return {
+      funcionario: func,
+      historicoJornadas: histJornadas.map((h) => ({
+        data_inicio: h.data_inicio,
+        data_fim: h.data_fim,
+        jornada: (h.expand?.jornada || func.expand?.jornada_atual) as Jornada,
+      })),
+      registros,
+      tratamentos,
+      ausencias,
+      ferias,
+      fechamento,
+    }
   },
 }
 

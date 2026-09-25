@@ -34,7 +34,16 @@ import {
   KeyRound,
   Lock,
 } from 'lucide-react'
-import { terminalService } from '@/services/rh'
+import { terminalService, jornadasService, bancoHorasService } from '@/services/rh'
+import type { Jornada, BancoHorasLancamento } from '@/types/rh'
+import { minutesToHoursText } from '@/lib/calculoHoras'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -56,13 +65,37 @@ export default function FuncionarioFicha() {
 
   const [funcionario, setFuncionario] = useState<Funcionario | null>(null)
   const [loading, setLoading] = useState(true)
+  const [todasJornadas, setTodasJornadas] = useState<Jornada[]>([])
+  const [bancoHorasLancamentos, setBancoHorasLancamentos] = useState<BancoHorasLancamento[]>([])
+  const [bancoHorasSaldo, setBancoHorasSaldo] = useState<{
+    minutos: number
+    horasFormatadas: string
+    totalCredito: number
+    totalDebito: number
+  }>({ minutos: 0, horasFormatadas: '00:00', totalCredito: 0, totalDebito: 0 })
+
+  // Troca de Jornada Modal
+  const [trocaJornadaModalOpen, setTrocaJornadaModalOpen] = useState(false)
+  const [novaJornadaId, setNovaJornadaId] = useState('')
+  const [dataInicioJornada, setDataInicioJornada] = useState(new Date().toISOString().split('T')[0])
+  const [salvandoJornada, setSalvandoJornada] = useState(false)
+
+  // Lançamento Banco de Horas Modal
+  const [bhModalOpen, setBhModalOpen] = useState(false)
+  const [bhTipo, setBhTipo] = useState<'credito' | 'debito' | 'ajuste_manual'>('credito')
+  const [bhHoras, setBhHoras] = useState('01:00')
+  const [bhDataRef, setBhDataRef] = useState(new Date().toISOString().split('T')[0])
+  const [bhMotivo, setBhMotivo] = useState('')
+  const [salvandoBh, setSalvandoBh] = useState(false)
 
   // Tab State
   type TabType =
     | 'pessoais'
     | 'profissionais'
+    | 'jornada'
     | 'contratuais'
     | 'documentos'
+    | 'banco_horas'
     | 'ferias'
     | 'historico'
   const [activeTab, setActiveTab] = useState<TabType>('pessoais')
@@ -103,12 +136,18 @@ export default function FuncionarioFicha() {
       const func = await funcionariosService.getById(id)
       setFuncionario(func)
 
-      const [hist, jorHist] = await Promise.all([
+      const [hist, jorHist, jorList, bhList, bhSaldo] = await Promise.all([
         historicoService.listByFuncionario(id),
         historicoJornadasService.listByFuncionario(id),
+        jornadasService.list(),
+        bancoHorasService.listByFuncionario(id),
+        bancoHorasService.getSaldoFuncionario(id),
       ])
       setHistoricoList(hist)
       setHistoricoJornadas(jorHist)
+      setTodasJornadas(jorList)
+      setBancoHorasLancamentos(bhList)
+      setBancoHorasSaldo(bhSaldo)
 
       // Load Ferias and Ausencias if any
       try {
@@ -425,6 +464,30 @@ export default function FuncionarioFicha() {
             Dados Profissionais
           </button>
 
+          <button
+            onClick={() => setActiveTab('jornada')}
+            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+              activeTab === 'jornada'
+                ? 'border-[#2563EB] text-[#2563EB]'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Jornada & Escala
+          </button>
+
+          <button
+            onClick={() => setActiveTab('banco_horas')}
+            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
+              activeTab === 'banco_horas'
+                ? 'border-[#2563EB] text-[#2563EB]'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <History className="w-4 h-4" />
+            Banco de Horas
+          </button>
+
           {isAdmin && (
             <button
               onClick={() => setActiveTab('contratuais')}
@@ -687,6 +750,293 @@ export default function FuncionarioFicha() {
                   </table>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* TAB: JORNADA & ESCALA INDIVIDUAL */}
+          {activeTab === 'jornada' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500 uppercase block">
+                    Jornada Vigente Atual
+                  </span>
+                  <p className="text-lg font-bold text-slate-900 mt-0.5">
+                    {funcionario.expand?.jornada_atual?.nome || 'Nenhuma jornada vinculada'}
+                  </p>
+                  {funcionario.expand?.jornada_atual && (
+                    <div className="flex items-center gap-3 text-xs text-slate-600 mt-1 flex-wrap">
+                      <span className="font-mono">
+                        {funcionario.expand.jornada_atual.hora_entrada} às{' '}
+                        {funcionario.expand.jornada_atual.hora_saida}
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Carga diária:{' '}
+                        {minutesToHoursText(
+                          funcionario.expand.jornada_atual.duracao_jornada_min || 0,
+                        )}
+                      </span>
+                      {funcionario.expand.jornada_atual.atravessa_meia_noite && (
+                        <span className="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          Turno Noturno
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link to={`/admin/espelho-ponto?funcionarioId=${funcionario.id}`}>
+                    <Button
+                      variant="outline"
+                      className="text-xs h-9 border-slate-200 text-[#2563EB]"
+                    >
+                      <CalendarDays className="w-3.5 h-3.5 mr-1" />
+                      Abrir Espelho de Ponto
+                    </Button>
+                  </Link>
+
+                  <Button
+                    onClick={() => {
+                      setNovaJornadaId(funcionario.jornada_atual || '')
+                      setDataInicioJornada(new Date().toISOString().split('T')[0])
+                      setTrocaJornadaModalOpen(true)
+                    }}
+                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-9 px-3.5 shadow-xs"
+                  >
+                    <Clock className="w-3.5 h-3.5 mr-1.5" />
+                    Alterar Jornada (Vigência)
+                  </Button>
+                </div>
+              </div>
+
+              {/* Detalhes da Jornada Atual */}
+              {funcionario.expand?.jornada_atual && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border border-slate-200 rounded-xl">
+                  <div>
+                    <span className="text-xs font-semibold text-slate-400 block uppercase">
+                      Dias de Trabalho
+                    </span>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {(funcionario.expand.jornada_atual.dias_trabalho || []).map((d) => (
+                        <span
+                          key={d}
+                          className="bg-blue-50 text-[#2563EB] text-xs font-bold uppercase px-2 py-0.5 rounded"
+                        >
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs font-semibold text-slate-400 block uppercase">
+                      Intervalo Previsto
+                    </span>
+                    <p className="text-sm font-medium text-slate-800 mt-1 font-mono">
+                      {funcionario.expand.jornada_atual.hora_inicio_intervalo &&
+                      funcionario.expand.jornada_atual.hora_retorno_intervalo
+                        ? `${funcionario.expand.jornada_atual.hora_inicio_intervalo} às ${funcionario.expand.jornada_atual.hora_retorno_intervalo}`
+                        : 'Sem intervalo previsto'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-xs font-semibold text-slate-400 block uppercase">
+                      Dias de Folga
+                    </span>
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {(funcionario.expand.jornada_atual.dias_folga || []).map((d) => (
+                        <span
+                          key={d}
+                          className="bg-slate-100 text-slate-600 text-xs font-bold uppercase px-2 py-0.5 rounded"
+                        >
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Histórico com Vigência */}
+              <div className="pt-2">
+                <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                  <History className="w-4 h-4 text-slate-500" />
+                  Histórico de Vigências de Jornada
+                </h4>
+                {historicoJornadas.length === 0 ? (
+                  <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-500">
+                    Nenhuma alteração histórica gravada. A jornada atual é a vigente desde a
+                    admissão.
+                  </div>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                          <th className="py-2.5 px-4">Jornada</th>
+                          <th className="py-2.5 px-4">Data Início</th>
+                          <th className="py-2.5 px-4">Data Fim</th>
+                          <th className="py-2.5 px-4">Horários</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {historicoJornadas.map((h) => (
+                          <tr key={h.id}>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">
+                              {h.expand?.jornada?.nome || 'Jornada'}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600 font-mono">
+                              {formatBRDate(h.data_inicio)}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600 font-mono">
+                              {h.data_fim ? (
+                                formatBRDate(h.data_fim)
+                              ) : (
+                                <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-semibold text-[10px]">
+                                  Vigente Atual
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-500 font-mono">
+                              {h.expand?.jornada?.hora_entrada} - {h.expand?.jornada?.hora_saida}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: BANCO DE HORAS */}
+          {activeTab === 'banco_horas' && (
+            <div className="space-y-6">
+              {/* Cards de Saldo */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-xl">
+                  <span className="text-xs font-semibold text-blue-900 block uppercase">
+                    Saldo Acumulado
+                  </span>
+                  <p
+                    className={`text-2xl font-bold font-mono mt-1 ${bancoHorasSaldo.minutos < 0 ? 'text-red-600' : 'text-emerald-700'}`}
+                  >
+                    {bancoHorasSaldo.horasFormatadas}
+                  </p>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">
+                    {bancoHorasSaldo.minutos >= 0 ? 'Horas a compensar/pagar' : 'Horas em débito'}
+                  </span>
+                </div>
+
+                <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl">
+                  <span className="text-xs font-semibold text-emerald-900 block uppercase">
+                    Total de Créditos
+                  </span>
+                  <p className="text-2xl font-bold font-mono text-emerald-700 mt-1">
+                    +{minutesToHoursText(bancoHorasSaldo.totalCredito)}
+                  </p>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">
+                    Horas extras acumuladas
+                  </span>
+                </div>
+
+                <div className="p-4 bg-red-50/50 border border-red-200 rounded-xl">
+                  <span className="text-xs font-semibold text-red-900 block uppercase">
+                    Total de Débitos
+                  </span>
+                  <p className="text-2xl font-bold font-mono text-red-700 mt-1">
+                    -{minutesToHoursText(bancoHorasSaldo.totalDebito)}
+                  </p>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">
+                    Compensações e descontos
+                  </span>
+                </div>
+              </div>
+
+              {/* Botão de Lançamento */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Extrato do Banco de Horas</h4>
+                  <p className="text-xs text-slate-500">
+                    Histórico de créditos, compensações e ajustes manuais
+                  </p>
+                </div>
+
+                <Button
+                  onClick={() => {
+                    setBhHoras('01:00')
+                    setBhDataRef(new Date().toISOString().split('T')[0])
+                    setBhMotivo('')
+                    setBhTipo('credito')
+                    setBhModalOpen(true)
+                  }}
+                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-9 px-3.5 shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1.5" />
+                  Novo Lançamento
+                </Button>
+              </div>
+
+              {bancoHorasLancamentos.length === 0 ? (
+                <div className="py-10 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                  <p className="text-xs text-slate-500">
+                    Nenhum lançamento no banco de horas deste funcionário.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                        <th className="py-2.5 px-4">Data Ref.</th>
+                        <th className="py-2.5 px-4">Tipo</th>
+                        <th className="py-2.5 px-4">Duração</th>
+                        <th className="py-2.5 px-4">Motivo / Descrição</th>
+                        <th className="py-2.5 px-4">Responsável</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {bancoHorasLancamentos.map((b) => (
+                        <tr key={b.id} className="hover:bg-slate-50/80">
+                          <td className="py-2.5 px-4 font-mono text-slate-700">
+                            {formatBRDate(b.data_referencia)}
+                          </td>
+                          <td className="py-2.5 px-4">
+                            {b.tipo === 'credito' && (
+                              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold">
+                                Crédito (+)
+                              </span>
+                            )}
+                            {b.tipo === 'debito' && (
+                              <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold">
+                                Débito (-)
+                              </span>
+                            )}
+                            {b.tipo === 'ajuste_manual' && (
+                              <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[10px] font-bold">
+                                Ajuste
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono font-bold text-slate-900">
+                            {minutesToHoursText(b.minutos)} ({b.minutos}m)
+                          </td>
+                          <td className="py-2.5 px-4 text-slate-700 max-w-xs">{b.motivo}</td>
+                          <td className="py-2.5 px-4 text-slate-500 text-[11px]">
+                            {b.expand?.usuario_responsavel?.nome ||
+                              b.expand?.usuario_responsavel?.name ||
+                              'RH'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -1048,6 +1398,258 @@ export default function FuncionarioFicha() {
                 className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
               >
                 {salvandoPin ? 'Gravando PIN...' : 'Salvar PIN'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Alterar Jornada com Vigência */}
+      <Dialog open={trocaJornadaModalOpen} onOpenChange={setTrocaJornadaModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alterar Jornada de Trabalho</DialogTitle>
+            <DialogDescription>
+              Defina a nova jornada para <strong>{funcionario.nome}</strong> e a data de início da
+              vigência. O espelho dos meses anteriores continuará respeitando a jornada anterior.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!id || !novaJornadaId) return
+              setSalvandoJornada(true)
+              try {
+                // 1. Close current history if any
+                const currentHist = historicoJornadas.find((h) => !h.data_fim)
+                if (currentHist) {
+                  // End date = one day before the new one
+                  const d = new Date(dataInicioJornada)
+                  d.setDate(d.getDate() - 1)
+                  const endStr = d.toISOString().split('T')[0]
+                  await pb.collection('historico_jornadas').update(currentHist.id, {
+                    data_fim: endStr,
+                  })
+                }
+
+                // 2. Create new history record
+                await historicoJornadasService.create({
+                  funcionario: id,
+                  jornada: novaJornadaId,
+                  data_inicio: dataInicioJornada,
+                })
+
+                // 3. Update current jornada in funcionario record
+                await pb.collection('funcionarios').update(id, {
+                  jornada_atual: novaJornadaId,
+                })
+
+                toast({
+                  title: 'Jornada atualizada.',
+                  description:
+                    'A nova jornada e seu histórico de vigência foram gravados com sucesso.',
+                  className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                })
+
+                setTrocaJornadaModalOpen(false)
+                loadData()
+              } catch (err: any) {
+                toast({
+                  title: 'Erro ao alterar jornada',
+                  description: err?.message,
+                  variant: 'destructive',
+                })
+              } finally {
+                setSalvandoJornada(false)
+              }
+            }}
+            className="space-y-4 pt-2"
+          >
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Nova Jornada <span className="text-red-500">*</span>
+              </Label>
+              <Select value={novaJornadaId} onValueChange={setNovaJornadaId}>
+                <SelectTrigger className="text-xs">
+                  <SelectValue placeholder="Selecione a nova jornada" />
+                </SelectTrigger>
+                <SelectContent>
+                  {todasJornadas.map((j) => (
+                    <SelectItem key={j.id} value={j.id}>
+                      {j.nome} ({j.hora_entrada} às {j.hora_saida})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="dataInicioJor" className="text-xs font-semibold">
+                Data de Início da Vigência <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="dataInicioJor"
+                type="date"
+                required
+                value={dataInicioJornada}
+                onChange={(e) => setDataInicioJornada(e.target.value)}
+              />
+              <p className="text-[11px] text-slate-500">
+                A partir desta data os cálculos do espelho de ponto utilizarão os parâmetros desta
+                nova jornada.
+              </p>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={salvandoJornada}
+                onClick={() => setTrocaJornadaModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={salvandoJornada || !novaJornadaId}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+              >
+                {salvandoJornada ? 'Salvando...' : 'Confirmar Alteração'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Lançamento no Banco de Horas */}
+      <Dialog open={bhModalOpen} onOpenChange={setBhModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Lançar no Banco de Horas</DialogTitle>
+            <DialogDescription>
+              Lance crédito de horas extras, compensações ou deduções no saldo de{' '}
+              <strong>{funcionario.nome}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!id || !bhMotivo.trim()) return
+
+              const [h, m] = bhHoras.split(':').map((v) => parseInt(v, 10))
+              const minutosTotal = (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m)
+
+              if (minutosTotal <= 0) {
+                toast({
+                  title: 'Duração inválida',
+                  description: 'Informe uma quantidade de tempo maior que zero.',
+                  variant: 'destructive',
+                })
+                return
+              }
+
+              setSalvandoBh(true)
+              try {
+                await bancoHorasService.lancar({
+                  funcionario: id,
+                  tipo: bhTipo,
+                  minutos: minutosTotal,
+                  data_referencia: bhDataRef,
+                  motivo: bhMotivo.trim(),
+                })
+
+                toast({
+                  title: 'Lançamento efetuado com sucesso.',
+                  className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                })
+
+                setBhModalOpen(false)
+                loadData()
+              } catch (err: any) {
+                toast({
+                  title: 'Erro ao lançar no banco de horas',
+                  description: err?.message,
+                  variant: 'destructive',
+                })
+              } finally {
+                setSalvandoBh(false)
+              }
+            }}
+            className="space-y-4 pt-2"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tipo de Lançamento</Label>
+                <Select value={bhTipo} onValueChange={(val: any) => setBhTipo(val)}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="credito">Crédito (+ Horas)</SelectItem>
+                    <SelectItem value="debito">Débito (- Compensação)</SelectItem>
+                    <SelectItem value="ajuste_manual">Ajuste Manual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bhHorasInput" className="text-xs font-semibold">
+                  Quantidade (HH:MM) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="bhHorasInput"
+                  type="time"
+                  required
+                  value={bhHoras}
+                  onChange={(e) => setBhHoras(e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="bhDataRefInput" className="text-xs font-semibold">
+                Data de Referência <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="bhDataRefInput"
+                type="date"
+                required
+                value={bhDataRef}
+                onChange={(e) => setBhDataRef(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="bhMotivoInput" className="text-xs font-semibold">
+                Motivo / Justificativa <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="bhMotivoInput"
+                required
+                placeholder="Ex: Hora extra autorizada / Compensação de folga"
+                value={bhMotivo}
+                onChange={(e) => setBhMotivo(e.target.value)}
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={salvandoBh}
+                onClick={() => setBhModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={salvandoBh || !bhMotivo.trim()}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+              >
+                {salvandoBh ? 'Gravando...' : 'Salvar Lançamento'}
               </Button>
             </DialogFooter>
           </form>

@@ -15,6 +15,7 @@ import {
   LogOut,
   User as UserIcon,
   ChevronDown,
+  FileCheck2,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -82,13 +83,13 @@ export default function AdminLayout() {
   }, [location.pathname])
 
   const navItems = [
-    { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Funcionários', path: '/admin/funcionarios', icon: Users },
+    { name: 'Espelho de Ponto', path: '/admin/espelho-ponto', icon: FileCheck2 },
     { name: 'Departamentos', path: '/admin/departamentos', icon: Building2 },
     { name: 'Cargos', path: '/admin/cargos', icon: Briefcase },
     { name: 'Configurações', path: '/admin/configuracoes', icon: Settings },
   ]
-
   // Derive page title from route
   const getPageTitle = () => {
     const p = location.pathname
@@ -97,6 +98,7 @@ export default function AdminLayout() {
     if (p.includes('/editar')) return 'Editar Funcionário'
     if (p.startsWith('/admin/funcionarios/') && p !== '/admin/funcionarios')
       return 'Ficha do Funcionário'
+    if (p.startsWith('/admin/espelho-ponto')) return 'Espelho de Ponto'
     if (p.startsWith('/admin/funcionarios')) return 'Funcionários'
     if (p.startsWith('/admin/departamentos')) return 'Departamentos'
     if (p.startsWith('/admin/cargos')) return 'Cargos'

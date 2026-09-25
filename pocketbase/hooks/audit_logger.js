@@ -36,6 +36,9 @@ onRecordCreateRequest(
   'ferias',
   'ausencias',
   'documentos',
+  'fechamentos_folha',
+  'banco_horas',
+  'tratamentos_ponto',
 )
 
 onRecordUpdateRequest(
@@ -73,6 +76,9 @@ onRecordUpdateRequest(
   'ferias',
   'ausencias',
   'documentos',
+  'fechamentos_folha',
+  'banco_horas',
+  'tratamentos_ponto',
 )
 
 onRecordDeleteRequest(
@@ -108,4 +114,7 @@ onRecordDeleteRequest(
   'ferias',
   'ausencias',
   'documentos',
+  'fechamentos_folha',
+  'banco_horas',
+  'tratamentos_ponto',
 )

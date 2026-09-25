@@ -23,6 +23,7 @@ import Departamentos from '@/pages/admin/Departamentos'
 import Cargos from '@/pages/admin/Cargos'
 import Configuracoes from '@/pages/admin/Configuracoes'
 import TerminalPonto from '@/pages/terminal/TerminalPonto'
+import EspelhoPonto from '@/pages/admin/EspelhoPonto'
 
 const App = () => (
   <BrowserRouter>
@@ -62,6 +63,7 @@ const App = () => (
             <Route path="funcionarios/novo" element={<FuncionarioForm />} />
             <Route path="funcionarios/:id" element={<FuncionarioFicha />} />
             <Route path="funcionarios/:id/editar" element={<FuncionarioForm />} />
+            <Route path="espelho-ponto" element={<EspelhoPonto />} />
             <Route path="departamentos" element={<Departamentos />} />
             <Route path="cargos" element={<Cargos />} />
             <Route path="configuracoes" element={<Configuracoes />} />

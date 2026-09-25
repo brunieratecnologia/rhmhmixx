@@ -55,6 +55,8 @@ export interface Jornada {
   hora_saida: string
   duracao_jornada_min: number
   dias_folga: ('seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom')[]
+  atravessa_meia_noite?: boolean
+  tipo_escala?: 'semanal_fixa' | 'escala_12x36' | 'escala_6x1' | 'personalizada'
   created: string
   updated: string
 }
@@ -116,6 +118,64 @@ export interface RegistroHorario {
   updated: string
   expand?: {
     funcionario?: Funcionario
+  }
+}
+
+export interface TratamentoPonto {
+  id: string
+  registro?: string
+  funcionario: string
+  tipo: 'justificativa' | 'correcao' | 'classificacao'
+  justificativa: string
+  usuario_responsavel?: string
+  data_tratamento: string
+  informacao_corrigida?: string
+  data_registro?: string
+  hora_registro?: string
+  tipo_marcacao?: 'entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida' | 'outro'
+  origem_ajuste?: 'inclusao_ponto_faltante' | 'justificativa_inconsistencia' | 'abono_horas'
+  created: string
+  updated: string
+  expand?: {
+    funcionario?: Funcionario
+    registro?: RegistroHorario
+    usuario_responsavel?: User
+  }
+}
+
+export interface FechamentoFolha {
+  id: string
+  competencia_ano: number
+  competencia_mes: number
+  status: 'aberto_fechamento' | 'fechado'
+  data_abertura_fechamento?: string
+  data_encerramento?: string
+  responsavel_abertura?: string
+  responsavel_encerramento?: string
+  observacoes?: string
+  created: string
+  updated: string
+  expand?: {
+    responsavel_abertura?: User
+    responsavel_encerramento?: User
+  }
+}
+
+export interface BancoHorasLancamento {
+  id: string
+  funcionario: string
+  data_referencia: string
+  tipo: 'credito' | 'debito' | 'ajuste_manual'
+  minutos: number
+  motivo: string
+  usuario_responsavel?: string
+  competencia_ano?: number
+  competencia_mes?: number
+  created: string
+  updated: string
+  expand?: {
+    funcionario?: Funcionario
+    usuario_responsavel?: User
   }
 }
 

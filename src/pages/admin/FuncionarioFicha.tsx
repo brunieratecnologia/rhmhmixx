@@ -7,6 +7,7 @@ import {
   historicoJornadasService,
   feriasService,
   ausenciasService,
+  documentosService,
 } from '@/services/rh'
 import type {
   Funcionario,
@@ -14,6 +15,7 @@ import type {
   HistoricoJornada,
   Ferias,
   Ausencia,
+  Documento,
 } from '@/types/rh'
 import pb from '@/lib/pocketbase/client'
 import { formatBRDate, formatBRCurrency, maskCPF, maskPhone } from '@/lib/formatters'
@@ -112,6 +114,15 @@ export default function FuncionarioFicha() {
   const [historicoJornadas, setHistoricoJornadas] = useState<HistoricoJornada[]>([])
   const [feriasList, setFeriasList] = useState<Ferias[]>([])
   const [ausenciasList, setAusenciasList] = useState<Ausencia[]>([])
+  const [documentosList, setDocumentosList] = useState<Documento[]>([])
+  const [uploadDocModalOpen, setUploadDocModalOpen] = useState(false)
+  const [docNome, setDocNome] = useState('')
+  const [docDescricao, setDocDescricao] = useState('')
+  const [docCategoria, setDocCategoria] = useState<Documento['categoria']>('contrato_trabalho')
+  const [docValidade, setDocValidade] = useState('')
+  const [docNivelAcesso, setDocNivelAcesso] = useState<Documento['nivel_acesso']>('restrito_rh')
+  const [docArquivo, setDocArquivo] = useState<File | null>(null)
+  const [salvandoDoc, setSalvandoDoc] = useState(false)
 
   // Modals
   const [desligarModalOpen, setDesligarModalOpen] = useState(false)
@@ -156,14 +167,16 @@ export default function FuncionarioFicha() {
       setBancoHorasLancamentos(bhList)
       setBancoHorasSaldo(bhSaldo)
 
-      // Load Ferias and Ausencias with expand
+      // Load Ferias, Ausencias and Documentos with expand
       try {
-        const [ferRes, ausRes] = await Promise.all([
+        const [ferRes, ausRes, docRes] = await Promise.all([
           feriasService.listByFuncionario(id),
           ausenciasService.listByFuncionario(id),
+          documentosService.list({ funcionarioId: id }),
         ])
         setFeriasList(ferRes)
         setAusenciasList(ausRes)
+        setDocumentosList(docRes)
       } catch {
         /* intentionally ignored */
       }
@@ -677,11 +690,12 @@ export default function FuncionarioFicha() {
                       </div>
                       <div>
                         <span className="text-xs font-semibold text-slate-800 block">
-                          PIN de Acesso ao Terminal Coletivo
+                          PIN Exclusivo do Terminal de Ponto
                         </span>
                         <p className="text-xs text-slate-500">
-                          Código numérico individual de 4 a 6 dígitos utilizado no terminal de
-                          registro de horários.
+                          Código numérico de 4 a 6 dígitos utilizado para identificação direta no
+                          terminal (sem necessidade de digitar matrícula). Cada funcionário ativo
+                          deve ter um PIN único.
                         </p>
                       </div>
                     </div>
@@ -1121,16 +1135,161 @@ export default function FuncionarioFicha() {
             </div>
           )}
 
-          {/* TAB: DOCUMENTOS */}
+          {/* TAB: DOCUMENTOS (ETAPA 5) */}
           {activeTab === 'documentos' && (
-            <div className="py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-                <FolderOpen className="w-8 h-8" />
+            <div className="space-y-6">
+              {/* Header da aba */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500 uppercase block">
+                    Prontuário e Dossiê Documental
+                  </span>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">
+                    {funcionario.nome} • {documentosList.length} documento(s) cadastrado(s)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Link to={`/admin/documentos?funcionarioId=${funcionario.id}`}>
+                    <Button
+                      variant="outline"
+                      className="text-xs h-9 border-slate-200 text-[#2563EB] hover:bg-blue-50"
+                    >
+                      <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
+                      Abrir na Central
+                    </Button>
+                  </Link>
+
+                  <Button
+                    onClick={() => {
+                      setDocNome('')
+                      setDocDescricao('')
+                      setDocValidade('')
+                      setDocArquivo(null)
+                      setUploadDocModalOpen(true)
+                    }}
+                    className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-9 font-semibold shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />
+                    Novo Documento
+                  </Button>
+                </div>
               </div>
-              <h3 className="text-base font-bold text-slate-800">Nenhum documento vinculado.</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                A gestão e armazenamento seguro de documentos será ativada na etapa correspondente.
-              </p>
+
+              {/* Lista categorizada de documentos */}
+              {documentosList.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                  <div className="w-14 h-14 rounded-full bg-blue-50 text-[#2563EB] flex items-center justify-center mb-3">
+                    <FolderOpen className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800">Nenhum documento arquivado</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                    Cadastre contratos de trabalho, documentos admissionais, atestados e termos
+                    assinados vinculados a este colaborador.
+                  </p>
+                  <Button
+                    onClick={() => setUploadDocModalOpen(true)}
+                    size="sm"
+                    className="mt-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-8"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Fazer Upload Agora
+                  </Button>
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                        <th className="py-2.5 px-4">Documento</th>
+                        <th className="py-2.5 px-4">Categoria</th>
+                        <th className="py-2.5 px-4">Nível de Acesso</th>
+                        <th className="py-2.5 px-4">Data Envio</th>
+                        <th className="py-2.5 px-4">Validade</th>
+                        <th className="py-2.5 px-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {documentosList.map((doc) => {
+                        return (
+                          <tr key={doc.id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="py-2.5 px-4">
+                              <span className="font-bold text-slate-800 block">{doc.nome}</span>
+                              {doc.descricao && (
+                                <span className="text-[11px] text-slate-500 block truncate max-w-xs">
+                                  {doc.descricao}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {doc.arquivo}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <Badge variant="outline" className="text-[11px] capitalize">
+                                {doc.categoria.replace('_', ' ')}
+                              </Badge>
+                            </td>
+                            <td className="py-2.5 px-4">
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                  doc.nivel_acesso === 'restrito_medico'
+                                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                    : doc.nivel_acesso === 'restrito_rh'
+                                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                }`}
+                              >
+                                {doc.nivel_acesso.replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600 font-mono">
+                              {formatBRDate(doc.data_envio || doc.created)}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600 font-mono">
+                              {doc.data_validade ? (
+                                formatBRDate(doc.data_validade)
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-4 text-right">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={async () => {
+                                  try {
+                                    const url = await documentosService.getSecureUrl(doc)
+                                    await documentosService.logAcessoVisualizacao(doc, 'download')
+                                    const res = await fetch(url)
+                                    const blob = await res.blob()
+                                    const blobUrl = window.URL.createObjectURL(blob)
+                                    const a = document.createElement('a')
+                                    a.href = blobUrl
+                                    a.download = doc.arquivo || `${doc.nome}.pdf`
+                                    document.body.appendChild(a)
+                                    a.click()
+                                    document.body.removeChild(a)
+                                    window.URL.revokeObjectURL(blobUrl)
+                                  } catch (err: any) {
+                                    toast({
+                                      title: 'Erro ao baixar documento',
+                                      description: err.message,
+                                      variant: 'destructive',
+                                    })
+                                  }
+                                }}
+                                className="h-7 text-xs text-[#2563EB] hover:bg-blue-50"
+                              >
+                                Baixar
+                              </Button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -1438,6 +1597,185 @@ export default function FuncionarioFicha() {
         </DialogContent>
       </Dialog>
 
+      {/* Modal Upload Rápido de Documento na Ficha */}
+      <Dialog open={uploadDocModalOpen} onOpenChange={setUploadDocModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2563EB] flex items-center justify-center mb-2">
+              <FolderOpen className="w-5 h-5" />
+            </div>
+            <DialogTitle>Anexar Documento ao Prontuário</DialogTitle>
+            <DialogDescription>
+              Vincule um novo arquivo ao funcionário <strong>{funcionario.nome}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!id || !docNome.trim() || !docArquivo) return
+              setSalvandoDoc(true)
+              try {
+                await documentosService.create({
+                  funcionario: id,
+                  categoria: docCategoria,
+                  nome: docNome.trim(),
+                  descricao: docDescricao.trim() || undefined,
+                  data_validade: docValidade || undefined,
+                  nivel_acesso: docNivelAcesso,
+                  arquivo: docArquivo,
+                  usuario_responsavel: user?.id,
+                })
+
+                toast({
+                  title: 'Documento anexado com sucesso.',
+                  description: 'Arquivo armazenado com acesso seguro.',
+                  className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                })
+
+                setUploadDocModalOpen(false)
+                setDocNome('')
+                setDocDescricao('')
+                setDocValidade('')
+                setDocArquivo(null)
+                loadData()
+              } catch (err: any) {
+                toast({
+                  title: 'Erro ao anexar documento',
+                  description: err?.message,
+                  variant: 'destructive',
+                })
+              } finally {
+                setSalvandoDoc(false)
+              }
+            }}
+            className="space-y-4 pt-2"
+          >
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Título do Documento <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                required
+                placeholder="Ex: Contrato de Trabalho, Documento Pessoal..."
+                value={docNome}
+                onChange={(e) => setDocNome(e.target.value)}
+                className="text-xs h-9"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Categoria</Label>
+                <Select
+                  value={docCategoria}
+                  onValueChange={(val: any) => {
+                    setDocCategoria(val)
+                    if (val === 'atestado_medico') setDocNivelAcesso('restrito_medico')
+                  }}
+                >
+                  <SelectTrigger className="text-xs h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contrato_trabalho">Contrato de Trabalho</SelectItem>
+                    <SelectItem value="documentacao_admissional">Doc. Admissional</SelectItem>
+                    <SelectItem value="atestado_medico">Atestado Médico</SelectItem>
+                    <SelectItem value="comprovantes">Comprovante</SelectItem>
+                    <SelectItem value="termos_internos">Termo Interno</SelectItem>
+                    <SelectItem value="documentos_ferias">Férias</SelectItem>
+                    <SelectItem value="outros">Outros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Nível de Acesso</Label>
+                <Select value={docNivelAcesso} onValueChange={(val: any) => setDocNivelAcesso(val)}>
+                  <SelectTrigger className="text-xs h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="restrito_rh">Restrito RH</SelectItem>
+                    <SelectItem value="restrito_medico">Restrito Médico</SelectItem>
+                    <SelectItem value="publico_interno">Público Interno</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Validade (se houver)</Label>
+                <Input
+                  type="date"
+                  value={docValidade}
+                  onChange={(e) => setDocValidade(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Observação</Label>
+                <Input
+                  placeholder="Opcional"
+                  value={docDescricao}
+                  onChange={(e) => setDocDescricao(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Arquivo (PDF, JPEG, PNG — Máx 10MB) <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                required
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) {
+                    if (f.size > 10 * 1024 * 1024) {
+                      toast({
+                        title: 'Arquivo muito grande',
+                        description: 'O tamanho máximo permitido é de 10 MB.',
+                        variant: 'destructive',
+                      })
+                      e.target.value = ''
+                      setDocArquivo(null)
+                      return
+                    }
+                    setDocArquivo(f)
+                    if (!docNome) setDocNome(f.name.replace(/\.[^/.]+$/, ''))
+                  }
+                }}
+                className="text-xs"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={salvandoDoc}
+                onClick={() => setUploadDocModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={salvandoDoc || !docNome || !docArquivo}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+              >
+                {salvandoDoc ? 'Salvando...' : 'Salvar Documento'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Modal Definir / Trocar PIN */}
       <Dialog open={pinModalOpen} onOpenChange={setPinModalOpen}>
         <DialogContent className="sm:max-w-md">
@@ -1447,9 +1785,10 @@ export default function FuncionarioFicha() {
             </div>
             <DialogTitle>PIN do Terminal Coletivo</DialogTitle>
             <DialogDescription>
-              Defina ou atualize o PIN de 4 a 6 dígitos para o funcionário{' '}
-              <strong>{funcionario.nome}</strong>. O PIN é armazenado com hash criptográfico no
-              servidor e auditado.
+              Defina ou atualize o PIN exclusivo de 4 a 6 dígitos para{' '}
+              <strong>{funcionario.nome}</strong>. Como o terminal registra o ponto apenas pelo PIN
+              (sem matrícula), este código deve ser único entre os colaboradores ativos e armazenado
+              com hash criptográfico.
             </DialogDescription>
           </DialogHeader>
 

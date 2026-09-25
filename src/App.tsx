@@ -26,6 +26,8 @@ import TerminalPonto from '@/pages/terminal/TerminalPonto'
 import EspelhoPonto from '@/pages/admin/EspelhoPonto'
 import Ferias from '@/pages/admin/Ferias'
 import Ausencias from '@/pages/admin/Ausencias'
+import DocumentosPage from '@/pages/admin/Documentos'
+import HoleritesPage from '@/pages/admin/Holerites'
 
 const App = () => (
   <BrowserRouter>
@@ -66,6 +68,8 @@ const App = () => (
             <Route path="funcionarios/:id" element={<FuncionarioFicha />} />
             <Route path="funcionarios/:id/editar" element={<FuncionarioForm />} />
             <Route path="espelho-ponto" element={<EspelhoPonto />} />
+            <Route path="documentos" element={<DocumentosPage />} />
+            <Route path="holerites" element={<HoleritesPage />} />
             <Route path="ferias" element={<Ferias />} />
             <Route path="ausencias" element={<Ausencias />} />
             <Route path="departamentos" element={<Departamentos />} />{' '}

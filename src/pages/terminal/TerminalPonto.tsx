@@ -12,6 +12,8 @@ import {
   Sparkles,
   ShieldAlert,
   ArrowRight,
+  KeyRound,
+  ShieldCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -24,10 +26,8 @@ export default function TerminalPonto() {
   // Clock
   const [currentTime, setCurrentTime] = useState<Date>(new Date())
 
-  // Form Fields
-  const [matricula, setMatricula] = useState<string>('')
+  // Form Field: APENAS PIN do funcionário
   const [pin, setPin] = useState<string>('')
-  const [focusedField, setFocusedField] = useState<'matricula' | 'pin'>('matricula')
 
   // Status & Confirmation
   const [submitting, setSubmitting] = useState<boolean>(false)
@@ -36,7 +36,6 @@ export default function TerminalPonto() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState<boolean>(false)
 
-  const matriculaInputRef = useRef<HTMLInputElement>(null)
   const pinInputRef = useRef<HTMLInputElement>(null)
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -64,7 +63,6 @@ export default function TerminalPonto() {
 
   useEffect(() => {
     checkStatus()
-    // Poll connection every 30 seconds
     const interval = setInterval(() => {
       checkStatus()
     }, 30000)
@@ -73,18 +71,16 @@ export default function TerminalPonto() {
 
   // 3. Clear Confirmation and Reset
   const resetForm = useCallback(() => {
-    setMatricula('')
     setPin('')
     setConfirmation(null)
     setErrorMessage(null)
     setIsLocked(false)
-    setFocusedField('matricula')
     if (countdownTimerRef.current) {
       clearInterval(countdownTimerRef.current)
       countdownTimerRef.current = null
     }
     setTimeout(() => {
-      matriculaInputRef.current?.focus()
+      pinInputRef.current?.focus()
     }, 100)
   }, [])
 
@@ -114,29 +110,18 @@ export default function TerminalPonto() {
     setErrorMessage(null)
 
     if (val === 'clear') {
-      if (focusedField === 'matricula') setMatricula('')
-      else setPin('')
+      setPin('')
       return
     }
 
     if (val === 'backspace') {
-      if (focusedField === 'matricula') {
-        setMatricula((prev) => prev.slice(0, -1))
-      } else {
-        setPin((prev) => prev.slice(0, -1))
-      }
+      setPin((prev) => prev.slice(0, -1))
       return
     }
 
-    // Number keys
-    if (focusedField === 'matricula') {
-      if (matricula.length < 15) {
-        setMatricula((prev) => prev + val)
-      }
-    } else {
-      if (pin.length < 6) {
-        setPin((prev) => prev + val)
-      }
+    // Number keys: PIN 4 a 6 dígitos
+    if (pin.length < 6) {
+      setPin((prev) => prev + val)
     }
   }
 
@@ -147,31 +132,21 @@ export default function TerminalPonto() {
     return `req_${Date.now()}_${randomHex}`
   }
 
-  // Submit time punch
+  // Submit time punch (APENAS PIN)
   const handleRegisterPonto = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (submitting) return
 
-    const cleanMatricula = matricula.trim().toUpperCase()
     const cleanPin = pin.trim()
 
-    if (!cleanMatricula) {
-      setErrorMessage('Por favor, informe o seu número de matrícula.')
-      setFocusedField('matricula')
-      matriculaInputRef.current?.focus()
-      return
-    }
-
     if (!cleanPin) {
-      setErrorMessage('Por favor, digite o seu PIN de 4 a 6 dígitos.')
-      setFocusedField('pin')
+      setErrorMessage('Por favor, digite o seu PIN individual de 4 a 6 dígitos.')
       pinInputRef.current?.focus()
       return
     }
 
     if (cleanPin.length < 4 || cleanPin.length > 6) {
-      setErrorMessage('O PIN deve conter entre 4 e 6 dígitos.')
-      setFocusedField('pin')
+      setErrorMessage('O PIN deve conter entre 4 e 6 dígitos numéricos.')
       pinInputRef.current?.focus()
       return
     }
@@ -180,12 +155,12 @@ export default function TerminalPonto() {
     setErrorMessage(null)
     setIsLocked(false)
 
-    // Generate unique idempotency key
+    // Unique idempotency key
     const idRequisicao = generateIdempotencyKey()
 
     try {
       const res = await terminalService.registrarPonto({
-        matricula: cleanMatricula,
+        matricula: '', // Requisito: apenas PIN, sem matrícula
         pin: cleanPin,
         id_requisicao: idRequisicao,
       })
@@ -204,12 +179,11 @@ export default function TerminalPonto() {
         setIsLocked(true)
         setErrorMessage(
           data.message ||
-            'Terminal temporariamente bloqueado para esta matrícula por excesso de tentativas incorretas. Tente novamente mais tarde.',
+            'Terminal temporariamente bloqueado por excesso de tentativas incorretas. Tente novamente mais tarde.',
         )
       } else if (status === 401) {
-        setErrorMessage(data.message || 'Matrícula ou PIN inválido.')
+        setErrorMessage(data.message || 'PIN inválido ou não cadastrado.')
         setPin('')
-        setFocusedField('pin')
         pinInputRef.current?.focus()
       } else if (status === 403) {
         setErrorMessage(
@@ -267,7 +241,7 @@ export default function TerminalPonto() {
     <div className="min-h-screen bg-[#F4F6F9] flex flex-col justify-between text-slate-900 select-none">
       {/* 1. Header / Topo */}
       <header className="bg-white border-b border-[#E2E8F0] shadow-xs px-4 sm:px-8 py-3 sm:py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           {/* Logo & Company info */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             {companyLogoUrl ? (
@@ -285,7 +259,7 @@ export default function TerminalPonto() {
               <h1 className="text-sm sm:text-lg font-bold text-slate-900 tracking-tight truncate">
                 {companyDisplayName}
               </h1>
-              <p className="text-xs text-slate-500 font-medium">Terminal Eletrônico de Registro</p>
+              <p className="text-xs text-slate-500 font-medium">Terminal Eletrônico de Ponto</p>
             </div>
           </div>
 
@@ -307,7 +281,7 @@ export default function TerminalPonto() {
 
       {/* 2. Main Content / Centro */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-xl">
+        <div className="w-full max-w-md">
           {confirmation ? (
             /* Confirmation Success Screen with Countdown */
             <div className="bg-white rounded-2xl border-2 border-emerald-500 p-6 sm:p-8 shadow-xl text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
@@ -352,7 +326,7 @@ export default function TerminalPonto() {
               {/* Identificador Único */}
               <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-left">
                 <div className="flex items-center justify-between text-xs text-[#1E3A8A] font-semibold">
-                  <span>Identificador Único do Registro:</span>
+                  <span>Identificador Único:</span>
                   <span className="font-mono text-[11px] text-slate-600 bg-white px-2 py-0.5 rounded border border-blue-200">
                     {confirmation.identificador || 'N/A'}
                   </span>
@@ -381,15 +355,18 @@ export default function TerminalPonto() {
               </div>
             </div>
           ) : (
-            /* Terminal Input Card with Virtual Keypad */
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 sm:p-7 shadow-lg space-y-5">
+            /* Terminal Input Card with PIN ONLY */
+            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 sm:p-7 shadow-lg space-y-5">
               {/* Card Title */}
               <div className="text-center pb-2 border-b border-slate-100">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center mx-auto mb-2 shadow-xs">
+                  <KeyRound className="w-6 h-6" />
+                </div>
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                  Registro de Horário de Trabalho
+                  Digite seu PIN
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Informe sua matrícula e seu PIN individual de 4 a 6 dígitos
+                  Identificação rápida: digite apenas seu PIN numérico de 4 a 6 dígitos
                 </p>
               </div>
 
@@ -414,68 +391,46 @@ export default function TerminalPonto() {
                 </div>
               )}
 
-              {/* Inputs Form */}
+              {/* Inputs Form: ONLY PIN */}
               <form onSubmit={handleRegisterPonto} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Campo Matrícula */}
-                  <div
-                    onClick={() => {
-                      setFocusedField('matricula')
-                      matriculaInputRef.current?.focus()
-                    }}
-                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${
-                      focusedField === 'matricula'
-                        ? 'border-[#2563EB] bg-blue-50/30 ring-2 ring-[#2563EB]/15'
-                        : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                    }`}
-                  >
-                    <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
-                      Matrícula
-                    </label>
-                    <input
-                      ref={matriculaInputRef}
-                      type="text"
-                      inputMode="numeric"
-                      value={matricula}
-                      placeholder="Ex: 001"
-                      onFocus={() => setFocusedField('matricula')}
-                      onChange={(e) => setMatricula(e.target.value.toUpperCase())}
-                      className="w-full bg-transparent font-mono text-xl sm:text-2xl font-bold text-slate-900 tracking-wider focus:outline-none placeholder:text-slate-300 mt-1"
-                      autoComplete="off"
-                    />
+                {/* Campo PIN com Display Visual dos Dígitos */}
+                <div
+                  onClick={() => pinInputRef.current?.focus()}
+                  className="p-4 rounded-xl border-2 border-[#2563EB] bg-blue-50/20 ring-2 ring-[#2563EB]/15 transition-all cursor-pointer text-center"
+                >
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-2">
+                    PIN do Funcionário
+                  </label>
+
+                  {/* Indicador de Bolinhas do PIN */}
+                  <div className="flex items-center justify-center gap-3 my-2">
+                    {[0, 1, 2, 3, 4, 5].map((idx) => {
+                      const isFilled = pin.length > idx
+                      return (
+                        <div
+                          key={idx}
+                          className={`w-4 h-4 rounded-full border-2 transition-all ${
+                            isFilled
+                              ? 'bg-[#2563EB] border-[#2563EB] scale-110 shadow-xs'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        />
+                      )
+                    })}
                   </div>
 
-                  {/* Campo PIN */}
-                  <div
-                    onClick={() => {
-                      setFocusedField('pin')
-                      pinInputRef.current?.focus()
-                    }}
-                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${
-                      focusedField === 'pin'
-                        ? 'border-[#2563EB] bg-blue-50/30 ring-2 ring-[#2563EB]/15'
-                        : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block">
-                        PIN de Acesso
-                      </label>
-                      <span className="text-[10px] text-slate-400 font-medium">4 a 6 dígitos</span>
-                    </div>
-                    <input
-                      ref={pinInputRef}
-                      type="password"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={pin}
-                      placeholder="••••"
-                      onFocus={() => setFocusedField('pin')}
-                      onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="w-full bg-transparent font-mono text-xl sm:text-2xl font-bold text-slate-900 tracking-widest focus:outline-none placeholder:text-slate-300 mt-1"
-                      autoComplete="off"
-                    />
-                  </div>
+                  <input
+                    ref={pinInputRef}
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={pin}
+                    placeholder="••••"
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full bg-transparent font-mono text-center text-2xl font-bold text-slate-900 tracking-widest focus:outline-none placeholder:text-slate-300 mt-1"
+                    autoComplete="off"
+                    autoFocus
+                  />
                 </div>
 
                 {/* Virtual Keypad (Touch Screen Friendly) */}
@@ -486,7 +441,7 @@ export default function TerminalPonto() {
                         key={num}
                         type="button"
                         onClick={() => handleKeypadPress(String(num))}
-                        className="h-12 sm:h-14 bg-white hover:bg-blue-50 active:bg-blue-100 rounded-xl text-lg sm:text-xl font-bold text-slate-800 border border-slate-200/80 shadow-xs hover:border-[#2563EB]/40 transition-all flex items-center justify-center active:scale-95"
+                        className="h-12 sm:h-14 bg-white hover:bg-blue-50 active:bg-blue-100 rounded-xl text-xl sm:text-2xl font-bold text-slate-800 border border-slate-200/80 shadow-xs hover:border-[#2563EB]/40 transition-all flex items-center justify-center active:scale-95"
                       >
                         {num}
                       </button>
@@ -506,7 +461,7 @@ export default function TerminalPonto() {
                     <button
                       type="button"
                       onClick={() => handleKeypadPress('0')}
-                      className="h-12 sm:h-14 bg-white hover:bg-blue-50 active:bg-blue-100 rounded-xl text-lg sm:text-xl font-bold text-slate-800 border border-slate-200/80 shadow-xs hover:border-[#2563EB]/40 transition-all flex items-center justify-center active:scale-95"
+                      className="h-12 sm:h-14 bg-white hover:bg-blue-50 active:bg-blue-100 rounded-xl text-xl sm:text-2xl font-bold text-slate-800 border border-slate-200/80 shadow-xs hover:border-[#2563EB]/40 transition-all flex items-center justify-center active:scale-95"
                     >
                       0
                     </button>
@@ -523,21 +478,21 @@ export default function TerminalPonto() {
                   </div>
                 </div>
 
-                {/* Big Action Button "REGISTRAR PONTO" */}
+                {/* Action Button "REGISTRAR PONTO" */}
                 <Button
                   type="submit"
-                  disabled={submitting || !matricula || !pin}
+                  disabled={submitting || pin.length < 4}
                   className="w-full h-14 bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E3A8A] text-white font-extrabold text-base sm:text-lg rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {submitting ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>REGISTRANDO NO SERVIDOR...</span>
+                      <span>IDENTIFICANDO E REGISTRANDO...</span>
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-5 h-5" />
-                      <span>REGISTRAR PONTO</span>
+                      <span>CONFIRMAR PONTO</span>
                     </>
                   )}
                 </Button>
@@ -549,13 +504,13 @@ export default function TerminalPonto() {
 
       {/* 3. Footer / Base */}
       <footer className="bg-white border-t border-[#E2E8F0] px-4 sm:px-8 py-3 text-xs text-slate-500">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
           {/* Orientation message */}
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
             <p className="text-[11px] sm:text-xs text-slate-600 font-medium">
-              Aproxime-se do terminal, digite sua matrícula e PIN e pressione{' '}
-              <strong className="text-slate-800">Registrar Ponto</strong>.
+              Aproxime-se do terminal, digite seu PIN individual e pressione{' '}
+              <strong className="text-slate-800">Confirmar Ponto</strong>.
             </p>
           </div>
 
@@ -564,7 +519,7 @@ export default function TerminalPonto() {
             {isOnline ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Servidor Online</span>
+                <span>Terminal Online</span>
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-50 text-red-700 border border-red-200">

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-25T01:12:43.280Z",
+  "generatedAt": "2026-09-25T01:19:20.513Z",
   "collections": [
     {
       "name": "users",
@@ -927,6 +927,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1106,6 +1112,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "observacoes",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1357,7 +1369,7 @@
         {
           "name": "matricula",
           "type": "text",
-          "required": true,
+          "required": false,
           "system": false
         },
         {
@@ -1385,9 +1397,24 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "pin_hash",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ip",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
-      "indexes": ["CREATE UNIQUE INDEX idx_tentativas_pin_mat ON tentativas_pin (matricula)"]
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_tentativas_pin_mat ON tentativas_pin (matricula)",
+        "CREATE INDEX `idx_tentativas_pin_hash` ON `tentativas_pin` (pin_hash)"
+      ]
     },
     {
       "name": "fechamentos_folha",
@@ -1552,6 +1579,88 @@
         "CREATE INDEX idx_banco_horas_func ON banco_horas (funcionario)",
         "CREATE INDEX idx_banco_horas_data ON banco_horas (data_referencia)",
         "CREATE INDEX idx_banco_horas_comp ON banco_horas (competencia_ano, competencia_mes)"
+      ]
+    },
+    {
+      "name": "holerites_versoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "view": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "holerite",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "holerites"
+        },
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "competencia_mes",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "competencia_ano",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "versao",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "motivo_substituicao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "arquivo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "usuario_responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_holerites_ver_hol ON holerites_versoes (holerite)",
+        "CREATE INDEX idx_holerites_ver_func ON holerites_versoes (funcionario)"
       ]
     }
   ]

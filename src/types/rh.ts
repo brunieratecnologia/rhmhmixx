@@ -246,6 +246,7 @@ export interface Documento {
     | 'documentos_ferias'
     | 'outros'
   nome: string
+  descricao?: string
   data_envio?: string
   data_validade?: string
   arquivo?: string
@@ -256,6 +257,43 @@ export interface Documento {
   updated: string
   expand?: {
     funcionario?: Funcionario
+    usuario_responsavel?: User
+  }
+}
+
+export interface Holerite {
+  id: string
+  funcionario: string
+  competencia_mes: number
+  competencia_ano: number
+  data_envio?: string
+  arquivo?: string
+  usuario_responsavel?: string
+  versao?: number
+  observacoes?: string
+  created: string
+  updated: string
+  expand?: {
+    funcionario?: Funcionario
+    usuario_responsavel?: User
+  }
+}
+
+export interface HoleriteVersao {
+  id: string
+  holerite: string
+  funcionario: string
+  competencia_mes: number
+  competencia_ano: number
+  versao: number
+  motivo_substituicao?: string
+  arquivo?: string
+  usuario_responsavel?: string
+  created: string
+  updated: string
+  expand?: {
+    funcionario?: Funcionario
+    usuario_responsavel?: User
   }
 }
 

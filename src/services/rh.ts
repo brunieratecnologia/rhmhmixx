@@ -9,6 +9,8 @@ import type {
   Ferias,
   Ausencia,
   Documento,
+  Holerite,
+  HoleriteVersao,
   Solicitacao,
   HistoricoFuncionario,
   HistoricoJornada,
@@ -18,6 +20,14 @@ import type {
 export const funcionariosService = {
   async list(page = 1, perPage = 50, filter = '', sort = '-created') {
     return await pb.collection('funcionarios').getList<Funcionario>(page, perPage, {
+      filter,
+      sort,
+      expand: 'cargo,departamento,jornada_atual,user',
+    })
+  },
+
+  async listAll(filter = '', sort = 'nome') {
+    return await pb.collection('funcionarios').getFullList<Funcionario>({
       filter,
       sort,
       expand: 'cargo,departamento,jornada_atual,user',
@@ -582,11 +592,449 @@ export const atestadosService = {
     })
   },
 
+  async getFileToken(): Promise<string> {
+    try {
+      return await pb.files.getToken()
+    } catch {
+      return ''
+    }
+  },
+
   getFileUrl(
     record: { id: string; collectionId: string; collectionName?: string },
     fileName: string,
+    token?: string,
   ) {
-    return pb.files.getURL(record, fileName)
+    return pb.files.getURL(record, fileName, token ? { token } : undefined)
+  },
+}
+
+export const documentosService = {
+  async list(filters?: {
+    funcionarioId?: string
+    categoria?: string
+    search?: string
+    vencendo?: boolean
+    somenteAtivos?: boolean
+  }) {
+    const filterClauses: string[] = []
+
+    if (filters?.funcionarioId) {
+      filterClauses.push(`funcionario = "${filters.funcionarioId}"`)
+    }
+
+    if (filters?.categoria && filters.categoria !== 'todas') {
+      filterClauses.push(`categoria = "${filters.categoria}"`)
+    }
+
+    if (filters?.somenteAtivos !== false) {
+      filterClauses.push('ativo = true')
+    }
+
+    if (filters?.search) {
+      filterClauses.push(`nome ~ "${filters.search}"`)
+    }
+
+    if (filters?.vencendo) {
+      const today = new Date().toISOString().split('T')[0]
+      const future = new Date()
+      future.setDate(future.getDate() + 30)
+      const futureStr = future.toISOString().split('T')[0]
+      filterClauses.push(`data_validade >= "${today}" && data_validade <= "${futureStr}"`)
+    }
+
+    const filter = filterClauses.length > 0 ? filterClauses.join(' && ') : ''
+
+    return await pb.collection('documentos').getFullList<Documento>({
+      filter,
+      sort: '-data_envio,-created',
+      expand: 'funcionario,usuario_responsavel',
+    })
+  },
+
+  async getById(id: string) {
+    return await pb.collection('documentos').getOne<Documento>(id, {
+      expand: 'funcionario,usuario_responsavel',
+    })
+  },
+
+  async create(data: {
+    funcionario: string
+    categoria: Documento['categoria']
+    nome: string
+    descricao?: string
+    data_validade?: string
+    arquivo: File
+    nivel_acesso: Documento['nivel_acesso']
+    usuario_responsavel?: string
+  }) {
+    const formData = new FormData()
+    formData.append('funcionario', data.funcionario)
+    formData.append('categoria', data.categoria)
+    formData.append('nome', data.nome.trim())
+    if (data.descricao) formData.append('descricao', data.descricao.trim())
+    formData.append('data_envio', new Date().toISOString())
+    if (data.data_validade) formData.append('data_validade', data.data_validade)
+    formData.append('arquivo', data.arquivo)
+    formData.append('nivel_acesso', data.nivel_acesso)
+    formData.append('ativo', 'true')
+    if (data.usuario_responsavel) {
+      formData.append('usuario_responsavel', data.usuario_responsavel)
+    }
+
+    const record = await pb.collection('documentos').create<Documento>(formData, {
+      expand: 'funcionario,usuario_responsavel',
+    })
+
+    // Registrar log de auditoria
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: data.usuario_responsavel || pb.authStore.record?.id,
+        acao: 'upload_documento',
+        entidade: 'documentos',
+        entidade_id: record.id,
+        detalhes: `Upload do documento ${record.nome} (${record.categoria}) para funcionário ID ${record.funcionario}`,
+        nivel: record.nivel_acesso === 'restrito_medico' ? 'sensivel' : 'info',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+
+    return record
+  },
+
+  async update(
+    id: string,
+    data: {
+      nome?: string
+      descricao?: string
+      categoria?: Documento['categoria']
+      data_validade?: string
+      nivel_acesso?: Documento['nivel_acesso']
+      ativo?: boolean
+      arquivo?: File | null
+      adminUserId?: string
+    },
+  ) {
+    const formData = new FormData()
+    if (data.nome) formData.append('nome', data.nome.trim())
+    if (data.descricao !== undefined) formData.append('descricao', data.descricao.trim())
+    if (data.categoria) formData.append('categoria', data.categoria)
+    if (data.data_validade !== undefined) formData.append('data_validade', data.data_validade)
+    if (data.nivel_acesso) formData.append('nivel_acesso', data.nivel_acesso)
+    if (data.ativo !== undefined) formData.append('ativo', String(data.ativo))
+    if (data.arquivo) formData.append('arquivo', data.arquivo)
+
+    const updated = await pb.collection('documentos').update<Documento>(id, formData, {
+      expand: 'funcionario,usuario_responsavel',
+    })
+
+    // Registrar log de auditoria
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: data.adminUserId || pb.authStore.record?.id,
+        acao: 'update_documento',
+        entidade: 'documentos',
+        entidade_id: id,
+        detalhes: `Atualização de metadados/arquivo do documento ${updated.nome}`,
+        nivel: updated.nivel_acesso === 'restrito_medico' ? 'sensivel' : 'info',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+
+    return updated
+  },
+
+  async arquivar(id: string, adminUserId?: string) {
+    const updated = await pb.collection('documentos').update<Documento>(id, { ativo: false })
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: adminUserId || pb.authStore.record?.id,
+        acao: 'arquivar_documento',
+        entidade: 'documentos',
+        entidade_id: id,
+        detalhes: `Arquivamento do documento ${updated.nome}`,
+        nivel: updated.nivel_acesso === 'restrito_medico' ? 'sensivel' : 'info',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+    return updated
+  },
+
+  async desarquivar(id: string, adminUserId?: string) {
+    const updated = await pb.collection('documentos').update<Documento>(id, { ativo: true })
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: adminUserId || pb.authStore.record?.id,
+        acao: 'desarquivar_documento',
+        entidade: 'documentos',
+        entidade_id: id,
+        detalhes: `Restauração do documento ${updated.nome}`,
+        nivel: updated.nivel_acesso === 'restrito_medico' ? 'sensivel' : 'info',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+    return updated
+  },
+
+  async getSecureUrl(record: Documento, fileName?: string): Promise<string> {
+    const file = fileName || record.arquivo
+    if (!file) return ''
+    try {
+      const token = await pb.files.getToken()
+      return pb.files.getURL(record, file, { token })
+    } catch {
+      return pb.files.getURL(record, file)
+    }
+  },
+
+  async logAcessoVisualizacao(record: Documento, acao: 'view' | 'download') {
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: pb.authStore.record?.id,
+        acao: acao === 'download' ? 'download_documento' : 'visualizacao_documento',
+        entidade: 'documentos',
+        entidade_id: record.id,
+        detalhes: `${acao === 'download' ? 'Download' : 'Visualização'} segura do documento ${record.nome} (Categoria: ${record.categoria}, Acesso: ${record.nivel_acesso})`,
+        nivel: record.nivel_acesso === 'restrito_medico' ? 'sensivel' : 'info',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+  },
+}
+
+export const holeritesService = {
+  async list(filters?: {
+    funcionarioId?: string
+    competenciaAno?: number
+    competenciaMes?: number
+    search?: string
+  }) {
+    const filterClauses: string[] = []
+
+    if (filters?.funcionarioId && filters.funcionarioId !== 'todos') {
+      filterClauses.push(`funcionario = "${filters.funcionarioId}"`)
+    }
+
+    if (filters?.competenciaAno) {
+      filterClauses.push(`competencia_ano = ${filters.competenciaAno}`)
+    }
+
+    if (filters?.competenciaMes && filters.competenciaMes > 0) {
+      filterClauses.push(`competencia_mes = ${filters.competenciaMes}`)
+    }
+
+    const filter = filterClauses.length > 0 ? filterClauses.join(' && ') : ''
+
+    const list = await pb.collection('holerites').getFullList<Holerite>({
+      filter,
+      sort: '-competencia_ano,-competencia_mes,-data_envio,-created',
+      expand: 'funcionario,usuario_responsavel',
+    })
+
+    if (filters?.search) {
+      const q = filters.search.toLowerCase()
+      return list.filter((h) => {
+        const fNome = h.expand?.funcionario?.nome?.toLowerCase() || ''
+        const fMat = h.expand?.funcionario?.matricula?.toLowerCase() || ''
+        return fNome.includes(q) || fMat.includes(q)
+      })
+    }
+
+    return list
+  },
+
+  async getById(id: string) {
+    return await pb.collection('holerites').getOne<Holerite>(id, {
+      expand: 'funcionario,usuario_responsavel',
+    })
+  },
+
+  async create(data: {
+    funcionario: string
+    competencia_mes: number
+    competencia_ano: number
+    arquivo: File
+    observacoes?: string
+    usuario_responsavel?: string
+  }) {
+    // Verificar se já existe holerite para esta mesma competência e funcionário
+    const existentes = await pb.collection('holerites').getFullList<Holerite>({
+      filter: `funcionario = "${data.funcionario}" && competencia_ano = ${data.competencia_ano} && competencia_mes = ${data.competencia_mes}`,
+      sort: '-versao',
+    })
+
+    if (existentes.length > 0) {
+      throw new Error(
+        `Já existe um holerite cadastrado para a competência ${String(data.competencia_mes).padStart(2, '0')}/${data.competencia_ano}. Utilize a opção 'Substituir Holerite' para atualizar com versionamento auditado.`,
+      )
+    }
+
+    const formData = new FormData()
+    formData.append('funcionario', data.funcionario)
+    formData.append('competencia_mes', String(data.competencia_mes))
+    formData.append('competencia_ano', String(data.competencia_ano))
+    formData.append('data_envio', new Date().toISOString())
+    formData.append('arquivo', data.arquivo)
+    formData.append('versao', '1')
+    if (data.observacoes) formData.append('observacoes', data.observacoes.trim())
+    if (data.usuario_responsavel) {
+      formData.append('usuario_responsavel', data.usuario_responsavel)
+    }
+
+    const record = await pb.collection('holerites').create<Holerite>(formData, {
+      expand: 'funcionario,usuario_responsavel',
+    })
+
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: data.usuario_responsavel || pb.authStore.record?.id,
+        acao: 'upload_holerite',
+        entidade: 'holerites',
+        entidade_id: record.id,
+        detalhes: `Envio do holerite v1 ref. ${String(data.competencia_mes).padStart(2, '0')}/${data.competencia_ano} para funcionário ID ${data.funcionario}`,
+        nivel: 'sensivel',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+
+    return record
+  },
+
+  async substituir(
+    id: string,
+    data: {
+      arquivo: File
+      motivo_substituicao: string
+      observacoes?: string
+      usuario_responsavel?: string
+    },
+  ) {
+    if (!data.motivo_substituicao || data.motivo_substituicao.trim().length < 5) {
+      throw new Error('Informe o motivo da substituição do holerite (mínimo de 5 caracteres).')
+    }
+
+    const holeriteAtual = await pb.collection('holerites').getOne<Holerite>(id, {
+      expand: 'funcionario',
+    })
+
+    const versaoAnterior = holeriteAtual.versao || 1
+    const novaVersao = versaoAnterior + 1
+
+    // 1. Arquivar a versão anterior na coleção holerites_versoes
+    try {
+      const versaoFormData = new FormData()
+      versaoFormData.append('holerite', holeriteAtual.id)
+      versaoFormData.append('funcionario', holeriteAtual.funcionario)
+      versaoFormData.append('competencia_mes', String(holeriteAtual.competencia_mes))
+      versaoFormData.append('competencia_ano', String(holeriteAtual.competencia_ano))
+      versaoFormData.append('versao', String(versaoAnterior))
+      versaoFormData.append('motivo_substituicao', data.motivo_substituicao.trim())
+      if (data.usuario_responsavel) {
+        versaoFormData.append('usuario_responsavel', data.usuario_responsavel)
+      }
+
+      // Se temos o arquivo atual, podemos clonar/baixar ou anexar
+      if (holeriteAtual.arquivo) {
+        try {
+          const fileToken = await pb.files.getToken()
+          const fileUrl = pb.files.getURL(holeriteAtual, holeriteAtual.arquivo, {
+            token: fileToken,
+          })
+          const res = await fetch(fileUrl)
+          const blob = await res.blob()
+          versaoFormData.append('arquivo', blob, holeriteAtual.arquivo)
+        } catch {
+          /* intentionally ignored */
+        }
+      }
+
+      await pb.collection('holerites_versoes').create(versaoFormData)
+    } catch (saveVerErr) {
+      console.warn('Falha ao arquivar versão anterior de holerite:', saveVerErr)
+    }
+
+    // 2. Atualizar o holerite com o novo arquivo e nova versão
+    const updateFormData = new FormData()
+    updateFormData.append('arquivo', data.arquivo)
+    updateFormData.append('versao', String(novaVersao))
+    updateFormData.append('data_envio', new Date().toISOString())
+    if (data.observacoes !== undefined) {
+      updateFormData.append('observacoes', data.observacoes.trim())
+    }
+    if (data.usuario_responsavel) {
+      updateFormData.append('usuario_responsavel', data.usuario_responsavel)
+    }
+
+    const updated = await pb.collection('holerites').update<Holerite>(id, updateFormData, {
+      expand: 'funcionario,usuario_responsavel',
+    })
+
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: data.usuario_responsavel || pb.authStore.record?.id,
+        acao: 'substituicao_holerite',
+        entidade: 'holerites',
+        entidade_id: id,
+        detalhes: `Substituição de holerite para v${novaVersao} ref. ${String(updated.competencia_mes).padStart(2, '0')}/${updated.competencia_ano}. Motivo: ${data.motivo_substituicao}`,
+        nivel: 'sensivel',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
+
+    return updated
+  },
+
+  async listVersoes(holeriteId: string) {
+    try {
+      return await pb.collection('holerites_versoes').getFullList<HoleriteVersao>({
+        filter: `holerite = "${holeriteId}"`,
+        sort: '-versao',
+        expand: 'usuario_responsavel',
+      })
+    } catch {
+      return []
+    }
+  },
+
+  async getSecureUrl(record: Holerite | HoleriteVersao, fileName?: string): Promise<string> {
+    const file = fileName || record.arquivo
+    if (!file) return ''
+    try {
+      const token = await pb.files.getToken()
+      return pb.files.getURL(record as any, file, { token })
+    } catch {
+      return pb.files.getURL(record as any, file)
+    }
+  },
+
+  async logAcesso(record: Holerite | HoleriteVersao, acao: 'view' | 'download') {
+    try {
+      await pb.collection('logs_auditoria').create({
+        usuario: pb.authStore.record?.id,
+        acao: acao === 'download' ? 'download_holerite' : 'visualizacao_holerite',
+        entidade: 'holerites',
+        entidade_id: record.id,
+        detalhes: `${acao === 'download' ? 'Download' : 'Visualização'} segura do holerite ref. ${String((record as any).competencia_mes).padStart(2, '0')}/${(record as any).competencia_ano} v${(record as any).versao || 1}`,
+        nivel: 'sensivel',
+        data: new Date().toISOString(),
+      })
+    } catch {
+      /* intentionally ignored */
+    }
   },
 }
 

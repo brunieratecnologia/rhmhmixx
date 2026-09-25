@@ -18,6 +18,8 @@ import {
   FileCheck2,
   Palmtree,
   UserX,
+  FolderOpen,
+  FileText,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -88,6 +90,8 @@ export default function AdminLayout() {
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { name: 'Funcionários', path: '/admin/funcionarios', icon: Users },
     { name: 'Espelho de Ponto', path: '/admin/espelho-ponto', icon: FileCheck2 },
+    { name: 'Documentos', path: '/admin/documentos', icon: FolderOpen },
+    { name: 'Holerites', path: '/admin/holerites', icon: FileText },
     { name: 'Férias', path: '/admin/ferias', icon: Palmtree },
     { name: 'Ausências', path: '/admin/ausencias', icon: UserX },
     { name: 'Departamentos', path: '/admin/departamentos', icon: Building2 },
@@ -103,6 +107,8 @@ export default function AdminLayout() {
     if (p.startsWith('/admin/funcionarios/') && p !== '/admin/funcionarios')
       return 'Ficha do Funcionário'
     if (p.startsWith('/admin/espelho-ponto')) return 'Espelho de Ponto'
+    if (p.startsWith('/admin/documentos')) return 'Central de Documentos'
+    if (p.startsWith('/admin/holerites')) return 'Central de Holerites'
     if (p.startsWith('/admin/ferias')) return 'Gestão de Férias'
     if (p.startsWith('/admin/ausencias')) return 'Controle de Ausências'
     if (p.startsWith('/admin/funcionarios')) return 'Funcionários'
@@ -317,7 +323,7 @@ export default function AdminLayout() {
               >
                 Abrir Terminal de Ponto ↗
               </a>
-              <span className="text-slate-400">• Etapa 4 — Férias e Ausências</span>
+              <span className="text-slate-400">• Etapa 5 — Documentos e Holerites</span>
             </div>
           </div>
         </footer>

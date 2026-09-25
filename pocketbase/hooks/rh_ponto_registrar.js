@@ -1,28 +1,47 @@
 routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
   const body = e.requestInfo().body || {}
-  const matricula = (body.matricula || '').toString().trim().toUpperCase()
   const pin = (body.pin || '').toString().trim()
   const idRequisicao = (body.id_requisicao || '').toString().trim()
 
-  if (!matricula || !pin) {
+  // Terminal agora autentica EXCLUSIVAMENTE pelo PIN do funcionário
+  if (!pin) {
     return e.json(400, {
       success: false,
-      message: 'Matrícula e PIN são obrigatórios.',
+      message: 'PIN é obrigatório para registrar o ponto.',
     })
   }
 
+  if (pin.length < 4 || pin.length > 6 || !/^\d{4,6}$/.test(pin)) {
+    return e.json(400, {
+      success: false,
+      message: 'O PIN deve conter entre 4 e 6 dígitos numéricos.',
+    })
+  }
+
+  const salt = 'rh_skip_pin_salt_2026'
+  const computedHash = $security.sha256(pin + ':' + salt)
+
+  // Taxa limite / Rate limiting e bloqueio temporário por tentativas incorretas repetidas
+  // Como o PIN é o único fator, limitamos por hash de PIN tentado e/ou IP do terminal
   const MAX_ATTEMPTS = 5
   const LOCKOUT_MINUTES = 10
   const now = new Date()
-  const nowIso = now.toISOString()
 
-  // 1. Check attempt lockout for this matricula
+  // 1. Verificar bloqueio temporário ativo para este PIN hash
   let attemptRecord = null
   try {
-    attemptRecord = $app.findFirstRecordByData('tentativas_pin', 'matricula', matricula)
-  } catch (_) {
-    // Record does not exist yet
-  }
+    const colTentativas = $app.findCollectionByNameOrId('tentativas_pin')
+    const recs = $app.findRecordsByFilter(
+      colTentativas.id,
+      "pin_hash = '" + computedHash + "'",
+      '-created',
+      1,
+      0,
+    )
+    if (recs && recs.length > 0) {
+      attemptRecord = recs[0]
+    }
+  } catch (_) {}
 
   if (attemptRecord) {
     const bloqueadoAte = attemptRecord.getString('bloqueado_ate')
@@ -37,7 +56,7 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
           success: false,
           locked: true,
           message:
-            'Terminal temporariamente bloqueado para esta matrícula por excesso de tentativas incorretas. Tente novamente em ' +
+            'Acesso temporariamente bloqueado por excesso de tentativas incorretas. Tente novamente em ' +
             remainingMinutes +
             ' minuto(s).',
         })
@@ -45,17 +64,29 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
     }
   }
 
-  // 2. Find employee by matricula
+  // 2. Localizar funcionário APENAS pelo pin_hash
   let func = null
   try {
-    func = $app.findFirstRecordByData('funcionarios', 'matricula', matricula)
-  } catch (_) {
-    // Employee doesn't exist. Record failed attempt for rate limiting
+    const colFuncs = $app.findCollectionByNameOrId('funcionarios')
+    const found = $app.findRecordsByFilter(
+      colFuncs.id,
+      "pin_hash = '" + computedHash + "'",
+      '-created',
+      2,
+      0,
+    )
+    if (found && found.length > 0) {
+      func = found[0]
+    }
+  } catch (_) {}
+
+  if (!func) {
+    // PIN inexistente: registrar tentativa com falha sem jamais revelar se o PIN existe ou a quem pertence
     try {
+      const col = $app.findCollectionByNameOrId('tentativas_pin')
       if (!attemptRecord) {
-        const col = $app.findCollectionByNameOrId('tentativas_pin')
         attemptRecord = new Record(col)
-        attemptRecord.set('matricula', matricula)
+        attemptRecord.set('pin_hash', computedHash)
         attemptRecord.set('tentativas', 1)
       } else {
         const currentAttempts = (attemptRecord.getInt('tentativas') || 0) + 1
@@ -70,11 +101,11 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
 
     return e.json(401, {
       success: false,
-      message: 'Matrícula ou PIN inválido.',
+      message: 'PIN inválido ou não cadastrado.',
     })
   }
 
-  // 3. Verify employee is active
+  // 3. Verificar situação do funcionário
   const situacao = func.getString('situacao')
   if (situacao !== 'ativo') {
     let motivoSituacao = 'Funcionário inativo no sistema.'
@@ -91,45 +122,7 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
     })
   }
 
-  // 4. Verify PIN hash
-  const storedHash = func.getString('pin_hash')
-  if (!storedHash) {
-    return e.json(400, {
-      success: false,
-      message:
-        'Funcionário ainda não possui PIN de terminal cadastrado. Solicite ao RH a definição do seu PIN.',
-    })
-  }
-
-  const salt = 'rh_skip_pin_salt_2026'
-  const computedHash = $security.sha256(pin + ':' + salt)
-
-  if (storedHash !== computedHash) {
-    // Increment failed attempts
-    try {
-      if (!attemptRecord) {
-        const col = $app.findCollectionByNameOrId('tentativas_pin')
-        attemptRecord = new Record(col)
-        attemptRecord.set('matricula', matricula)
-        attemptRecord.set('tentativas', 1)
-      } else {
-        const currentAttempts = (attemptRecord.getInt('tentativas') || 0) + 1
-        attemptRecord.set('tentativas', currentAttempts)
-        if (currentAttempts >= MAX_ATTEMPTS) {
-          const lockUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60000)
-          attemptRecord.set('bloqueado_ate', lockUntil.toISOString())
-        }
-      }
-      $app.save(attemptRecord)
-    } catch (_) {}
-
-    return e.json(401, {
-      success: false,
-      message: 'Matrícula ou PIN inválido.',
-    })
-  }
-
-  // PIN verified! Reset attempts
+  // PIN válido e funcionário ativo! Zerar tentativas se houver registro prévio
   if (attemptRecord) {
     try {
       attemptRecord.set('tentativas', 0)
@@ -138,7 +131,7 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
     } catch (_) {}
   }
 
-  // 5. Idempotency Check: if id_requisicao is provided and already recorded, return that record
+  // 4. Checagem de idempotência com id_requisicao
   if (idRequisicao) {
     try {
       const existing = $app.findFirstRecordByData(
@@ -178,13 +171,13 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
     } catch (_) {}
   }
 
-  // 6. Official server timestamp in UTC
+  // 5. Horário oficial do servidor em UTC
   const officialServerTime = new Date()
   const officialUtcIso = officialServerTime.toISOString()
   const dateUtc = officialUtcIso.split('T')[0]
   const timeUtc = officialUtcIso.split('T')[1].slice(0, 8)
 
-  // 7. Persist record into registros_horario
+  // 6. Gravar em registros_horario
   const regCol = $app.findCollectionByNameOrId('registros_horario')
   const newReg = new Record(regCol)
   newReg.set('funcionario', func.id)
@@ -197,7 +190,7 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
   }
   $app.save(newReg)
 
-  // 8. Format date and time for Brazilian timezone America/Sao_Paulo
+  // 7. Formatar fuso horário America/Sao_Paulo
   let spTimeFormatted = timeUtc
   let spDateFormatted = dateUtc
   try {

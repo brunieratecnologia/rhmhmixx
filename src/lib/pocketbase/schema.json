@@ -1,0 +1,1290 @@
+{
+  "generatedAt": "2026-09-25T00:32:34.937Z",
+  "collections": [
+    {
+      "name": "users",
+      "type": "auth",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.id = id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.id = id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.id = id)",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin' && @request.auth.id != id"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avatar",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["admin", "rh", "funcionario"]
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
+        "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      ]
+    },
+    {
+      "name": "empresa",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "razao_social",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nome_fantasia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cnpj",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "endereco",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "logotipo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuso_horario",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel_rh",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_empresa_cnpj ON empresa (cnpj) WHERE cnpj != ''"]
+    },
+    {
+      "name": "departamentos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_departamentos_nome ON departamentos (nome)"]
+    },
+    {
+      "name": "cargos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_cargos_nome ON cargos (nome)"]
+    },
+    {
+      "name": "jornadas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "dias_trabalho",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
+        },
+        {
+          "name": "hora_entrada",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hora_inicio_intervalo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hora_retorno_intervalo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hora_saida",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "duracao_jornada_min",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dias_folga",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_jornadas_nome ON jornadas (nome)"]
+    },
+    {
+      "name": "funcionarios",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cpf",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_nascimento",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telefone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "endereco",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fotografia",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contato_emergencia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "matricula",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_admissao",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cargo",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "cargos"
+        },
+        {
+          "name": "departamento",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "departamentos"
+        },
+        {
+          "name": "tipo_vinculo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["CLT", "Estágio", "PJ", "Terceirizado", "Aprendiz"]
+        },
+        {
+          "name": "jornada_atual",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "jornadas"
+        },
+        {
+          "name": "situacao",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ativo", "afastado", "em_ferias", "desligado"]
+        },
+        {
+          "name": "data_desligamento",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "salario_contratual",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_inicio_contrato",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo_contrato",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["CLT", "Estágio", "PJ", "Terceirizado", "Aprendiz"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_funcionarios_cpf ON funcionarios (cpf)",
+        "CREATE UNIQUE INDEX idx_funcionarios_matricula ON funcionarios (matricula)",
+        "CREATE UNIQUE INDEX idx_funcionarios_email ON funcionarios (email)",
+        "CREATE INDEX idx_funcionarios_situacao ON funcionarios (situacao)",
+        "CREATE INDEX idx_funcionarios_cargo ON funcionarios (cargo)",
+        "CREATE INDEX idx_funcionarios_departamento ON funcionarios (departamento)"
+      ]
+    },
+    {
+      "name": "historico_jornadas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "jornada",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "jornadas"
+        },
+        {
+          "name": "data_inicio",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_fim",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_hist_jornadas_func ON historico_jornadas (funcionario)"]
+    },
+    {
+      "name": "registros_horario",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "data_utc",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hora_utc",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timestamp_utc",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origem",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["terminal", "admin", "portal"]
+        },
+        {
+          "name": "id_requisicao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_reg_horario_func ON registros_horario (funcionario)",
+        "CREATE INDEX idx_reg_horario_timestamp ON registros_horario (timestamp_utc)",
+        "CREATE INDEX idx_reg_horario_data ON registros_horario (data_utc)",
+        "CREATE UNIQUE INDEX idx_reg_horario_req ON registros_horario (id_requisicao) WHERE id_requisicao != ''"
+      ]
+    },
+    {
+      "name": "tratamentos_ponto",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "registro",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "registros_horario"
+        },
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["justificativa", "correcao", "classificacao"]
+        },
+        {
+          "name": "justificativa",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "usuario_responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "data_tratamento",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "informacao_corrigida",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_tratamentos_func ON tratamentos_ponto (funcionario)"]
+    },
+    {
+      "name": "ferias",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "data_inicio",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_fim",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "dias",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["integral", "fracionada"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["solicitado", "aprovado", "concluido"]
+        },
+        {
+          "name": "periodo_aquisitivo_inicio",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "periodo_aquisitivo_fim",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "periodo_concessivo_fim",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "saldo_dias",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dias_usufruidos",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "solicitado_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_ferias_func ON ferias (funcionario)",
+        "CREATE INDEX idx_ferias_inicio ON ferias (data_inicio)",
+        "CREATE INDEX idx_ferias_status ON ferias (status)"
+      ]
+    },
+    {
+      "name": "documentos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_medico'))",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_medico'))",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "categoria",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "contrato_trabalho",
+            "documentacao_admissional",
+            "atestado_medico",
+            "comprovantes",
+            "termos_internos",
+            "documentos_ferias",
+            "outros"
+          ]
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_envio",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_validade",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "arquivo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nivel_acesso",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["publico_interno", "restrito_rh", "restrito_medico"]
+        },
+        {
+          "name": "usuario_responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_documentos_func ON documentos (funcionario)",
+        "CREATE INDEX idx_documentos_data_envio ON documentos (data_envio)",
+        "CREATE INDEX idx_documentos_validade ON documentos (data_validade)"
+      ]
+    },
+    {
+      "name": "ausencias",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "categoria",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "falta",
+            "atraso_justificado",
+            "atestado",
+            "afastamento",
+            "licenca",
+            "folga_compensatoria"
+          ]
+        },
+        {
+          "name": "data_inicio",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_fim",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "justificativa",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "documentos",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "documentos"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_ausencias_func ON ausencias (funcionario)",
+        "CREATE INDEX idx_ausencias_inicio ON ausencias (data_inicio)"
+      ]
+    },
+    {
+      "name": "holerites",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "competencia_mes",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "competencia_ano",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "data_envio",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "arquivo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "usuario_responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "versao",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_holerites_func ON holerites (funcionario)",
+        "CREATE INDEX idx_holerites_competencia ON holerites (competencia_ano, competencia_mes)"
+      ]
+    },
+    {
+      "name": "solicitacoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["correcao_ponto", "justificativa", "ferias", "documento", "outro"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pendente", "aprovado", "recusado", "cancelado"]
+        },
+        {
+          "name": "motivo",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detalhes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "decidido_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "decidido_em",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_solicitacoes_func ON solicitacoes (funcionario)",
+        "CREATE INDEX idx_solicitacoes_status ON solicitacoes (status)"
+      ]
+    },
+    {
+      "name": "logs_auditoria",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "view": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "usuario",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "acao",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "entidade",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "entidade_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detalhes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ip",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "nivel",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["info", "sensivel"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_logs_entidade ON logs_auditoria (entidade, entidade_id)",
+        "CREATE INDEX idx_logs_data ON logs_auditoria (data)"
+      ]
+    },
+    {
+      "name": "historico_funcionario",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "funcionario",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "funcionarios"
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "cadastro",
+            "edicao",
+            "promocao",
+            "desligamento",
+            "reativacao",
+            "alteracao_salarial",
+            "outro"
+          ]
+        },
+        {
+          "name": "descricao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "usuario_responsavel",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_hist_func_func ON historico_funcionario (funcionario)",
+        "CREATE INDEX idx_hist_func_data ON historico_funcionario (data)"
+      ]
+    },
+    {
+      "name": "tentativas_pin",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "view": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+      },
+      "fields": [
+        {
+          "name": "matricula",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tentativas",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bloqueado_ate",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_tentativas_pin_mat ON tentativas_pin (matricula)"]
+    }
+  ]
+}

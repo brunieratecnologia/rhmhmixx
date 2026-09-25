@@ -4,6 +4,8 @@ import type { PortalContextType } from '@/pages/portal/PortalTypes'
 import { Clock, Calendar, CheckCircle2, XCircle, Info, ShieldAlert } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { minutesToHoursText, getHorarioDiaJornada } from '@/lib/calculoHoras'
+import type { DiaSemanaSigla } from '@/types/rh'
 
 const DIAS_MAP: Record<string, string> = {
   seg: 'Segunda-feira',
@@ -92,13 +94,19 @@ export default function PortalMeusHorarios() {
         <CardContent className="pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {ORDEM_DIAS.map((dia) => {
-              const trabalha = diasTrabalho.includes(dia as any)
-              const folga = diasFolga.includes(dia as any) || !trabalha
+              const horarioDia = getHorarioDiaJornada(jornada, dia as DiaSemanaSigla)
+              const trabalha = horarioDia ? horarioDia.ativo : diasTrabalho.includes(dia as any)
+              const folga = !trabalha
+              const horaEntradaDia = horarioDia?.hora_entrada || jornada?.hora_entrada
+              const horaSaidaDia = horarioDia?.hora_saida || jornada?.hora_saida
+              const duracaoDiaTexto = horarioDia
+                ? minutesToHoursText(horarioDia.duracao_min)
+                : duracaoHoras
 
               return (
                 <div
                   key={dia}
-                  className={`p-3 rounded-xl border flex flex-col justify-between h-32 transition-all ${
+                  className={`p-3 rounded-xl border flex flex-col justify-between min-h-[136px] transition-all ${
                     folga
                       ? 'bg-[#070B11]/60 border-slate-800 text-slate-500'
                       : 'bg-[#121A28] border-[#D4AF37]/30 text-amber-100 shadow-sm'
@@ -107,21 +115,30 @@ export default function PortalMeusHorarios() {
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs uppercase tracking-wider">{dia}</span>
                     {folga ? (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
                         Folga
                       </span>
                     ) : (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30">
                         Trabalho
                       </span>
                     )}
                   </div>
 
-                  <div className="my-auto">
+                  <div className="my-auto py-1">
                     <span className="text-[11px] block font-medium">{DIAS_MAP[dia]}</span>
                     {!folga ? (
-                      <div className="font-mono text-xs text-amber-200 mt-1 font-semibold">
-                        {jornada?.hora_entrada} às {jornada?.hora_saida}
+                      <div className="space-y-0.5 mt-1">
+                        <div className="font-mono text-xs text-amber-200 font-semibold">
+                          {horaEntradaDia} às {horaSaidaDia}
+                        </div>
+                        {horarioDia?.hora_inicio_intervalo &&
+                          horarioDia?.hora_retorno_intervalo && (
+                            <div className="text-[10px] font-mono text-slate-400">
+                              Almoço: {horarioDia.hora_inicio_intervalo}–
+                              {horarioDia.hora_retorno_intervalo}
+                            </div>
+                          )}
                       </div>
                     ) : (
                       <span className="text-[10px] text-slate-500 mt-1 block">
@@ -131,7 +148,7 @@ export default function PortalMeusHorarios() {
                   </div>
 
                   <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-800/60 flex items-center justify-between">
-                    <span>{folga ? 'DSR' : `${duracaoHoras} diárias`}</span>
+                    <span>{folga ? 'DSR' : `${duracaoDiaTexto} liq.`}</span>
                   </div>
                 </div>
               )

@@ -45,18 +45,33 @@ export interface Cargo {
   }
 }
 
+export type DiaSemanaSigla = 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom'
+
+export interface HorarioDiaSemana {
+  ativo: boolean
+  hora_entrada: string
+  hora_inicio_intervalo?: string
+  hora_retorno_intervalo?: string
+  hora_saida: string
+  duracao_min: number
+  atravessa_meia_noite?: boolean
+}
+
+export type GradeSemanal = Record<DiaSemanaSigla, HorarioDiaSemana>
+
 export interface Jornada {
   id: string
   nome: string
-  dias_trabalho: ('seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom')[]
+  dias_trabalho: DiaSemanaSigla[]
   hora_entrada: string
   hora_inicio_intervalo: string
   hora_retorno_intervalo: string
   hora_saida: string
   duracao_jornada_min: number
-  dias_folga: ('seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom')[]
+  dias_folga: DiaSemanaSigla[]
   atravessa_meia_noite?: boolean
   tipo_escala?: 'semanal_fixa' | 'escala_12x36' | 'escala_6x1' | 'personalizada'
+  grade_semanal?: GradeSemanal | null
   created: string
   updated: string
 }

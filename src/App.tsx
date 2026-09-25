@@ -26,6 +26,7 @@ import Configuracoes from '@/pages/admin/Configuracoes'
 import TerminalPonto from '@/pages/terminal/TerminalPonto'
 import EspelhoPonto from '@/pages/admin/EspelhoPonto'
 import Ferias from '@/pages/admin/Ferias'
+import { FeriasErrorBoundary } from '@/components/admin/FeriasErrorBoundary'
 import Ausencias from '@/pages/admin/Ausencias'
 import DocumentosPage from '@/pages/admin/Documentos'
 import HoleritesPage from '@/pages/admin/Holerites'
@@ -77,7 +78,14 @@ export default function App() {
               <Route path="espelho-ponto" element={<EspelhoPonto />} />
               <Route path="documentos" element={<DocumentosPage />} />
               <Route path="holerites" element={<HoleritesPage />} />
-              <Route path="ferias" element={<Ferias />} />
+              <Route
+                path="ferias"
+                element={
+                  <FeriasErrorBoundary>
+                    <Ferias />
+                  </FeriasErrorBoundary>
+                }
+              />
               <Route path="ausencias" element={<Ausencias />} />
               <Route path="departamentos" element={<Departamentos />} />
               <Route path="cargos" element={<Cargos />} />

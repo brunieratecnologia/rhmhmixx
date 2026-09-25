@@ -302,6 +302,174 @@ export function executarTestesIntervaloAutomatico(): {
     })
   }
 
+  // TESTE 7: Jornada SÁBADO com horários diferentes por dia da semana
+  // Segunda: 10:00–18:00 com 1h30 intervalo (12:30–14:00) -> 6h30 = 390 min
+  // Terça a Sexta: 09:00–18:00 com 1h30 intervalo (12:30–14:00) -> 7h30 = 450 min
+  // Sábado e Domingo: folga -> previsto 0
+  {
+    const jornadaSabado: Jornada = {
+      id: 'j-sabado-teste',
+      nome: 'SÁBADO',
+      dias_trabalho: ['seg', 'ter', 'qua', 'qui', 'sex'],
+      hora_entrada: '09:00',
+      hora_inicio_intervalo: '12:30',
+      hora_retorno_intervalo: '14:00',
+      hora_saida: '18:00',
+      duracao_jornada_min: 438,
+      dias_folga: ['sab', 'dom'],
+      grade_semanal: {
+        seg: {
+          ativo: true,
+          hora_entrada: '10:00',
+          hora_inicio_intervalo: '12:30',
+          hora_retorno_intervalo: '14:00',
+          hora_saida: '18:00',
+          duracao_min: 390,
+          atravessa_meia_noite: false,
+        },
+        ter: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:30',
+          hora_retorno_intervalo: '14:00',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        qua: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:30',
+          hora_retorno_intervalo: '14:00',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        qui: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:30',
+          hora_retorno_intervalo: '14:00',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        sex: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:30',
+          hora_retorno_intervalo: '14:00',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        sab: {
+          ativo: false,
+          hora_entrada: '',
+          hora_saida: '',
+          duracao_min: 0,
+          atravessa_meia_noite: false,
+        },
+        dom: {
+          ativo: false,
+          hora_entrada: '',
+          hora_saida: '',
+          duracao_min: 0,
+          atravessa_meia_noite: false,
+        },
+      },
+      created: '',
+      updated: '',
+    }
+
+    // Setembro 2026:
+    // 2026-09-07 é Segunda-feira
+    // 2026-09-08 é Terça-feira
+    // 2026-09-12 é Sábado (Folga)
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaSabado,
+      historicoJornadas: [],
+      registrosMes: [
+        // Segunda 07/09: bateu 10:00 e 18:00 (sem bater almoço) -> auto intervalo 12:30–14:00 (90 min) -> realizado 390 min (6h30)
+        {
+          id: 'seg1',
+          funcionario: 'f1',
+          data_utc: '2026-09-07',
+          hora_utc: '10:00:00',
+          timestamp_utc: '2026-09-07T13:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'seg2',
+          funcionario: 'f1',
+          data_utc: '2026-09-07',
+          hora_utc: '18:00:00',
+          timestamp_utc: '2026-09-07T21:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        // Terça 08/09: bateu 09:00 e 18:00 (sem bater almoço) -> auto intervalo 12:30–14:00 (90 min) -> realizado 450 min (7h30)
+        {
+          id: 'ter1',
+          funcionario: 'f1',
+          data_utc: '2026-09-08',
+          hora_utc: '09:00:00',
+          timestamp_utc: '2026-09-08T12:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'ter2',
+          funcionario: 'f1',
+          data_utc: '2026-09-08',
+          hora_utc: '18:00:00',
+          timestamp_utc: '2026-09-08T21:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const diaSeg = espelho.dias.find((d) => d.data === '2026-09-07')
+    const diaTer = espelho.dias.find((d) => d.data === '2026-09-08')
+    const diaSab = espelho.dias.find((d) => d.data === '2026-09-12')
+
+    const passouSeg =
+      Boolean(diaSeg) &&
+      diaSeg?.previstoMinutos === 390 && // 6h30
+      diaSeg?.realizadoMinutos === 390 &&
+      diaSeg?.diferencaMinutos === 0 &&
+      diaSeg?.intervaloAutomaticoAplicado === true
+
+    const passouTer =
+      Boolean(diaTer) &&
+      diaTer?.previstoMinutos === 450 && // 7h30
+      diaTer?.realizadoMinutos === 450 &&
+      diaTer?.diferencaMinutos === 0 &&
+      diaTer?.intervaloAutomaticoAplicado === true
+
+    const passouSab =
+      Boolean(diaSab) && diaSab?.previstoMinutos === 0 && diaSab?.ehDiaFolga === true
+
+    const passouJornadaFlexivel = Boolean(passouSeg && passouTer && passouSab)
+
+    resultados.push({
+      nome: 'Teste (g): Jornada flexível "SÁBADO" calcula Segunda (6h30), Ter–Sex (7h30) e Folga Sáb/Dom corretamente',
+      passou: passouJornadaFlexivel,
+      detalhe: `Seg Prev: ${diaSeg?.previstoMinutos}m / Real: ${diaSeg?.realizadoMinutos}m; Ter Prev: ${diaTer?.previstoMinutos}m / Real: ${diaTer?.realizadoMinutos}m; Sáb Folga: ${diaSab?.ehDiaFolga}`,
+    })
+  }
+
   const todosPassaram = resultados.every((r) => r.passou)
   return { todosPassaram, resultados }
 }

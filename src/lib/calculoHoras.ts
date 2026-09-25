@@ -1,4 +1,12 @@
-import type { Jornada, RegistroHorario, TratamentoPonto, Ausencia, Ferias } from '@/types/rh'
+import type {
+  Jornada,
+  RegistroHorario,
+  TratamentoPonto,
+  Ausencia,
+  Ferias,
+  DiaSemanaSigla,
+  HorarioDiaSemana,
+} from '@/types/rh'
 
 export interface MarcacaoInterpreta {
   id?: string
@@ -117,21 +125,11 @@ export function minutesToHoursText(minutes: number): string {
 /**
  * Retorna o dia da semana no formato de 3 letras utilizado pelo sistema ('seg', 'ter', etc.)
  */
-export function getDiaSemanaSigla(
-  dateStr: string,
-): 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab' | 'dom' {
+export function getDiaSemanaSigla(dateStr: string): DiaSemanaSigla {
   // Use noon to avoid timezone border shifts
   const d = new Date(dateStr + 'T12:00:00Z')
   const day = d.getUTCDay()
-  const map: ('dom' | 'seg' | 'ter' | 'qua' | 'qui' | 'sex' | 'sab')[] = [
-    'dom',
-    'seg',
-    'ter',
-    'qua',
-    'qui',
-    'sex',
-    'sab',
-  ]
+  const map: DiaSemanaSigla[] = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab']
   return map[day]
 }
 
@@ -149,47 +147,130 @@ export function getDiaSemanaLabel(sigla: string): string {
 }
 
 /**
+ * Retorna a configuração de horário específica para um dia da semana na jornada.
+ * Retrocompatibilidade total: se grade_semanal não existir ou o dia não constar nela,
+ * cai para a configuração global existente (hora_entrada, hora_saida, dias_trabalho, dias_folga).
+ */
+export function getHorarioDiaJornada(
+  jornada: Jornada | null,
+  diaSigla: DiaSemanaSigla,
+): HorarioDiaSemana | null {
+  if (!jornada) return null
+
+  // 1. Prioriza grade_semanal se presente
+  if (jornada.grade_semanal && jornada.grade_semanal[diaSigla]) {
+    const diaConfig = jornada.grade_semanal[diaSigla]
+    if (!diaConfig.ativo) {
+      return {
+        ativo: false,
+        hora_entrada: '',
+        hora_saida: '',
+        duracao_min: 0,
+        atravessa_meia_noite: false,
+      }
+    }
+
+    let duracao = diaConfig.duracao_min
+    if (!duracao || duracao <= 0) {
+      const ent = timeStringToMinutes(diaConfig.hora_entrada)
+      let sai = timeStringToMinutes(diaConfig.hora_saida)
+      const atravessa = Boolean(
+        diaConfig.atravessa_meia_noite ||
+        (diaConfig.hora_entrada && diaConfig.hora_saida && sai < ent),
+      )
+      if (sai < ent || atravessa) {
+        sai += 24 * 60
+      }
+      let tot = sai - ent
+      if (diaConfig.hora_inicio_intervalo && diaConfig.hora_retorno_intervalo) {
+        const intIni = timeStringToMinutes(diaConfig.hora_inicio_intervalo)
+        let intFim = timeStringToMinutes(diaConfig.hora_retorno_intervalo)
+        if (intFim < intIni || (atravessa && intFim < intIni)) {
+          intFim += 24 * 60
+        }
+        const diffInt = intFim - intIni
+        if (diffInt > 0) tot -= diffInt
+      }
+      duracao = Math.max(0, tot)
+    }
+
+    return {
+      ativo: true,
+      hora_entrada: diaConfig.hora_entrada || '',
+      hora_inicio_intervalo: diaConfig.hora_inicio_intervalo || '',
+      hora_retorno_intervalo: diaConfig.hora_retorno_intervalo || '',
+      hora_saida: diaConfig.hora_saida || '',
+      duracao_min: duracao,
+      atravessa_meia_noite: Boolean(
+        diaConfig.atravessa_meia_noite ||
+        (diaConfig.hora_entrada &&
+          diaConfig.hora_saida &&
+          timeStringToMinutes(diaConfig.hora_saida) < timeStringToMinutes(diaConfig.hora_entrada)),
+      ),
+    }
+  }
+
+  // 2. Fallback retrocompatível: configuração global
+  const ehFolga = jornada.dias_folga?.includes(diaSigla)
+  const ehTrabalho = jornada.dias_trabalho?.includes(diaSigla)
+  if (ehFolga || !ehTrabalho) {
+    return {
+      ativo: false,
+      hora_entrada: '',
+      hora_saida: '',
+      duracao_min: 0,
+      atravessa_meia_noite: false,
+    }
+  }
+
+  let duracao = jornada.duracao_jornada_min
+  if (!duracao || duracao <= 0) {
+    const ent = timeStringToMinutes(jornada.hora_entrada)
+    let sai = timeStringToMinutes(jornada.hora_saida)
+    const atravessa = Boolean(
+      jornada.atravessa_meia_noite || (jornada.hora_entrada && jornada.hora_saida && sai < ent),
+    )
+    if (sai < ent || atravessa) {
+      sai += 24 * 60
+    }
+    let tot = sai - ent
+    if (jornada.hora_inicio_intervalo && jornada.hora_retorno_intervalo) {
+      const intIni = timeStringToMinutes(jornada.hora_inicio_intervalo)
+      let intFim = timeStringToMinutes(jornada.hora_retorno_intervalo)
+      if (intFim < intIni || (atravessa && intFim < intIni)) {
+        intFim += 24 * 60
+      }
+      const diffInt = intFim - intIni
+      if (diffInt > 0) tot -= diffInt
+    }
+    duracao = Math.max(0, tot)
+  }
+
+  return {
+    ativo: true,
+    hora_entrada: jornada.hora_entrada || '',
+    hora_inicio_intervalo: jornada.hora_inicio_intervalo || '',
+    hora_retorno_intervalo: jornada.hora_retorno_intervalo || '',
+    hora_saida: jornada.hora_saida || '',
+    duracao_min: Math.max(0, duracao || 0),
+    atravessa_meia_noite: Boolean(
+      jornada.atravessa_meia_noite ||
+      (jornada.hora_entrada &&
+        jornada.hora_saida &&
+        timeStringToMinutes(jornada.hora_saida) < timeStringToMinutes(jornada.hora_entrada)),
+    ),
+  }
+}
+
+/**
  * Calcula a duração prevista da jornada diária em minutos.
- * Suporta jornadas que ultrapassam a meia-noite (ex.: 22:00 às 06:00).
+ * Suporta grade semanal por dia e jornadas que ultrapassam a meia-noite.
  */
 export function calcularPrevistoJornada(jornada: Jornada | null, diaSigla: string): number {
   if (!jornada) return 0
-
-  // Se o dia está na lista de folgas ou não está na lista de trabalho
-  const ehFolga = jornada.dias_folga?.includes(diaSigla as any)
-  const ehTrabalho = jornada.dias_trabalho?.includes(diaSigla as any)
-  if (ehFolga || !ehTrabalho) return 0
-
-  if (jornada.duracao_jornada_min && jornada.duracao_jornada_min > 0) {
-    return jornada.duracao_jornada_min
-  }
-
-  const ent = timeStringToMinutes(jornada.hora_entrada)
-  let sai = timeStringToMinutes(jornada.hora_saida)
-  const intIni = timeStringToMinutes(jornada.hora_inicio_intervalo)
-  let intFim = timeStringToMinutes(jornada.hora_retorno_intervalo)
-
-  if (!jornada.hora_entrada || !jornada.hora_saida) return 0
-
-  // Tratamento de jornada que atravessa a meia-noite
-  if (sai < ent || jornada.atravessa_meia_noite) {
-    sai += 24 * 60
-  }
-
-  let total = sai - ent
-
-  // Desconta intervalo se configurado
-  if (jornada.hora_inicio_intervalo && jornada.hora_retorno_intervalo) {
-    if (intFim < intIni) {
-      intFim += 24 * 60
-    }
-    const interv = intFim - intIni
-    if (interv > 0) {
-      total -= interv
-    }
-  }
-
-  return Math.max(0, total)
+  const horarioDia = getHorarioDiaJornada(jornada, diaSigla as DiaSemanaSigla)
+  if (!horarioDia || !horarioDia.ativo) return 0
+  return horarioDia.duracao_min
 }
 
 /**
@@ -239,6 +320,7 @@ export function calcularHorasRealizadas(
   jornada: Jornada | null,
   opcoes?: {
     ehDiaFolga?: boolean
+    diaSigla?: DiaSemanaSigla
   },
 ): {
   minutosTrabalhados: number
@@ -297,25 +379,33 @@ export function calcularHorasRealizadas(
     }
   }
 
-  const ehNoturno = Boolean(jornada?.atravessa_meia_noite)
-  const ehDiaFolga = Boolean(opcoes?.ehDiaFolga)
+  // Resolve horários do dia específico da semana (suporta grade_semanal por dia)
+  const diaConfig = opcoes?.diaSigla ? getHorarioDiaJornada(jornada, opcoes.diaSigla) : null
+  const horaEntradaRef = diaConfig ? diaConfig.hora_entrada : jornada?.hora_entrada || ''
+  const horaIniIntRef = diaConfig
+    ? diaConfig.hora_inicio_intervalo || ''
+    : jornada?.hora_inicio_intervalo || ''
+  const horaRetIntRef = diaConfig
+    ? diaConfig.hora_retorno_intervalo || ''
+    : jornada?.hora_retorno_intervalo || ''
+  const ehNoturno = diaConfig
+    ? Boolean(diaConfig.atravessa_meia_noite)
+    : Boolean(jornada?.atravessa_meia_noite)
+  const ehDiaFolga =
+    opcoes?.ehDiaFolga !== undefined ? opcoes.ehDiaFolga : diaConfig ? !diaConfig.ativo : false
 
-  // Verifica se a jornada possui intervalo previsto configurado
+  // Verifica se o dia possui intervalo previsto configurado
   const temIntervaloConfigurado = Boolean(
-    jornada &&
-    jornada.hora_inicio_intervalo &&
-    jornada.hora_retorno_intervalo &&
-    jornada.hora_inicio_intervalo.trim() !== '' &&
-    jornada.hora_retorno_intervalo.trim() !== '',
+    horaIniIntRef && horaRetIntRef && horaIniIntRef.trim() !== '' && horaRetIntRef.trim() !== '',
   )
 
   let intIniMin = 0
   let intFimMin = 0
   let duracaoIntervaloMin = 0
 
-  if (temIntervaloConfigurado && jornada) {
-    intIniMin = timeStringToMinutes(jornada.hora_inicio_intervalo)
-    intFimMin = timeStringToMinutes(jornada.hora_retorno_intervalo)
+  if (temIntervaloConfigurado) {
+    intIniMin = timeStringToMinutes(horaIniIntRef)
+    intFimMin = timeStringToMinutes(horaRetIntRef)
     if (intFimMin < intIniMin || (ehNoturno && intFimMin < intIniMin)) {
       intFimMin += 24 * 60
     }
@@ -367,7 +457,7 @@ export function calcularHorasRealizadas(
 
     if (ehNoturno) {
       // Se jornada noturna (ex: 22:00 às 06:00, almoço 02:00 às 03:00)
-      const horaEntradaJornada = timeStringToMinutes(jornada?.hora_entrada)
+      const horaEntradaJornada = timeStringToMinutes(horaEntradaRef)
       if (intIniAjustado < horaEntradaJornada) {
         intIniAjustado += 24 * 60
         intFimAjustado += 24 * 60
@@ -375,17 +465,15 @@ export function calcularHorasRealizadas(
     }
 
     // Verifica se o intervalo cai dentro do período em que o funcionário esteve presente
-    // (com tolerância de 15 minutos se a pessoa saiu ligeiramente antes ou após)
     const periodoPresencaMin = saiMin - entMin
     const intervaloCaiDentroDaPresenca = entMin <= intIniAjustado && saiMin >= intFimAjustado
 
-    // Se o colaborador trabalhou tempo suficiente (superior à duração do intervalo + margem de trabalho)
-    // e o intervalo cai dentro da sua permanência:
+    // Se o colaborador trabalhou tempo suficiente e o intervalo cai dentro da sua permanência:
     if (intervaloCaiDentroDaPresenca && periodoPresencaMin > duracaoIntervaloMin) {
       aplicarIntervaloAutomatico = true
       intervaloInfo = {
-        inicio: jornada!.hora_inicio_intervalo.slice(0, 5),
-        retorno: jornada!.hora_retorno_intervalo.slice(0, 5),
+        inicio: horaIniIntRef.slice(0, 5),
+        retorno: horaRetIntRef.slice(0, 5),
         duracaoMinutos: duracaoIntervaloMin,
       }
 
@@ -397,7 +485,7 @@ export function calcularHorasRealizadas(
 
       listaFinal.push({
         id: `auto-int-ini-${listaFisica[0].id || 'dia'}`,
-        horario: jornada!.hora_inicio_intervalo.slice(0, 5),
+        horario: horaIniIntRef.slice(0, 5),
         tipo: 'inicio_intervalo',
         origem: 'intervalo_automatico',
         automatico: true,
@@ -405,7 +493,7 @@ export function calcularHorasRealizadas(
 
       listaFinal.push({
         id: `auto-int-fim-${listaFisica[1].id || 'dia'}`,
-        horario: jornada!.hora_retorno_intervalo.slice(0, 5),
+        horario: horaRetIntRef.slice(0, 5),
         tipo: 'retorno_intervalo',
         origem: 'intervalo_automatico',
         automatico: true,
@@ -582,14 +670,17 @@ export function construirEspelhoMensal(params: {
     const regsDoDia = registrosPorDia.get(dataStr) || []
     const tratamentosDoDia = tratamentosPorDia.get(dataStr) || []
 
-    // Calcula realizado (considerando intervalo automático para a jornada individual vigente)
+    // Calcula realizado (considerando intervalo automático para a jornada individual vigente e dia da semana)
     const {
       minutosTrabalhados,
       todasMarcacoes,
       isIncompleto,
       intervaloAutomaticoAplicado,
       intervaloInfo,
-    } = calcularHorasRealizadas(regsDoDia, tratamentosDoDia, jornadaVigente, { ehDiaFolga })
+    } = calcularHorasRealizadas(regsDoDia, tratamentosDoDia, jornadaVigente, {
+      ehDiaFolga,
+      diaSigla,
+    })
 
     if (minutosTrabalhados > 0) {
       totalDiasTrabalhados++

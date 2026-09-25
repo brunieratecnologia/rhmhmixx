@@ -144,18 +144,32 @@ export default function FeriasPage() {
     }
   }, [])
 
-  // Mapa de cálculos por funcionário
+  // Mapa de cálculos por funcionário com try/catch individual e fallback seguro
   const calculosPorFuncionario = useMemo(() => {
     const map = new Map<string, ReturnType<typeof calcularPeriodosColaborador>>()
-    for (const func of funcionarios) {
-      const feriasFunc = todasFerias.filter((f) => f.funcionario === func.id)
-      const ausenciasFunc = todasAusencias.filter((a) => a.funcionario === func.id)
-      const calc = calcularPeriodosColaborador({
-        dataAdmissao: func.data_admissao,
-        feriasCadastradas: feriasFunc,
-        ausencias: ausenciasFunc,
-      })
-      map.set(func.id, calc)
+    const fallback = {
+      periodos: [],
+      saldoTotalDisponivel: 0,
+      diasEmGozoHoje: 0,
+      proximasFerias: null,
+      temAlertaConcessivo: false,
+    }
+
+    for (const func of funcionarios || []) {
+      if (!func || !func.id) continue
+      try {
+        const feriasFunc = (todasFerias || []).filter((f) => f && f.funcionario === func.id)
+        const ausenciasFunc = (todasAusencias || []).filter((a) => a && a.funcionario === func.id)
+        const calc = calcularPeriodosColaborador({
+          dataAdmissao: func.data_admissao,
+          feriasCadastradas: feriasFunc,
+          ausencias: ausenciasFunc,
+        })
+        map.set(func.id, calc || fallback)
+      } catch (err) {
+        console.error(`Erro ao calcular férias para o funcionário ${func.id}:`, err)
+        map.set(func.id, fallback)
+      }
     }
     return map
   }, [funcionarios, todasFerias, todasAusencias])
@@ -178,10 +192,11 @@ export default function FeriasPage() {
     trintaDias.setDate(trintaDias.getDate() + 30)
     const trintaDiasStr = trintaDias.toISOString().split('T')[0]
 
-    for (const f of todasFerias) {
-      if (f.status === 'cancelada') continue
-      const ini = f.data_inicio.split('T')[0]
-      const fim = f.data_fim.split('T')[0]
+    for (const f of todasFerias || []) {
+      if (!f || f.status === 'cancelada') continue
+      const ini = f.data_inicio ? f.data_inicio.split('T')[0].split(' ')[0] : ''
+      const fim = f.data_fim ? f.data_fim.split('T')[0].split(' ')[0] : ini
+      if (!ini) continue
       if (hojeStr >= ini && hojeStr <= fim) {
         totalEmGozo++
       }
@@ -191,6 +206,7 @@ export default function FeriasPage() {
     }
 
     calculosPorFuncionario.forEach((calc) => {
+      if (!calc || !calc.periodos) return
       for (const p of calc.periodos) {
         if (p.situacao === 'vencido') {
           totalVencidas++
@@ -205,8 +221,9 @@ export default function FeriasPage() {
       totalProgramadas30d,
       totalAlertasConcessivos,
       totalVencidas,
-      totalAtivos: funcionarios.filter((f) => f.situacao === 'ativo' || f.situacao === 'em_ferias')
-        .length,
+      totalAtivos: (funcionarios || []).filter(
+        (f) => f && (f.situacao === 'ativo' || f.situacao === 'em_ferias'),
+      ).length,
     }
   }, [todasFerias, calculosPorFuncionario, funcionarios])
 
@@ -223,7 +240,7 @@ export default function FeriasPage() {
 
   const feriasDoFuncionarioSelecionado = useMemo(() => {
     if (!funcionarioSelecionado) return []
-    return todasFerias.filter((f) => f.funcionario === funcionarioSelecionado.id)
+    return (todasFerias || []).filter((f) => f && f.funcionario === funcionarioSelecionado.id)
   }, [funcionarioSelecionado, todasFerias])
 
   // Filtragem da lista geral de funcionários
@@ -344,9 +361,11 @@ export default function FeriasPage() {
   // Abrir Modal para Edição
   const handleOpenEditModal = (ferias: Ferias) => {
     setEditingFerias(ferias)
-    setFormFuncId(ferias.funcionario)
-    setFormDataInicio(ferias.data_inicio.split('T')[0])
-    setFormDataFim(ferias.data_fim.split('T')[0])
+    setFormFuncId(ferias.funcionario || '')
+    const iniSafe = ferias.data_inicio ? ferias.data_inicio.split('T')[0].split(' ')[0] : ''
+    const fimSafe = ferias.data_fim ? ferias.data_fim.split('T')[0].split(' ')[0] : iniSafe
+    setFormDataInicio(iniSafe)
+    setFormDataFim(fimSafe)
     setFormDiasAbono(ferias.dias_abono || 0)
     setFormStatus(ferias.status)
     setFormTipo(ferias.tipo || 'integral')
@@ -356,9 +375,8 @@ export default function FeriasPage() {
     // Tentar achar índice do período aquisitivo
     const calc = calculosPorFuncionario.get(ferias.funcionario)
     if (calc && ferias.periodo_aquisitivo_inicio) {
-      const idx = calc.periodos.findIndex(
-        (p) => p.inicio === ferias.periodo_aquisitivo_inicio?.split('T')[0],
-      )
+      const perAqIni = ferias.periodo_aquisitivo_inicio.split('T')[0].split(' ')[0]
+      const idx = calc.periodos.findIndex((p) => p.inicio === perAqIni)
       setFormPeriodoIndex(idx >= 0 ? idx : null)
     } else {
       setFormPeriodoIndex(null)
@@ -479,7 +497,7 @@ export default function FeriasPage() {
       <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center shrink-0">
               <Palmtree className="w-5 h-5" />
             </div>
             <div>
@@ -505,7 +523,7 @@ export default function FeriasPage() {
 
           <Button
             onClick={() => handleOpenNewModal()}
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs font-semibold h-9 px-3.5 shadow-xs"
+            className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-9 px-3.5 shadow-xs"
           >
             <Plus className="w-4 h-4 mr-1.5" />
             Cadastrar Período de Férias
@@ -533,7 +551,7 @@ export default function FeriasPage() {
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Próximos 30 Dias</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#7C3AED]/15 text-[#7C3AED] flex items-center justify-center">
               <CalendarClock className="w-4 h-4" />
             </div>
           </div>
@@ -585,13 +603,13 @@ export default function FeriasPage() {
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 text-[#2563EB] flex items-center justify-center font-bold text-base">
-                  {funcionarioSelecionado.nome.slice(0, 2).toUpperCase()}
+                <div className="w-12 h-12 rounded-xl bg-[#D4AF37]/20 text-[#AA820A] border border-[#D4AF37]/30 flex items-center justify-center font-bold text-base">
+                  {(funcionarioSelecionado.nome || '?').slice(0, 2).toUpperCase()}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-slate-900">
-                      {funcionarioSelecionado.nome}
+                      {funcionarioSelecionado.nome || 'Funcionário'}
                     </h3>
                     <Badge
                       className={
@@ -606,11 +624,11 @@ export default function FeriasPage() {
                         ? 'Em Férias'
                         : funcionarioSelecionado.situacao === 'ativo'
                           ? 'Ativo'
-                          : funcionarioSelecionado.situacao}
+                          : funcionarioSelecionado.situacao || 'Desconhecido'}
                     </Badge>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Matrícula: {funcionarioSelecionado.matricula} • Admissão:{' '}
+                    Matrícula: {funcionarioSelecionado.matricula || '?'} • Admissão:{' '}
                     <strong>{formatBRDate(funcionarioSelecionado.data_admissao)}</strong> • Vínculo:{' '}
                     {funcionarioSelecionado.tipo_vinculo || 'CLT'}
                   </p>
@@ -626,7 +644,7 @@ export default function FeriasPage() {
                 <Button
                   size="sm"
                   onClick={() => handleOpenNewModal(funcionarioSelecionado.id)}
-                  className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-8"
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-8"
                 >
                   <Plus className="w-3.5 h-3.5 mr-1" />
                   Programar Férias
@@ -651,8 +669,8 @@ export default function FeriasPage() {
                   Dias Gozados
                 </span>
                 <p className="text-xl font-bold text-slate-800 font-mono mt-0.5">
-                  {calculoFuncionarioSelecionado.periodos.reduce(
-                    (acc, p) => acc + p.diasGozados,
+                  {(calculoFuncionarioSelecionado.periodos || []).reduce(
+                    (acc, p) => acc + (p.diasGozados || 0),
                     0,
                   )}{' '}
                   dias
@@ -664,8 +682,11 @@ export default function FeriasPage() {
                 <span className="text-[11px] font-semibold text-slate-400 uppercase block">
                   Abonos Pecuniários
                 </span>
-                <p className="text-xl font-bold text-blue-700 font-mono mt-0.5">
-                  {calculoFuncionarioSelecionado.periodos.reduce((acc, p) => acc + p.diasAbono, 0)}{' '}
+                <p className="text-xl font-bold text-[#7C3AED] font-mono mt-0.5">
+                  {(calculoFuncionarioSelecionado.periodos || []).reduce(
+                    (acc, p) => acc + (p.diasAbono || 0),
+                    0,
+                  )}{' '}
                   dias
                 </p>
                 <span className="text-[11px] text-slate-500">Dias convertidos em abono</span>
@@ -690,12 +711,15 @@ export default function FeriasPage() {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-[#2563EB]" />
+                  <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
                   Ciclos Aquisitivos e Limites Concessivos (CLT)
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Calculados rigorosamente de 12 em 12 meses a partir da data de admissão (
-                  {formatBRDate(funcionarioSelecionado.data_admissao)})
+                  {funcionarioSelecionado.data_admissao
+                    ? formatBRDate(funcionarioSelecionado.data_admissao)
+                    : 'Não informada'}
+                  )
                 </p>
               </div>
             </div>
@@ -779,7 +803,7 @@ export default function FeriasPage() {
                         <td className="py-3 px-3 text-center font-mono text-slate-700">
                           {p.diasAbono > 0 ? `${p.diasAbono}d` : '—'}
                         </td>
-                        <td className="py-3 px-3 text-center font-mono text-blue-700">
+                        <td className="py-3 px-3 text-center font-mono text-[#7C3AED]">
                           {p.diasProgramados > 0 ? `${p.diasProgramados}d` : '—'}
                         </td>
                         <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700 text-sm">
@@ -789,7 +813,7 @@ export default function FeriasPage() {
                           {p.situacao === 'em_aquisicao' && (
                             <Badge
                               variant="outline"
-                              className="text-blue-700 border-blue-200 bg-blue-50"
+                              className="text-[#7C3AED] border-[#7C3AED]/30 bg-[#7C3AED]/10"
                             >
                               Em Aquisição
                             </Badge>
@@ -851,7 +875,7 @@ export default function FeriasPage() {
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <CalendarCheck2 className="w-4 h-4 text-[#2563EB]" />
+                  <CalendarCheck2 className="w-4 h-4 text-[#D4AF37]" />
                   Histórico de Férias Agendadas e Concluídas
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -862,7 +886,7 @@ export default function FeriasPage() {
               <Button
                 size="sm"
                 onClick={() => handleOpenNewModal(funcionarioSelecionado.id)}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-8"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-8"
               >
                 <Plus className="w-3.5 h-3.5 mr-1" />
                 Novo Agendamento
@@ -915,10 +939,11 @@ export default function FeriasPage() {
                                   : f.status === 'concluida'
                                     ? 'bg-slate-100 text-slate-700 border-slate-300'
                                     : f.status === 'programada' || f.status === 'aprovado'
-                                      ? 'bg-blue-100 text-[#1E3A8A] border-blue-300'
+                                      ? 'bg-[#7C3AED]/15 text-[#5B21B6] border-[#7C3AED]/30'
                                       : 'bg-red-50 text-red-700 border-red-200'
                               }
                             >
+                              {' '}
                               {f.status === 'programada'
                                 ? 'Programada'
                                 : f.status === 'em_gozo'
@@ -1028,7 +1053,7 @@ export default function FeriasPage() {
           {/* Tabela de Colaboradores */}
           {loading ? (
             <div className="py-20 text-center">
-              <div className="w-8 h-8 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-xs text-slate-500">Calculando períodos de férias...</p>
             </div>
           ) : funcionariosFiltrados.length === 0 ? (
@@ -1081,17 +1106,18 @@ export default function FeriasPage() {
                             onClick={() => setSearchParams({ funcionarioId: func.id })}
                             className="text-left group focus:outline-none"
                           >
-                            <span className="font-bold text-slate-900 group-hover:text-[#2563EB] group-hover:underline block">
-                              {func.nome}
+                            <span className="font-bold text-slate-900 group-hover:text-[#AA820A] group-hover:underline block">
+                              {func.nome || 'Funcionário'}
                             </span>
                             <span className="text-[11px] text-slate-500 font-mono">
-                              Matrícula: {func.matricula} • {func.expand?.cargo?.nome || 'Cargo'}
+                              Matrícula: {func.matricula || '?'} •{' '}
+                              {func.expand?.cargo?.nome || 'Cargo'}
                             </span>
                           </button>
                         </td>
 
                         <td className="py-3 px-3 font-mono text-slate-700">
-                          {formatBRDate(func.data_admissao)}
+                          {func.data_admissao ? formatBRDate(func.data_admissao) : '-'}
                         </td>
 
                         <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700 text-sm">
@@ -1099,13 +1125,14 @@ export default function FeriasPage() {
                         </td>
 
                         <td className="py-3 px-3 text-center font-mono text-slate-700">
-                          {(calc?.periodos || []).reduce((acc, p) => acc + p.diasGozados, 0)}d
+                          {(calc?.periodos || []).reduce((acc, p) => acc + (p.diasGozados || 0), 0)}
+                          d
                         </td>
 
                         <td className="py-3 px-3 text-center font-mono">
                           {proxFerias ? (
-                            <span className="text-[#2563EB] font-semibold">
-                              {formatBRDate(proxFerias.data_inicio)} ({proxFerias.dias}d)
+                            <span className="text-[#7C3AED] font-semibold">
+                              {formatBRDate(proxFerias.data_inicio)} ({proxFerias.dias || 0}d)
                             </span>
                           ) : (
                             <span className="text-slate-300">—</span>
@@ -1174,7 +1201,7 @@ export default function FeriasPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => setSearchParams({ funcionarioId: func.id })}
-                              className="text-xs h-7 px-2.5 border-slate-200 text-[#2563EB] hover:bg-blue-50"
+                              className="text-xs h-7 px-2.5 border-slate-200 text-[#AA820A] hover:bg-amber-50"
                             >
                               Ver Períodos
                               <ChevronRight className="w-3 h-3 ml-1" />
@@ -1182,7 +1209,7 @@ export default function FeriasPage() {
                             <Button
                               size="sm"
                               onClick={() => handleOpenNewModal(func.id)}
-                              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-xs h-7 px-2"
+                              className="bg-gradient-to-r from-[#D4AF37] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-7 px-2"
                               title="Agendar Férias"
                             >
                               <Plus className="w-3.5 h-3.5" />
@@ -1205,15 +1232,15 @@ export default function FeriasPage() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#2563EB] flex items-center justify-center mb-1">
+            <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center mb-1">
               <Palmtree className="w-5 h-5" />
             </div>
             <DialogTitle>
               {editingFerias ? 'Editar Período de Férias' : 'Cadastrar Período de Férias'}
             </DialogTitle>
             <DialogDescription>
-              Preencha os dados do período de descanso. As validações da CLT (art. 134 e 130) serão
-              checadas automaticamente.
+              Preencha os dados do período de descanso. As validações da CLT serão checadas
+              automaticamente.
             </DialogDescription>
           </DialogHeader>
 
@@ -1336,7 +1363,7 @@ export default function FeriasPage() {
                 <span className="text-[11px] font-semibold text-slate-500 uppercase block">
                   Total Deduzido
                 </span>
-                <p className="text-lg font-bold text-[#2563EB] font-mono mt-0.5">
+                <p className="text-lg font-bold text-[#7C3AED] font-mono mt-0.5">
                   {validationResult.diasCalculados + (Number(formDiasAbono) || 0)} dias
                 </p>
               </div>
@@ -1449,7 +1476,7 @@ export default function FeriasPage() {
               <Button
                 type="submit"
                 disabled={saving || !validationResult.valido}
-                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0"
               >
                 {saving
                   ? 'Gravando...'

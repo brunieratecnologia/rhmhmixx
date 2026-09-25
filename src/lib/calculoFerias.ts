@@ -34,15 +34,44 @@ export function calcularDiasDireitoCLT(faltasInjustificadas: number): number {
 }
 
 /**
+ * Sanitiza e extrai data segura no formato YYYY-MM-DD.
+ * Rejeita vazios, undefined, strings inválidas ou que gerem NaN.
+ */
+export function sanitizarDataISO(dateStr?: string | null): string | null {
+  if (!dateStr || typeof dateStr !== 'string') return null
+  const limpo = dateStr.trim().split('T')[0].split(' ')[0]
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(limpo)) return null
+  const [y, m, d] = limpo.split('-').map(Number)
+  if (
+    isNaN(y) ||
+    isNaN(m) ||
+    isNaN(d) ||
+    y < 1900 ||
+    y > 2100 ||
+    m < 1 ||
+    m > 12 ||
+    d < 1 ||
+    d > 31
+  ) {
+    return null
+  }
+  const testDate = new Date(Date.UTC(y, m - 1, d))
+  if (isNaN(testDate.getTime())) return null
+  return limpo
+}
+
+/**
  * Adiciona anos a uma data no formato YYYY-MM-DD mantendo consistência de calendário
  */
 function addYears(dateStr: string, years: number): Date {
-  const [y, m, d] = dateStr.split('T')[0].split('-').map(Number)
+  const safeStr = sanitizarDataISO(dateStr) || '2000-01-01'
+  const [y, m, d] = safeStr.split('-').map(Number)
   const dt = new Date(Date.UTC(y + years, m - 1, d))
   return dt
 }
 
 function formatDateISO(d: Date): string {
+  if (!d || isNaN(d.getTime())) return '2000-01-01'
   return d.toISOString().split('T')[0]
 }
 
@@ -55,10 +84,16 @@ function subtractDays(d: Date, days: number): Date {
 /**
  * Calcula a diferença em dias corridos entre duas datas no formato YYYY-MM-DD (inclusive)
  */
-export function calcularDiasEntreDatas(dataInicio: string, dataFim: string): number {
-  if (!dataInicio || !dataFim) return 0
-  const d1 = new Date(dataInicio.split('T')[0] + 'T00:00:00Z')
-  const d2 = new Date(dataFim.split('T')[0] + 'T00:00:00Z')
+export function calcularDiasEntreDatas(
+  dataInicio?: string | null,
+  dataFim?: string | null,
+): number {
+  const safeInicio = sanitizarDataISO(dataInicio)
+  const safeFim = sanitizarDataISO(dataFim)
+  if (!safeInicio || !safeFim) return 0
+  const d1 = new Date(safeInicio + 'T00:00:00Z')
+  const d2 = new Date(safeFim + 'T00:00:00Z')
+  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 0
   const diffTime = d2.getTime() - d1.getTime()
   if (diffTime < 0) return 0
   return Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1
@@ -68,9 +103,9 @@ export function calcularDiasEntreDatas(dataInicio: string, dataFim: string): num
  * Calcula todos os períodos aquisitivos e concessivos de um colaborador a partir da admissão
  */
 export function calcularPeriodosColaborador(params: {
-  dataAdmissao: string
-  feriasCadastradas: Ferias[]
-  ausencias: Ausencia[]
+  dataAdmissao?: string | null
+  feriasCadastradas?: Ferias[]
+  ausencias?: Ausencia[]
   dataReferencia?: string // defaults to today (America/Sao_Paulo)
 }): {
   periodos: PeriodoAquisitivoCalculado[]
@@ -79,19 +114,22 @@ export function calcularPeriodosColaborador(params: {
   proximasFerias: Ferias | null
   temAlertaConcessivo: boolean
 } {
-  const { dataAdmissao, feriasCadastradas, ausencias } = params
-  if (!dataAdmissao) {
-    return {
-      periodos: [],
-      saldoTotalDisponivel: 0,
-      diasEmGozoHoje: 0,
-      proximasFerias: null,
-      temAlertaConcessivo: false,
-    }
+  const fallback = {
+    periodos: [],
+    saldoTotalDisponivel: 0,
+    diasEmGozoHoje: 0,
+    proximasFerias: null,
+    temAlertaConcessivo: false,
+  }
+
+  const { dataAdmissao, feriasCadastradas = [], ausencias = [] } = params || {}
+  const safeAdmissao = sanitizarDataISO(dataAdmissao)
+  if (!safeAdmissao) {
+    return fallback
   }
 
   const hojeStr =
-    params.dataReferencia ||
+    sanitizarDataISO(params.dataReferencia) ||
     new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Sao_Paulo',
       year: 'numeric',
@@ -100,7 +138,9 @@ export function calcularPeriodosColaborador(params: {
     }).format(new Date())
 
   const hoje = new Date(hojeStr + 'T00:00:00Z')
-  const adm = new Date(dataAdmissao.split('T')[0] + 'T00:00:00Z')
+  if (isNaN(hoje.getTime())) {
+    return fallback
+  }
 
   // Determina quantos ciclos de 12 meses já se iniciaram até hoje
   const periodos: PeriodoAquisitivoCalculado[] = []
@@ -108,9 +148,9 @@ export function calcularPeriodosColaborador(params: {
 
   // Geramos ciclos até cobrir o período atual em aquisição (mais 1 ciclo além da data atual)
   while (true) {
-    const inicioAquisitivoDate = addYears(dataAdmissao, indice - 1)
-    const fimAquisitivoDate = subtractDays(addYears(dataAdmissao, indice), 1)
-    const limiteConcessivoDate = subtractDays(addYears(dataAdmissao, indice + 1), 1)
+    const inicioAquisitivoDate = addYears(safeAdmissao, indice - 1)
+    const fimAquisitivoDate = subtractDays(addYears(safeAdmissao, indice), 1)
+    const limiteConcessivoDate = subtractDays(addYears(safeAdmissao, indice + 1), 1)
 
     const inicioStr = formatDateISO(inicioAquisitivoDate)
     const fimStr = formatDateISO(fimAquisitivoDate)
@@ -122,8 +162,10 @@ export function calcularPeriodosColaborador(params: {
     }
 
     // Calcula faltas injustificadas registradas durante este período aquisitivo
-    const faltasNoPeriodo = ausencias.filter((a) => {
-      const aData = a.data_inicio ? a.data_inicio.split('T')[0] : ''
+    const faltasNoPeriodo = (ausencias || []).filter((a) => {
+      if (!a) return false
+      const aData = sanitizarDataISO(a.data_inicio)
+      if (!aData) return false
       const ehFaltaInjustificada =
         (a.categoria === 'falta' && a.situacao === 'nao_justificada') ||
         (a.categoria === 'falta' && a.situacao === 'informada') ||
@@ -134,21 +176,23 @@ export function calcularPeriodosColaborador(params: {
     // Quantidade de dias de falta somando o período de ausência
     let totalDiasFaltas = 0
     for (const f of faltasNoPeriodo) {
-      const fFim = f.data_fim ? f.data_fim.split('T')[0] : f.data_inicio.split('T')[0]
+      const fFim = sanitizarDataISO(f.data_fim) || sanitizarDataISO(f.data_inicio)
       totalDiasFaltas += calcularDiasEntreDatas(f.data_inicio, fFim)
     }
 
     const diasDireitoAposFaltas = calcularDiasDireitoCLT(totalDiasFaltas)
 
     // Busca férias vinculadas especificamente a este período ou ordenadas
-    const feriasDestePeriodo = feriasCadastradas.filter((f) => {
-      if (f.status === 'cancelada') return false
+    const feriasDestePeriodo = (feriasCadastradas || []).filter((f) => {
+      if (!f || f.status === 'cancelada') return false
       // Se tiver periodo_aquisitivo_inicio explicitamente informado
-      if (f.periodo_aquisitivo_inicio) {
-        return f.periodo_aquisitivo_inicio.split('T')[0] === inicioStr
+      const perAqIni = sanitizarDataISO(f.periodo_aquisitivo_inicio)
+      if (perAqIni) {
+        return perAqIni === inicioStr
       }
       // Ou se o início das férias recai durante ou após o fim aquisitivo
-      const fInicio = f.data_inicio.split('T')[0]
+      const fInicio = sanitizarDataISO(f.data_inicio)
+      if (!fInicio) return false
       return fInicio >= fimStr && fInicio <= limiteConcessivoStr
     })
 
@@ -236,21 +280,27 @@ export function calcularPeriodosColaborador(params: {
     .reduce((acc, p) => acc + p.saldoRemanescente, 0)
 
   // Verifica se está em gozo hoje
-  const feriasEmGozo = feriasCadastradas.find((f) => {
-    if (f.status === 'cancelada') return false
-    const ini = f.data_inicio.split('T')[0]
-    const fim = f.data_fim.split('T')[0]
+  const feriasEmGozo = (feriasCadastradas || []).find((f) => {
+    if (!f || f.status === 'cancelada') return false
+    const ini = sanitizarDataISO(f.data_inicio)
+    const fim = sanitizarDataISO(f.data_fim)
+    if (!ini || !fim) return false
     return hojeStr >= ini && hojeStr <= fim
   })
 
   // Próximas férias programadas
-  const futuras = feriasCadastradas
+  const futuras = (feriasCadastradas || [])
     .filter((f) => {
-      if (f.status === 'cancelada') return false
-      const ini = f.data_inicio.split('T')[0]
+      if (!f || f.status === 'cancelada') return false
+      const ini = sanitizarDataISO(f.data_inicio)
+      if (!ini) return false
       return ini >= hojeStr
     })
-    .sort((a, b) => a.data_inicio.localeCompare(b.data_inicio))
+    .sort((a, b) => {
+      const iniA = sanitizarDataISO(a.data_inicio) || ''
+      const iniB = sanitizarDataISO(b.data_inicio) || ''
+      return iniA.localeCompare(iniB)
+    })
 
   const temAlertaConcessivo = periodos.some(
     (p) =>
@@ -314,8 +364,19 @@ export function validarRegrasFerias(params: {
     }
   }
 
-  const iniStr = dataInicio.split('T')[0]
-  const fimStr = dataFim.split('T')[0]
+  const iniStr = sanitizarDataISO(dataInicio)
+  const fimStr = sanitizarDataISO(dataFim)
+
+  if (!iniStr || !fimStr) {
+    erros.push('Datas de início e fim no formato YYYY-MM-DD são obrigatórias.')
+    return {
+      valido: false,
+      erros,
+      avisos,
+      diasCalculados: 0,
+      permiteComJustificativa: false,
+    }
+  }
 
   if (iniStr > fimStr) {
     erros.push('A data de início deve ser anterior ou igual à data de fim.')
@@ -342,10 +403,11 @@ export function validarRegrasFerias(params: {
   }
 
   // 1. Verificação de sobreposição com outras férias cadastradas
-  for (const f of feriasExistentesMesmoPeriodo) {
-    if (f.status === 'cancelada') continue
-    const fIni = f.data_inicio.split('T')[0]
-    const fFim = f.data_fim.split('T')[0]
+  for (const f of feriasExistentesMesmoPeriodo || []) {
+    if (!f || f.status === 'cancelada') continue
+    const fIni = sanitizarDataISO(f.data_inicio)
+    const fFim = sanitizarDataISO(f.data_fim)
+    if (!fIni || !fFim) continue
     // Sobreposição ocorre se ini <= fFim && fim >= fIni
     if (iniStr <= fFim && fimStr >= fIni) {
       erros.push(
@@ -388,10 +450,11 @@ export function validarRegrasFerias(params: {
   }
 
   // Verificar se o período concessivo já está expirado ou se este gozo ultrapassará o concessivo
-  if (periodoAquisitivo) {
-    if (fimStr > periodoAquisitivo.limiteConcessivo) {
+  if (periodoAquisitivo && periodoAquisitivo.limiteConcessivo) {
+    const limSafe = sanitizarDataISO(periodoAquisitivo.limiteConcessivo)
+    if (limSafe && fimStr > limSafe) {
       avisos.push(
-        `Atenção: O término destas férias (${fimStr.split('-').reverse().join('/')}) ultrapassa o limite concessivo legal (${periodoAquisitivo.limiteConcessivo.split('-').reverse().join('/')}).`,
+        `Atenção: O término destas férias (${fimStr.split('-').reverse().join('/')}) ultrapassa o limite concessivo legal (${limSafe.split('-').reverse().join('/')}).`,
       )
     }
   }

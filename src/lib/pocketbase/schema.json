@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-25T10:13:24.338Z",
+  "generatedAt": "2026-09-25T21:14:23.450Z",
   "collections": [
     {
       "name": "users",
@@ -300,6 +300,12 @@
           "required": false,
           "system": false,
           "selectValues": ["semanal_fixa", "escala_12x36", "escala_6x1", "personalizada"]
+        },
+        {
+          "name": "grade_semanal",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_jornadas_nome ON jornadas (nome)"]

@@ -235,50 +235,50 @@ export default function TerminalPonto() {
   const companyDisplayName =
     terminalInfo?.empresa?.nome_fantasia ||
     terminalInfo?.empresa?.razao_social ||
-    'Sistema de Recursos Humanos'
+    'MH MIXX — Açaí e Frutas Congeladas'
 
   return (
-    <div className="min-h-screen bg-[#F4F6F9] flex flex-col justify-between text-slate-900 select-none">
+    <div className="min-h-screen flex flex-col bg-[#090D14] text-amber-50 select-none">
       {/* 1. Header / Topo */}
-      <header className="bg-white border-b border-[#E2E8F0] shadow-xs px-4 sm:px-8 py-3 sm:py-4">
+      <header className="bg-[#070B11] border-b border-[#D4AF37]/20 px-4 sm:px-8 py-3.5 shadow-lg">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-          {/* Logo & Company info */}
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            {companyLogoUrl ? (
+          {/* Logo / Nome da Empresa */}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-black border border-[#D4AF37]/40 flex items-center justify-center p-1 shrink-0 shadow-md">
               <img
-                src={companyLogoUrl}
+                src={companyLogoUrl || '/src/assets/logomhmixx-7c4e3.jpeg'}
                 alt={companyDisplayName}
-                className="w-10 h-10 sm:w-12 sm:h-12 object-contain rounded-xl border border-slate-100 shadow-xs shrink-0"
-              />
-            ) : (
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-[#2563EB] flex items-center justify-center text-white shrink-0 font-bold text-base sm:text-lg shadow-xs">
-                RH
-              </div>
-            )}
+                className="w-full h-full object-contain rounded-lg"
+                onError={(e) => {
+                  ;(e.currentTarget as HTMLImageElement).src = '/src/assets/logomhmixx-7c4e3.jpeg'
+                }}
+              />{' '}
+            </div>
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-lg font-bold text-slate-900 tracking-tight truncate">
+              <h1 className="text-sm sm:text-base font-bold text-amber-100 tracking-tight truncate">
                 {companyDisplayName}
               </h1>
-              <p className="text-xs text-slate-500 font-medium">Terminal Eletrônico de Ponto</p>
+              <p className="text-xs text-[#D4AF37] font-medium">
+                Terminal Eletrônico de Ponto • Registro por PIN
+              </p>
             </div>
           </div>
 
           {/* Large Digital Clock */}
           <div className="flex flex-col items-end">
-            <div className="flex items-center gap-1.5 font-mono text-2xl sm:text-4xl font-extrabold text-[#1E3A8A] tracking-wider drop-shadow-xs">
+            <div className="flex items-center gap-1.5 font-mono text-2xl sm:text-4xl font-extrabold text-[#D4AF37] tracking-wider drop-shadow-xs">
               <span>{hours}</span>
-              <span className="animate-pulse text-[#2563EB]">:</span>
+              <span className="animate-pulse text-[#E5C07B]">:</span>
               <span>{minutes}</span>
-              <span className="animate-pulse text-[#2563EB]">:</span>
-              <span className="text-lg sm:text-2xl text-slate-600">{seconds}</span>
+              <span className="animate-pulse text-[#E5C07B]">:</span>
+              <span className="text-lg sm:text-2xl text-slate-400">{seconds}</span>
             </div>
-            <div className="text-[11px] sm:text-xs text-slate-500 font-medium capitalize mt-0.5">
+            <div className="text-[11px] sm:text-xs text-slate-400 font-medium capitalize mt-0.5">
               {shortDateBR} • <span className="capitalize">{dateFormatted}</span>
             </div>
           </div>
         </div>
       </header>
-
       {/* 2. Main Content / Centro */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-md">
@@ -356,16 +356,16 @@ export default function TerminalPonto() {
             </div>
           ) : (
             /* Terminal Input Card with PIN ONLY */
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 sm:p-7 shadow-lg space-y-5">
+            <div className="bg-[#0F1624] rounded-2xl border border-[#D4AF37]/25 p-6 sm:p-7 shadow-2xl space-y-5">
               {/* Card Title */}
-              <div className="text-center pb-2 border-b border-slate-100">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center mx-auto mb-2 shadow-xs">
+              <div className="text-center pb-2 border-b border-[#D4AF37]/15">
+                <div className="w-12 h-12 rounded-2xl bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center mx-auto mb-2 shadow-xs">
                   <KeyRound className="w-6 h-6" />
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-amber-100 tracking-tight">
                   Digite seu PIN
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-400 mt-0.5">
                   Identificação rápida: digite apenas seu PIN numérico de 4 a 6 dígitos
                 </p>
               </div>
@@ -396,9 +396,9 @@ export default function TerminalPonto() {
                 {/* Campo PIN com Display Visual dos Dígitos */}
                 <div
                   onClick={() => pinInputRef.current?.focus()}
-                  className="p-4 rounded-xl border-2 border-[#2563EB] bg-blue-50/20 ring-2 ring-[#2563EB]/15 transition-all cursor-pointer text-center"
+                  className="p-4 rounded-xl border-2 border-[#D4AF37] bg-[#070B11] ring-2 ring-[#D4AF37]/20 transition-all cursor-pointer text-center"
                 >
-                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-2">
+                  <label className="text-[11px] font-bold text-amber-200/80 uppercase tracking-wider block mb-2">
                     PIN do Funcionário
                   </label>
 
@@ -411,8 +411,8 @@ export default function TerminalPonto() {
                           key={idx}
                           className={`w-4 h-4 rounded-full border-2 transition-all ${
                             isFilled
-                              ? 'bg-[#2563EB] border-[#2563EB] scale-110 shadow-xs'
-                              : 'border-slate-300 bg-white'
+                              ? 'bg-[#D4AF37] border-[#D4AF37] scale-110 shadow-xs'
+                              : 'border-slate-700 bg-slate-900'
                           }`}
                         />
                       )
@@ -427,21 +427,21 @@ export default function TerminalPonto() {
                     value={pin}
                     placeholder="••••"
                     onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full bg-transparent font-mono text-center text-2xl font-bold text-slate-900 tracking-widest focus:outline-none placeholder:text-slate-300 mt-1"
+                    className="w-full bg-transparent font-mono text-center text-2xl font-bold text-amber-100 tracking-widest focus:outline-none placeholder:text-slate-600 mt-1"
                     autoComplete="off"
                     autoFocus
                   />
                 </div>
 
                 {/* Virtual Keypad (Touch Screen Friendly) */}
-                <div className="bg-slate-100/80 p-3 rounded-xl border border-slate-200">
+                <div className="bg-[#070B11] p-3 rounded-xl border border-[#D4AF37]/20">
                   <div className="grid grid-cols-3 gap-2">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                       <button
                         key={num}
                         type="button"
                         onClick={() => handleKeypadPress(String(num))}
-                        className="h-12 sm:h-14 bg-white hover:bg-blue-50 active:bg-blue-100 rounded-xl text-xl sm:text-2xl font-bold text-slate-800 border border-slate-200/80 shadow-xs hover:border-[#2563EB]/40 transition-all flex items-center justify-center active:scale-95"
+                        className="h-12 sm:h-14 bg-[#121824] hover:bg-[#1A2233] active:bg-[#252F42] rounded-xl text-xl sm:text-2xl font-bold text-amber-50 border border-slate-800 shadow-xs hover:border-[#D4AF37]/50 transition-all flex items-center justify-center active:scale-95"
                       >
                         {num}
                       </button>
@@ -451,9 +451,9 @@ export default function TerminalPonto() {
                     <button
                       type="button"
                       onClick={() => handleKeypadPress('clear')}
-                      className="h-12 sm:h-14 bg-slate-200/80 hover:bg-slate-300 active:bg-slate-400 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 border border-slate-300/80 transition-all flex flex-col items-center justify-center active:scale-95 gap-0.5"
+                      className="h-12 sm:h-14 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 border border-slate-800 transition-all flex flex-col items-center justify-center active:scale-95 gap-0.5"
                     >
-                      <RotateCcw className="w-4 h-4 text-slate-500" />
+                      <RotateCcw className="w-4 h-4 text-slate-400" />
                       <span>Limpar</span>
                     </button>
 
@@ -461,7 +461,7 @@ export default function TerminalPonto() {
                     <button
                       type="button"
                       onClick={() => handleKeypadPress('0')}
-                      className="h-12 sm:h-14 bg-white hover:bg-blue-50 active:bg-blue-100 rounded-xl text-xl sm:text-2xl font-bold text-slate-800 border border-slate-200/80 shadow-xs hover:border-[#2563EB]/40 transition-all flex items-center justify-center active:scale-95"
+                      className="h-12 sm:h-14 bg-[#121824] hover:bg-[#1A2233] active:bg-[#252F42] rounded-xl text-xl sm:text-2xl font-bold text-amber-50 border border-slate-800 shadow-xs hover:border-[#D4AF37]/50 transition-all flex items-center justify-center active:scale-95"
                     >
                       0
                     </button>
@@ -470,9 +470,9 @@ export default function TerminalPonto() {
                     <button
                       type="button"
                       onClick={() => handleKeypadPress('backspace')}
-                      className="h-12 sm:h-14 bg-slate-200/80 hover:bg-slate-300 active:bg-slate-400 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 border border-slate-300/80 transition-all flex flex-col items-center justify-center active:scale-95 gap-0.5"
+                      className="h-12 sm:h-14 bg-slate-900 hover:bg-slate-800 active:bg-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-slate-300 border border-slate-800 transition-all flex flex-col items-center justify-center active:scale-95 gap-0.5"
                     >
-                      <Delete className="w-4 h-4 text-slate-500" />
+                      <Delete className="w-4 h-4 text-slate-400" />
                       <span>Apagar</span>
                     </button>
                   </div>
@@ -482,7 +482,7 @@ export default function TerminalPonto() {
                 <Button
                   type="submit"
                   disabled={submitting || pin.length < 4}
-                  className="w-full h-14 bg-[#2563EB] hover:bg-[#1D4ED8] active:bg-[#1E3A8A] text-white font-extrabold text-base sm:text-lg rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full h-14 bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 hover:brightness-110 font-extrabold text-base sm:text-lg rounded-xl shadow-lg shadow-[#D4AF37]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-40 border-0"
                 >
                   {submitting ? (
                     <>
@@ -503,14 +503,14 @@ export default function TerminalPonto() {
       </main>
 
       {/* 3. Footer / Base */}
-      <footer className="bg-white border-t border-[#E2E8F0] px-4 sm:px-8 py-3 text-xs text-slate-500">
+      <footer className="bg-[#070B11] border-t border-[#D4AF37]/20 px-4 sm:px-8 py-3 text-xs text-slate-400">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
           {/* Orientation message */}
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#2563EB]" />
-            <p className="text-[11px] sm:text-xs text-slate-600 font-medium">
+            <span className="w-2 h-2 rounded-full bg-[#D4AF37]" />
+            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">
               Aproxime-se do terminal, digite seu PIN individual e pressione{' '}
-              <strong className="text-slate-800">Confirmar Ponto</strong>.
+              <strong className="text-amber-200">Confirmar Ponto</strong>.
             </p>
           </div>
 

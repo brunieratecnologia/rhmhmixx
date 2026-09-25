@@ -708,11 +708,31 @@ export default function FuncionarioFicha() {
                         setPinError(null)
                         setPinModalOpen(true)
                       }}
-                      className="bg-white hover:bg-slate-50 text-[#2563EB] border border-[#2563EB]/30 text-xs font-semibold h-8 px-3 shadow-xs shrink-0"
+                      className="bg-[#0F1624] hover:bg-[#151D2C] text-[#D4AF37] border border-[#D4AF37]/40 text-xs font-semibold h-8 px-3 shadow-xs shrink-0"
                     >
                       <Lock className="w-3.5 h-3.5 mr-1" />
                       Definir / Trocar PIN
                     </Button>
+                  </div>
+
+                  {/* Informação sobre Acesso ao Portal */}
+                  <div className="mt-3 p-3 rounded-lg bg-[#0F1624] border border-[#D4AF37]/20 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-bold text-amber-100 block">
+                        Acesso ao Portal do Colaborador
+                      </span>
+                      <p className="text-[11px] text-slate-400">
+                        {funcionario.user
+                          ? `Usuário vinculado ao e-mail ${funcionario.email}. O colaborador acessa com seu e-mail e senha.`
+                          : `O colaborador ainda não possui usuário individual. Ele pode ser cadastrado ou vinculado ao e-mail ${funcionario.email}.`}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] border-[#D4AF37]/30 text-amber-300 shrink-0"
+                    >
+                      {funcionario.user ? 'Conta Ativa' : 'Pendente'}
+                    </Badge>
                   </div>
                 </div>
 

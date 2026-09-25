@@ -1,4 +1,7 @@
-/* Global styles - Theme, font, utilities, animations and global components */
+/* Global styles - Theme, font, utilities, animations and global components
+   Identidade Visual MH MIXX: Preto base (#0B0F17 / #121824), Dourado corporativo (#D4AF37 / #E5C07B / #F59E0B),
+   com pitada de Roxo do Açaí (#7C3AED / #8B5CF6 / #6D28D9) e acentos elegantes.
+*/
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
@@ -18,102 +21,106 @@
   }
 
   :root {
-    --background: 214 20% 97%; /* #F4F6F9 */
-    --foreground: 222 47% 11%; /* #0F172A */
+    /* Tema Base Escuro MH MIXX — Preto / Grafite com Acentos Dourados e Roxo Açaí */
+    --background: 222 47% 7%; /* #090D14 */
+    --foreground: 45 30% 96%; /* #FAF8F2 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card: 222 40% 10%; /* #0F1624 */
+    --card-foreground: 45 30% 96%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover: 222 40% 10%;
+    --popover-foreground: 45 30% 96%;
 
-    --primary: 221 83% 53%; /* #2563EB */
-    --primary-foreground: 210 40% 98%;
+    /* Dourado institucional rico (#D4AF37 / #E6B800) */
+    --primary: 43 74% 49%; /* #D4A314 / Dourado Ouro */
+    --primary-foreground: 222 47% 7%;
 
-    --secondary: 214 32% 91%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 222 30% 16%; /* #1A2233 */
+    --secondary-foreground: 45 30% 96%;
 
-    --muted: 214 32% 91%;
-    --muted-foreground: 215 16% 47%; /* #64748B */
+    --muted: 222 30% 14%; /* #151D2C */
+    --muted-foreground: 215 20% 65%; /* #94A3B8 */
 
-    --accent: 214 95% 93%; /* #DBEAFE */
-    --accent-foreground: 224 76% 33%; /* #1E3A8A */
+    /* Acento Dourado com leve toque de Roxo Açaí */
+    --accent: 270 50% 20%; /* Roxo Açaí Escuro Suave */
+    --accent-foreground: 45 80% 88%;
 
     --destructive: 0 84% 60%; /* #DC2626 */
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%; /* #E2E8F0 */
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221 83% 53%;
+    --border: 222 25% 18%; /* Borda sutil grafite */
+    --input: 222 25% 20%;
+    --ring: 43 74% 50%; /* Dourado */
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 222 47% 6%; /* #070B11 */
+    --sidebar-foreground: 45 20% 90%;
+    --sidebar-primary: 43 74% 49%;
+    --sidebar-primary-foreground: 222 47% 7%;
+    --sidebar-accent: 222 35% 12%;
+    --sidebar-accent-foreground: 45 74% 65%;
+    --sidebar-border: 222 25% 14%;
+    --sidebar-ring: 43 74% 49%;
 
-    --sidebar-foreground: 222.2 84% 4.9%;
-
-    --sidebar-primary: 222.2 84% 4.9%;
-
-    --sidebar-primary-foreground: 0 0% 100%;
-
-    --sidebar-accent: 210 40% 98%;
-
-    --sidebar-accent-foreground: 222.2 84% 4.9%;
-
-    --sidebar-border: 214.3 31.8% 91.4%;
-
-    --sidebar-ring: 222.2 84% 4.9%;
-
-    --chart-1: 34 100% 44%;
-    --chart-2: 189 100% 38%;
-    --chart-3: 209 100% 32%;
-    --chart-4: 42 100% 50%;
-    --chart-5: 33 100% 50%;
+    /* Charts com Dourado, Açaí, Esmeralda e Âmbar */
+    --chart-1: 43 74% 49%; /* Dourado */
+    --chart-2: 270 70% 60%; /* Roxo Açaí */
+    --chart-3: 158 64% 52%; /* Verde Sucesso */
+    --chart-4: 38 92% 50%; /* Âmbar */
+    --chart-5: 0 84% 60%; /* Vermelho */
   }
 
   .dark {
-    /* Change the colors to match the design system consistent with the dark mode */
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 84% 4.9%;
-
-    --secondary: 222.2 84% 4.9%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 222.2 84% 4.9%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 222.2 84% 4.9%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 84.2% 60.2%;
+    --background: 222 47% 7%;
+    --foreground: 45 30% 96%;
+    --card: 222 40% 10%;
+    --card-foreground: 45 30% 96%;
+    --popover: 222 40% 10%;
+    --popover-foreground: 45 30% 96%;
+    --primary: 43 74% 49%;
+    --primary-foreground: 222 47% 7%;
+    --secondary: 222 30% 16%;
+    --secondary-foreground: 45 30% 96%;
+    --muted: 222 30% 14%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 270 50% 20%;
+    --accent-foreground: 45 80% 88%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
+    --border: 222 25% 18%;
+    --input: 222 25% 20%;
+    --ring: 43 74% 50%;
+    --sidebar-background: 222 47% 6%;
+    --sidebar-foreground: 45 20% 90%;
+    --sidebar-primary: 43 74% 49%;
+    --sidebar-primary-foreground: 222 47% 7%;
+    --sidebar-accent: 222 35% 12%;
+    --sidebar-accent-foreground: 45 74% 65%;
+    --sidebar-border: 222 25% 14%;
+    --sidebar-ring: 43 74% 49%;
+  }
 
-    --border: 222.2 84% 4.9%;
-    --input: 222.2 84% 4.9%;
-    --ring: 214.3 31.8% 91.4%;
-    --sidebar-background: 222.2 84% 4.9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 222.2 84% 4.9%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222.2 84% 4.9%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 222.2 84% 4.9%;
-    --sidebar-ring: 222.2 84% 4.9%;
+  body {
+    background-color: #090d14;
+    color: #faf8f2;
+    min-height: 100vh;
+  }
 
-    --chart-1: 270 100% 44%;
-    --chart-2: 164 100% 38%;
-    --chart-3: 43 100% 32%;
-    --chart-4: 340 100% 50%;
-    --chart-5: 10 100% 50%;
+  /* Scrollbars refinados escuros com toque dourado */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0b0f17;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #252f42;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #d4af37;
   }
 
   /* NEVER REMOVE THIS */
@@ -124,6 +131,33 @@
 }
 
 @layer utilities {
+  /* Utilitários MH MIXX */
+  .gold-gradient {
+    background: linear-gradient(135deg, #f3d279 0%, #d4af37 50%, #aa820a 100%);
+  }
+
+  .gold-text-gradient {
+    background: linear-gradient(135deg, #f8e39a 0%, #e5c07b 40%, #d4af37 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .acai-badge {
+    background: rgba(124, 58, 237, 0.15);
+    color: #c4b5fd;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+  }
+
+  .card-dark-gold {
+    background-color: #0f1624;
+    border: 1px solid rgba(212, 175, 55, 0.15);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  }
+
+  .card-dark-gold:hover {
+    border-color: rgba(212, 175, 55, 0.3);
+  }
+
   /* KEEP ALL THE ANIMATIONS CLASSES THAT ARE USED BELOW */
   @keyframes accordion-down {
     from {

@@ -1038,6 +1038,167 @@ export const holeritesService = {
   },
 }
 
+export const solicitacoesService = {
+  async list(filters?: { funcionarioId?: string; status?: string }) {
+    const filterClauses: string[] = []
+    if (filters?.funcionarioId) filterClauses.push(`funcionario = "${filters.funcionarioId}"`)
+    if (filters?.status) filterClauses.push(`status = "${filters.status}"`)
+    const filter = filterClauses.join(' && ')
+
+    return await pb.collection('solicitacoes').getFullList<Solicitacao>({
+      filter,
+      sort: '-created',
+      expand: 'funcionario,decidido_por',
+    })
+  },
+
+  async create(data: {
+    funcionario: string
+    tipo: Solicitacao['tipo']
+    motivo: string
+    detalhes?: string
+  }) {
+    return await pb.collection('solicitacoes').create<Solicitacao>({
+      ...data,
+      status: 'pendente',
+    })
+  },
+
+  async decidir(
+    id: string,
+    data: {
+      status: 'aprovado' | 'recusado' | 'cancelado'
+      decidido_por?: string
+    },
+  ) {
+    return await pb.collection('solicitacoes').update<Solicitacao>(id, {
+      status: data.status,
+      decidido_por: data.decidido_por || pb.authStore.record?.id,
+      decidido_em: new Date().toISOString(),
+    })
+  },
+}
+
+export const portalService = {
+  // Retorna a ficha do funcionário associada ao usuário autenticado atual
+  async getMeuPerfil(): Promise<Funcionario | null> {
+    const userId = pb.authStore.record?.id
+    if (!userId) return null
+
+    // 1. Tenta buscar por vínculo direto user = userId
+    try {
+      const list = await pb.collection('funcionarios').getList<Funcionario>(1, 1, {
+        filter: `user = "${userId}"`,
+        expand: 'cargo,departamento,jornada_atual',
+      })
+      if (list.items.length > 0) return list.items[0]
+    } catch {
+      /* ignore */
+    }
+
+    // 2. Fallback: Se for admin/rh ou e-mail coincidente, busca por e-mail e auto-vincula
+    const userEmail = pb.authStore.record?.email
+    if (userEmail) {
+      try {
+        const listEmail = await pb.collection('funcionarios').getList<Funcionario>(1, 1, {
+          filter: `email = "${userEmail.toLowerCase()}"`,
+          expand: 'cargo,departamento,jornada_atual',
+        })
+        if (listEmail.items.length > 0) {
+          const func = listEmail.items[0]
+          // Tenta atualizar vínculo se não estiver preenchido
+          if (!func.user) {
+            try {
+              await pb.collection('funcionarios').update(func.id, { user: userId })
+            } catch {
+              /* ignore */
+            }
+          }
+          return func
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // 3. Se for usuário admin inspecionando e não tem ficha própria, retorna o primeiro funcionário ativo para visualização
+    if (pb.authStore.record?.role === 'admin' || pb.authStore.record?.role === 'rh') {
+      try {
+        const fallback = await pb.collection('funcionarios').getList<Funcionario>(1, 1, {
+          filter: 'situacao = "ativo"',
+          sort: 'matricula',
+          expand: 'cargo,departamento,jornada_atual',
+        })
+        if (fallback.items.length > 0) return fallback.items[0]
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return null
+  },
+
+  // Meus Holerites
+  async getMeusHolerites(funcionarioId: string): Promise<Holerite[]> {
+    return await pb.collection('holerites').getFullList<Holerite>({
+      filter: `funcionario = "${funcionarioId}"`,
+      sort: '-competencia_ano,-competencia_mes,-data_envio',
+      expand: 'funcionario',
+    })
+  },
+
+  // Meus Documentos (somente documentos liberados — oculta restrito_rh e restrito_medico)
+  async getMeusDocumentos(funcionarioId: string): Promise<Documento[]> {
+    return await pb.collection('documentos').getFullList<Documento>({
+      filter: `funcionario = "${funcionarioId}" && nivel_acesso != "restrito_rh" && nivel_acesso != "restrito_medico" && ativo = true`,
+      sort: '-data_envio,-created',
+      expand: 'funcionario',
+    })
+  },
+
+  // Minhas Férias
+  async getMinhasFerias(funcionarioId: string): Promise<Ferias[]> {
+    return await pb.collection('ferias').getFullList<Ferias>({
+      filter: `funcionario = "${funcionarioId}"`,
+      sort: '-data_inicio',
+      expand: 'funcionario',
+    })
+  },
+
+  // Meus Registros de Ponto Recentes
+  async getMeusRegistrosRecentes(funcionarioId: string, limit = 30): Promise<RegistroHorario[]> {
+    const list = await pb.collection('registros_horario').getList<RegistroHorario>(1, limit, {
+      filter: `funcionario = "${funcionarioId}"`,
+      sort: '-timestamp_utc,-created',
+    })
+    return list.items
+  },
+
+  // Minhas Solicitações
+  async getMinhasSolicitacoes(funcionarioId: string): Promise<Solicitacao[]> {
+    return await pb.collection('solicitacoes').getFullList<Solicitacao>({
+      filter: `funcionario = "${funcionarioId}"`,
+      sort: '-created',
+      expand: 'decidido_por',
+    })
+  },
+
+  async criarSolicitacao(data: {
+    funcionarioId: string
+    tipo: Solicitacao['tipo']
+    motivo: string
+    detalhes?: string
+  }): Promise<Solicitacao> {
+    return await pb.collection('solicitacoes').create<Solicitacao>({
+      funcionario: data.funcionarioId,
+      tipo: data.tipo,
+      motivo: data.motivo.trim(),
+      detalhes: data.detalhes?.trim() || '',
+      status: 'pendente',
+    })
+  },
+}
+
 export const espelhoPontoService = {
   async getDadosEspelho(funcionarioId: string, ano: number, mes: number) {
     const padMes = String(mes).padStart(2, '0')

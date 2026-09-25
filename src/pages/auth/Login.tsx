@@ -27,10 +27,13 @@ export default function Login() {
     try {
       const loggedUser = await signIn(email, password)
       if (loggedUser.role === 'admin' || loggedUser.role === 'rh') {
-        navigate(from, { replace: true })
+        navigate(
+          from && from !== '/login' && !from.startsWith('/portal') ? from : '/admin/dashboard',
+          { replace: true },
+        )
       } else {
-        // Funcionário role
-        navigate('/admin/dashboard', { replace: true })
+        // Funcionário role -> Portal do Funcionário
+        navigate('/portal/inicio', { replace: true })
       }
     } catch (err: any) {
       console.error('Login error:', err)
@@ -41,21 +44,34 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-8 bg-gradient-to-br from-[#E8EEF7] via-[#DFE8F5] to-[#D5E0F0] relative overflow-hidden">
-      {/* Subtle blue radial glow in top right */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[#2563EB]/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-8 bg-[#090D14] relative overflow-hidden text-amber-50">
+      {/* Subtle gold and acai radial glows */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#7C3AED]/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
 
-      <div className="w-full max-w-[400px] z-10">
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200/80 p-8">
+      <div className="w-full max-w-[420px] z-10">
+        <div className="bg-[#0F1624] rounded-2xl shadow-2xl border border-[#D4AF37]/25 p-8 relative backdrop-blur-md">
           {/* Logo / Header */}
           <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-[#2563EB] flex items-center justify-center text-white shadow-md shadow-blue-500/20 mb-3">
-              <svg className="w-8 h-8 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
-              </svg>
+            <div className="w-20 h-20 rounded-2xl bg-black/60 border border-[#D4AF37]/40 flex items-center justify-center p-2 mb-3 shadow-lg shadow-black/60">
+              <img
+                src="/src/assets/logomhmixx-7c4e3.jpeg"
+                alt="MH MIXX"
+                className="w-full h-full object-contain rounded-xl"
+                onError={(e) => {
+                  ;(e.currentTarget as HTMLElement).style.display = 'none'
+                }}
+              />
             </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Recursos Humanos</h1>
-            <p className="text-sm text-slate-500 mt-1">Acesso administrativo ao sistema</p>
+            <h1 className="text-xl font-bold text-amber-100 tracking-tight flex items-center gap-1.5">
+              <span>MH MIXX</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-[#7C3AED]/20 text-purple-300 border border-[#7C3AED]/40">
+                Açaí & Frutas
+              </span>
+            </h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Acesso corporativo — Gestão de RH e Portal do Colaborador
+            </p>
           </div>
 
           {/* Error Banner */}
@@ -69,11 +85,11 @@ export default function Login() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs font-semibold text-slate-700">
-                E-mail
+              <Label htmlFor="email" className="text-xs font-semibold text-amber-200/90">
+                E-mail corporativo ou pessoal
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#D4AF37]/70" />
                 <Input
                   id="email"
                   type="email"
@@ -81,18 +97,18 @@ export default function Login() {
                   placeholder="seu.email@empresa.com.br"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9 h-11 border-slate-200 focus-visible:ring-[#2563EB]"
+                  className="pl-9 h-11 bg-[#090D14] border-[#D4AF37]/30 text-amber-50 placeholder:text-slate-500 focus-visible:ring-[#D4AF37] focus-visible:border-[#D4AF37]"
                   autoComplete="email"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="password" className="text-xs font-semibold text-amber-200/90">
                 Senha
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#D4AF37]/70" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -100,13 +116,13 @@ export default function Login() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9 pr-10 h-11 border-slate-200 focus-visible:ring-[#2563EB]"
+                  className="pl-9 pr-10 h-11 bg-[#090D14] border-[#D4AF37]/30 text-amber-50 placeholder:text-slate-500 focus-visible:ring-[#D4AF37] focus-visible:border-[#D4AF37]"
                   autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-amber-300 p-1"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -116,15 +132,15 @@ export default function Login() {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold text-sm transition-all shadow-sm"
+              className="w-full h-11 bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-sm transition-all hover:brightness-110 shadow-lg shadow-[#D4AF37]/20 border-0"
             >
-              {isLoading ? 'Entrando...' : 'Entrar'}
+              {isLoading ? 'Entrando...' : 'Entrar no Sistema'}
             </Button>
 
             <div className="text-center pt-2">
               <Link
                 to="/esqueci-senha"
-                className="text-xs font-medium text-slate-500 hover:text-[#2563EB] transition-colors"
+                className="text-xs font-medium text-slate-400 hover:text-amber-300 transition-colors"
               >
                 Esqueci minha senha
               </Link>

@@ -124,55 +124,57 @@ export default function AdminLayout() {
   }
 
   const logoUrl = empresa?.logotipo ? pb.files.getURL(empresa, empresa.logotipo) : null
-  const companyName = empresa?.nome_fantasia || empresa?.razao_social || 'Recursos Humanos'
+  const companyName =
+    empresa?.nome_fantasia || empresa?.razao_social || 'MH MIXX — Açaí e Frutas Congeladas'
   const isDashboard = location.pathname === '/admin/dashboard'
 
   const userDisplayName = user?.nome || user?.name || user?.email || 'Usuário'
   const userInitials = userDisplayName.slice(0, 2).toUpperCase()
 
   return (
-    <div className="min-h-screen flex bg-[#F4F6F9] text-slate-900 font-sans antialiased">
+    <div className="min-h-screen flex bg-[#090D14] text-amber-50 font-sans antialiased">
       {/* Mobile Backdrop Overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs lg:hidden transition-opacity duration-200"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-xs lg:hidden transition-opacity duration-200"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Sidebar (Desktop 250px, Tablet 72px icon-only, Mobile Slide-in Drawer) */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-white border-r border-[#E2E8F0] transition-all duration-200 ease-in-out
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#070B11] border-r border-[#D4AF37]/20 transition-all duration-200 ease-in-out
           ${mobileOpen ? 'translate-x-0 w-[250px]' : '-translate-x-full lg:translate-x-0'}
           w-[250px] md:w-[72px] lg:w-[250px]
         `}
       >
         {/* Brand / Logo Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-[#E2E8F0]">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-[#D4AF37]/15">
           <div className="flex items-center gap-3 overflow-hidden">
-            {logoUrl ? (
+            <div className="w-10 h-10 rounded-lg bg-black border border-[#D4AF37]/40 flex items-center justify-center shrink-0 p-1">
               <img
-                src={logoUrl}
+                src={logoUrl || '/src/assets/logomhmixx-7c4e3.jpeg'}
                 alt={companyName}
-                className="w-9 h-9 object-contain rounded-lg shrink-0 border border-slate-100"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-lg bg-[#2563EB] flex items-center justify-center text-white shrink-0 font-bold text-sm shadow-xs">
-                RH
-              </div>
-            )}
+                className="w-full h-full object-contain rounded"
+                onError={(e) => {
+                  ;(e.currentTarget as HTMLImageElement).src = '/src/assets/logomhmixx-7c4e3.jpeg'
+                }}
+              />{' '}
+            </div>
             <div className="flex flex-col min-w-0 md:hidden lg:flex">
-              <span className="text-sm font-bold text-slate-900 truncate tracking-tight">
-                {companyName}
+              <span className="text-xs font-bold text-amber-100 truncate tracking-tight">
+                MH MIXX
               </span>
-              <span className="text-[11px] font-medium text-slate-500 truncate">Gestão de RH</span>
+              <span className="text-[10px] font-medium text-[#D4AF37] truncate">
+                Gestão & Recursos Humanos
+              </span>
             </div>
           </div>
 
           {/* Close button on mobile drawer */}
           <button
             onClick={() => setMobileOpen(false)}
-            className="lg:hidden p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+            className="lg:hidden p-1 text-slate-400 hover:text-amber-300 rounded-lg hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,20 +194,16 @@ export default function AdminLayout() {
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative group
                   ${
                     isActive
-                      ? 'bg-[#DBEAFE] text-[#1E3A8A] font-semibold'
-                      : 'text-slate-600 hover:bg-blue-50/60 hover:text-[#2563EB]'
+                      ? 'bg-[#151D2C] text-[#E5C07B] font-semibold border-l-2 border-[#D4AF37]'
+                      : 'text-slate-400 hover:bg-[#121824] hover:text-[#D4AF37]'
                   }
                   md:justify-center lg:justify-start
                 `}
                 title={item.name}
               >
-                {/* Active Indicator Bar */}
-                {isActive && (
-                  <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-[#2563EB] rounded-r-full" />
-                )}
                 <Icon
                   className={`w-5 h-5 shrink-0 transition-colors ${
-                    isActive ? 'text-[#2563EB]' : 'text-slate-500 group-hover:text-[#2563EB]'
+                    isActive ? 'text-[#D4AF37]' : 'text-slate-500 group-hover:text-[#D4AF37]'
                   }`}
                 />
                 <span className="truncate md:hidden lg:inline">{item.name}</span>
@@ -215,17 +213,19 @@ export default function AdminLayout() {
         </nav>
 
         {/* User preview at sidebar bottom */}
-        <div className="p-3 border-t border-[#E2E8F0]">
-          <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50/80 md:justify-center lg:justify-start">
-            <Avatar className="w-8 h-8 rounded-full border border-slate-200">
+        <div className="p-3 border-t border-[#D4AF37]/15">
+          <div className="flex items-center gap-3 p-2 rounded-lg bg-[#0F1624] border border-[#D4AF37]/10 md:justify-center lg:justify-start">
+            <Avatar className="w-8 h-8 rounded-full border border-[#D4AF37]/40">
               <AvatarImage src={user?.avatar} />
-              <AvatarFallback className="bg-[#2563EB]/10 text-[#2563EB] text-xs font-bold">
+              <AvatarFallback className="bg-[#D4AF37]/20 text-[#D4AF37] text-xs font-bold">
                 {userInitials}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0 md:hidden lg:block text-left">
-              <p className="text-xs font-semibold text-slate-800 truncate">{userDisplayName}</p>
-              <p className="text-[10px] text-slate-500 capitalize">{user?.role || 'admin'}</p>
+              <p className="text-xs font-semibold text-amber-100 truncate">{userDisplayName}</p>
+              <p className="text-[10px] text-[#D4AF37] uppercase tracking-wider">
+                {user?.role || 'admin'}
+              </p>
             </div>
           </div>
         </div>
@@ -234,26 +234,35 @@ export default function AdminLayout() {
       {/* Main Container */}
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-200 lg:pl-[250px] md:pl-[72px]">
         {/* Top bar */}
-        <header className="h-16 bg-white border-b border-[#E2E8F0] sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6">
+        <header className="h-16 bg-[#070B11]/90 backdrop-blur-md border-b border-[#D4AF37]/15 sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
             {/* Hamburger Button (Mobile Only) */}
             <button
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-2 -ml-1 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 focus:outline-none"
+              className="lg:hidden p-2 -ml-1 text-slate-400 hover:text-amber-200 rounded-lg hover:bg-slate-800 focus:outline-none"
               aria-label="Abrir menu"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+            <h1 className="text-lg sm:text-xl font-bold text-amber-50 tracking-tight truncate">
               {getPageTitle()}
             </h1>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            {/* Link direto para Portal do Colaborador (se admin/RH quiser inspecionar ou acessar) */}
+            <button
+              onClick={() => navigate('/portal/inicio')}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#7C3AED]/20 hover:bg-[#7C3AED]/30 text-purple-200 border border-[#7C3AED]/40 text-xs font-medium transition-colors"
+              title="Acessar Portal do Colaborador"
+            >
+              <span>Portal Colaborador</span>
+            </button>
+
             {/* Status Pill on Dashboard */}
             {isDashboard && (
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>{totalAtivos} ativos</span>
               </div>
             )}
@@ -261,14 +270,14 @@ export default function AdminLayout() {
             {/* User Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none">
-                  <Avatar className="w-8 h-8 rounded-full border border-slate-200">
+                <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[#121824] transition-colors focus:outline-none border border-transparent hover:border-[#D4AF37]/20">
+                  <Avatar className="w-8 h-8 rounded-full border border-[#D4AF37]/40">
                     <AvatarImage src={user?.avatar} />
-                    <AvatarFallback className="bg-[#2563EB] text-white text-xs font-bold">
+                    <AvatarFallback className="bg-[#D4AF37] text-slate-950 text-xs font-bold">
                       {userInitials}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="hidden sm:inline-block text-xs font-medium text-slate-700 max-w-[130px] truncate">
+                  <span className="hidden sm:inline-block text-xs font-medium text-amber-100 max-w-[130px] truncate">
                     {userDisplayName}
                   </span>
                   <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -276,28 +285,35 @@ export default function AdminLayout() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-56 shadow-lg rounded-xl border-slate-200 p-1.5"
+                className="w-56 shadow-2xl rounded-xl border-[#D4AF37]/30 bg-[#0F1624] text-amber-50 p-1.5"
               >
                 <DropdownMenuLabel className="px-2 py-1.5">
-                  <div className="text-xs font-bold text-slate-900 truncate">{userDisplayName}</div>
-                  <div className="text-[11px] font-normal text-slate-500 truncate">
+                  <div className="text-xs font-bold text-amber-100 truncate">{userDisplayName}</div>
+                  <div className="text-[11px] font-normal text-slate-400 truncate">
                     {user?.email}
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-slate-100" />
+                <DropdownMenuSeparator className="bg-slate-800" />
                 <DropdownMenuItem
                   onClick={() => navigate('/admin/configuracoes')}
-                  className="px-2 py-2 text-xs font-medium text-slate-700 cursor-pointer rounded-lg hover:bg-blue-50 hover:text-[#2563EB]"
+                  className="px-2 py-2 text-xs font-medium text-amber-100 cursor-pointer rounded-lg hover:bg-[#1A2233] hover:text-[#D4AF37]"
                 >
                   <UserIcon className="w-4 h-4 mr-2 text-slate-400" />
                   Meu perfil & Configurações
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-slate-100" />
+                <DropdownMenuItem
+                  onClick={() => navigate('/portal/inicio')}
+                  className="px-2 py-2 text-xs font-medium text-purple-300 cursor-pointer rounded-lg hover:bg-[#7C3AED]/20"
+                >
+                  <UserIcon className="w-4 h-4 mr-2 text-purple-400" />
+                  Ir para Portal do Colaborador
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-slate-800" />
                 <DropdownMenuItem
                   onClick={handleSignOut}
-                  className="px-2 py-2 text-xs font-medium text-red-600 cursor-pointer rounded-lg hover:bg-red-50"
+                  className="px-2 py-2 text-xs font-medium text-red-400 cursor-pointer rounded-lg hover:bg-red-950/40"
                 >
-                  <LogOut className="w-4 h-4 mr-2 text-red-500" />
+                  <LogOut className="w-4 h-4 mr-2 text-red-400" />
                   Sair do sistema
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -311,19 +327,19 @@ export default function AdminLayout() {
         </main>
 
         {/* Footer */}
-        <footer className="hidden sm:block py-4 px-6 border-t border-[#E2E8F0] bg-white text-center text-xs text-slate-500">
+        <footer className="hidden sm:block py-4 px-6 border-t border-[#D4AF37]/15 bg-[#070B11] text-center text-xs text-slate-400">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-[1400px] mx-auto">
-            <span>{companyName} • Sistema de Recursos Humanos</span>
+            <span className="text-amber-100/80">{companyName} • Gestão de Recursos Humanos</span>
             <div className="flex items-center gap-3">
               <a
                 href="/terminal"
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs font-semibold text-[#2563EB] hover:underline"
+                className="text-xs font-semibold text-[#D4AF37] hover:underline"
               >
                 Abrir Terminal de Ponto ↗
               </a>
-              <span className="text-slate-400">• Etapa 5 — Documentos e Holerites</span>
+              <span className="text-slate-500">• Etapa 6 — Portal do Funcionário</span>
             </div>
           </div>
         </footer>

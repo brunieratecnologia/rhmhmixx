@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-25T01:19:20.513Z",
+  "generatedAt": "2026-09-25T01:30:26.705Z",
   "collections": [
     {
       "name": "users",
@@ -308,8 +308,8 @@
       "name": "funcionarios",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || user = @request.auth.id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || user = @request.auth.id)",
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || user = @request.auth.id)",
         "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
         "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
         "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
@@ -524,8 +524,8 @@
       "name": "registros_horario",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
         "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
         "update": null,
         "delete": null
@@ -595,8 +595,8 @@
       "name": "tratamentos_ponto",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
         "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
         "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
         "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
@@ -841,11 +841,11 @@
       "name": "documentos",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_medico'))",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_medico'))",
-        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_rh' && nivel_acesso != 'restrito_medico' && ativo = true))",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || (funcionario.user = @request.auth.id && nivel_acesso != 'restrito_rh' && nivel_acesso != 'restrito_medico' && ativo = true))",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },
       "fields": [
         {
@@ -1048,11 +1048,11 @@
       "name": "holerites",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "create": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },
       "fields": [
         {
@@ -1129,11 +1129,11 @@
       "name": "solicitacoes",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || funcionario.user = @request.auth.id)",
-        "update": "@request.auth.id != '' && @request.auth.role = 'admin'",
-        "delete": "@request.auth.id != '' && @request.auth.role = 'admin'"
+        "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },
       "fields": [
         {

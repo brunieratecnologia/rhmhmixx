@@ -22,6 +22,7 @@ import FuncionarioFicha from '@/pages/admin/FuncionarioFicha'
 import Departamentos from '@/pages/admin/Departamentos'
 import Cargos from '@/pages/admin/Cargos'
 import Configuracoes from '@/pages/admin/Configuracoes'
+import TerminalPonto from '@/pages/terminal/TerminalPonto'
 
 const App = () => (
   <BrowserRouter>
@@ -30,6 +31,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <Routes>
+          {/* Public Terminal Route */}
+          <Route path="/terminal" element={<TerminalPonto />} />
+
           {/* Public Auth Routes */}
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />

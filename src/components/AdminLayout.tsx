@@ -300,7 +300,17 @@ export default function AdminLayout() {
         <footer className="hidden sm:block py-4 px-6 border-t border-[#E2E8F0] bg-white text-center text-xs text-slate-500">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-[1400px] mx-auto">
             <span>{companyName} • Sistema de Recursos Humanos</span>
-            <span className="text-slate-400">Etapa 1 — Gestão de Pessoas & Cadastros</span>
+            <div className="flex items-center gap-3">
+              <a
+                href="/terminal"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-[#2563EB] hover:underline"
+              >
+                Abrir Terminal de Ponto ↗
+              </a>
+              <span className="text-slate-400">• Etapa 2 — Terminal Coletivo de Ponto</span>
+            </div>
           </div>
         </footer>
       </div>

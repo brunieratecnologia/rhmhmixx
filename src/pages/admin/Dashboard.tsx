@@ -270,20 +270,32 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {movimentacoesHoje.map((reg) => (
-                    <tr key={reg.id} className="hover:bg-[#F0F6FF] transition-colors">
-                      <td className="py-2.5 px-3 font-semibold text-slate-900">
-                        {reg.hora_utc ||
-                          (reg.timestamp_utc ? reg.timestamp_utc.slice(11, 16) : '--:--')}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-700">
-                        {reg.expand?.funcionario?.nome || 'Funcionário'}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-slate-500">
-                        {reg.expand?.funcionario?.matricula || '-'}
-                      </td>
-                    </tr>
-                  ))}
+                  {movimentacoesHoje.map((reg) => {
+                    const ts = reg.timestamp_utc
+                      ? new Date(reg.timestamp_utc)
+                      : new Date(reg.created)
+                    const horaFormatada = new Intl.DateTimeFormat('pt-BR', {
+                      timeZone: 'America/Sao_Paulo',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: false,
+                    }).format(ts)
+
+                    return (
+                      <tr key={reg.id} className="hover:bg-[#F0F6FF] transition-colors">
+                        <td className="py-2.5 px-3 font-semibold text-slate-900 font-mono">
+                          {horaFormatada}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          {reg.expand?.funcionario?.nome || 'Funcionário'}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-500">
+                          {reg.expand?.funcionario?.matricula || '-'}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             )}

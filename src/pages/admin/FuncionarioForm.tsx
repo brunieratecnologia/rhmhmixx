@@ -13,7 +13,8 @@ import type { Cargo, Departamento, Jornada, Funcionario } from '@/types/rh'
 import { maskCPF, maskPhone, isValidCPF, cleanDigits } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, Save, User, Briefcase, Upload, AlertCircle, Plus } from 'lucide-react'
+import { ArrowLeft, Save, User, Briefcase, Upload, AlertCircle, Plus, KeyRound } from 'lucide-react'
+import { terminalService } from '@/services/rh'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -72,6 +73,8 @@ export default function FuncionarioForm() {
   const [cargoId, setCargoId] = useState('')
   const [departamentoId, setDepartamentoId] = useState('')
   const [tipoVinculo, setTipoVinculo] = useState<string>('CLT')
+  const [pinInicial, setPinInicial] = useState('')
+  const [confirmaPinInicial, setConfirmaPinInicial] = useState('')
   const [jornadaId, setJornadaId] = useState('')
   const [situacao, setSituacao] = useState<string>('ativo')
   const [dataDesligamento, setDataDesligamento] = useState('')
@@ -210,6 +213,14 @@ export default function FuncionarioForm() {
       newErrors.dataDesligamento = 'Informe a data de desligamento.'
     }
 
+    if (!isEditing && pinInicial) {
+      if (!/^\d{4,6}$/.test(pinInicial)) {
+        newErrors.pin = 'O PIN deve conter entre 4 e 6 dígitos numéricos.'
+      } else if (pinInicial !== confirmaPinInicial) {
+        newErrors.pinConfirm = 'A confirmação do PIN não confere.'
+      }
+    }
+
     // Uniqueness validation against database
     if (Object.keys(newErrors).length === 0) {
       const dupErrors = await funcionariosService.checkUniqueness(cpf, matricula, email, id)
@@ -295,6 +306,14 @@ export default function FuncionarioForm() {
           console.log('Employee user auth creation notice:', authErr)
         }
 
+        // If initial PIN was informed on creation, update it via terminalService
+        if (pinInicial) {
+          try {
+            await terminalService.updatePin(created.id, pinInicial)
+          } catch (pinErr) {
+            console.log('Erro ao definir PIN inicial:', pinErr)
+          }
+        }
         // Add initial jornada to historico_jornadas
         if (jornadaId) {
           try {
@@ -745,6 +764,78 @@ export default function FuncionarioForm() {
                   )}
                 </div>
               </div>
+
+              {/* PIN Inicial do Terminal (quando for novo funcionário) */}
+              {!isEditing && (
+                <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-200 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-[#2563EB]" />
+                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      PIN do Terminal Coletivo (Opcional no cadastro)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Defina agora ou posteriormente o código numérico de 4 a 6 dígitos para o
+                    colaborador bater ponto no terminal.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pinInicial" className="text-xs font-semibold text-slate-700">
+                        PIN (4 a 6 dígitos numéricos)
+                      </Label>
+                      <Input
+                        id="pinInicial"
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Ex: 1234"
+                        value={pinInicial}
+                        onChange={(e) =>
+                          setPinInicial(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        className={`h-10 text-xs sm:text-sm font-mono tracking-widest bg-white ${
+                          errors.pin ? 'border-red-400 focus-visible:ring-red-400' : ''
+                        }`}
+                      />
+                      {errors.pin && (
+                        <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {errors.pin}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="confirmaPinInicial"
+                        className="text-xs font-semibold text-slate-700"
+                      >
+                        Confirme o PIN
+                      </Label>
+                      <Input
+                        id="confirmaPinInicial"
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Ex: 1234"
+                        value={confirmaPinInicial}
+                        onChange={(e) =>
+                          setConfirmaPinInicial(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        className={`h-10 text-xs sm:text-sm font-mono tracking-widest bg-white ${
+                          errors.pinConfirm ? 'border-red-400 focus-visible:ring-red-400' : ''
+                        }`}
+                      />
+                      {errors.pinConfirm && (
+                        <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {errors.pinConfirm}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Jornada & Situação */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

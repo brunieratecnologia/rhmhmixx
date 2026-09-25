@@ -31,7 +31,10 @@ import {
   Phone,
   MapPin,
   Clock,
+  KeyRound,
+  Lock,
 } from 'lucide-react'
+import { terminalService } from '@/services/rh'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -84,6 +87,13 @@ export default function FuncionarioFicha() {
   const [dataAlteracao, setDataAlteracao] = useState(new Date().toISOString().split('T')[0])
   const [motivoAlteracao, setMotivoAlteracao] = useState('')
   const [salvandoSalario, setSalvandoSalario] = useState(false)
+
+  // PIN Modal
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [novoPin, setNovoPin] = useState('')
+  const [confirmaPin, setConfirmaPin] = useState('')
+  const [salvandoPin, setSalvandoPin] = useState(false)
+  const [pinError, setPinError] = useState<string | null>(null)
 
   const isAdmin = role === 'admin'
 
@@ -181,6 +191,40 @@ export default function FuncionarioFicha() {
       })
     } finally {
       setReativando(false)
+    }
+  }
+
+  const handleSalvarPin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!id) return
+    setPinError(null)
+
+    if (!/^\d{4,6}$/.test(novoPin)) {
+      setPinError('O PIN deve conter exclusivamente de 4 a 6 dígitos numéricos.')
+      return
+    }
+
+    if (novoPin !== confirmaPin) {
+      setPinError('A confirmação do PIN não confere com o novo PIN digitado.')
+      return
+    }
+
+    setSalvandoPin(true)
+    try {
+      await terminalService.updatePin(id, novoPin)
+      toast({
+        title: 'PIN atualizado com sucesso.',
+        description: 'O funcionário já pode utilizar este PIN no Terminal Coletivo de Ponto.',
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      })
+      setPinModalOpen(false)
+      setNovoPin('')
+      setConfirmaPin('')
+      loadData()
+    } catch (err: any) {
+      setPinError(err?.message || 'Erro ao atualizar PIN do funcionário.')
+    } finally {
+      setSalvandoPin(false)
     }
   }
 
@@ -563,6 +607,40 @@ export default function FuncionarioFicha() {
                   </p>
                 </div>
 
+                {/* PIN do Terminal */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 col-span-1 md:col-span-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center shrink-0">
+                        <KeyRound className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-slate-800 block">
+                          PIN de Acesso ao Terminal Coletivo
+                        </span>
+                        <p className="text-xs text-slate-500">
+                          Código numérico individual de 4 a 6 dígitos utilizado no terminal de
+                          registro de horários.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setNovoPin('')
+                        setConfirmaPin('')
+                        setPinError(null)
+                        setPinModalOpen(true)
+                      }}
+                      className="bg-white hover:bg-slate-50 text-[#2563EB] border border-[#2563EB]/30 text-xs font-semibold h-8 px-3 shadow-xs shrink-0"
+                    >
+                      <Lock className="w-3.5 h-3.5 mr-1" />
+                      Definir / Trocar PIN
+                    </Button>
+                  </div>
+                </div>
+
                 {funcionario.situacao === 'desligado' && (
                   <div>
                     <span className="text-xs font-semibold text-red-500 block uppercase">
@@ -894,6 +972,85 @@ export default function FuncionarioFicha() {
               {reativando ? 'Reativando...' : 'Confirmar Reativação'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Definir / Trocar PIN */}
+      <Dialog open={pinModalOpen} onOpenChange={setPinModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-full bg-blue-100 text-[#2563EB] flex items-center justify-center mb-2">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <DialogTitle>PIN do Terminal Coletivo</DialogTitle>
+            <DialogDescription>
+              Defina ou atualize o PIN de 4 a 6 dígitos para o funcionário{' '}
+              <strong>{funcionario.nome}</strong>. O PIN é armazenado com hash criptográfico no
+              servidor e auditado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSalvarPin} className="space-y-4 pt-2">
+            {pinError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{pinError}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="novoPinInput" className="text-xs font-semibold">
+                Novo PIN (4 a 6 dígitos numéricos) <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="novoPinInput"
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                required
+                placeholder="Ex: 1234"
+                value={novoPin}
+                onChange={(e) => setNovoPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                autoFocus
+                className="font-mono tracking-widest text-lg"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="confirmaPinInput" className="text-xs font-semibold">
+                Confirme o Novo PIN <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="confirmaPinInput"
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                required
+                placeholder="Ex: 1234"
+                value={confirmaPin}
+                onChange={(e) => setConfirmaPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="font-mono tracking-widest text-lg"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={salvandoPin}
+                onClick={() => setPinModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={salvandoPin || !novoPin || !confirmaPin}
+                className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white"
+              >
+                {salvandoPin ? 'Gravando PIN...' : 'Salvar PIN'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

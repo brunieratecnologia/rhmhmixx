@@ -265,6 +265,58 @@ export const usersService = {
   },
 }
 
+export interface TerminalInfo {
+  status: 'online' | 'offline'
+  server_time_utc: string
+  empresa: {
+    id: string
+    nome_fantasia: string
+    razao_social: string
+    logotipo: string
+    fuso_horario: string
+  }
+}
+
+export interface RegistroPontoResult {
+  success: boolean
+  idempotent?: boolean
+  identificador?: string
+  funcionario_nome?: string
+  data_formatada?: string
+  horario_formatado?: string
+  timestamp_utc?: string
+  fuso_horario?: string
+  mensagem?: string
+  message?: string
+  locked?: boolean
+}
+
+export const terminalService = {
+  async getInfo(): Promise<TerminalInfo> {
+    return await pb.send<TerminalInfo>('/backend/v1/rh/terminal/info', {
+      method: 'GET',
+    })
+  },
+
+  async registrarPonto(data: {
+    matricula: string
+    pin: string
+    id_requisicao: string
+  }): Promise<RegistroPontoResult> {
+    return await pb.send<RegistroPontoResult>('/backend/v1/rh/ponto/registrar', {
+      method: 'POST',
+      body: data,
+    })
+  },
+
+  async updatePin(funcionarioId: string, pin: string) {
+    return await pb.send<{ success: boolean; message: string }>('/backend/v1/rh/pin/update', {
+      method: 'POST',
+      body: { funcionarioId, pin },
+    })
+  },
+}
+
 export const dashboardService = {
   async getMetrics() {
     // 1. Total de Funcionários Ativos
@@ -273,15 +325,36 @@ export const dashboardService = {
     })
     const totalAtivos = ativosRes.totalItems
 
-    // 2. Entradas Registradas Hoje
-    // Using UTC date of today
-    const todayStr = new Date().toISOString().split('T')[0]
-    const hojeRegistros = await pb.collection('registros_horario').getFullList<RegistroHorario>({
-      filter: `data_utc >= "${todayStr}" || timestamp_utc >= "${todayStr} 00:00:00"`,
+    // 2. Entradas Registradas Hoje (America/Sao_Paulo)
+    // Convert current time to America/Sao_Paulo date string YYYY-MM-DD
+    const spNow = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date()) // Returns YYYY-MM-DD
+
+    const todosRegistros = await pb.collection('registros_horario').getFullList<RegistroHorario>({
+      sort: '-timestamp_utc,-created',
       expand: 'funcionario',
     })
+
+    // Filter registrations that correspond to today in America/Sao_Paulo
+    const hojeRegistros = todosRegistros.filter((r) => {
+      const d = r.timestamp_utc ? new Date(r.timestamp_utc) : new Date(r.created)
+      const rSpDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d)
+      return rSpDate === spNow
+    })
+
     const distinctHojeFuncs = new Set(hojeRegistros.map((r) => r.funcionario))
     const entradasHoje = distinctHojeFuncs.size
+
+    const todayStr = spNow
 
     // 3. Funcionários em Férias
     // Vacation where status = 'aprovado' and data_inicio <= today <= data_fim
@@ -324,14 +397,32 @@ export const dashboardService = {
   },
 
   async getMovimentacoesHoje() {
-    const todayStr = new Date().toISOString().split('T')[0]
+    const spNow = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+
     try {
-      const registros = await pb.collection('registros_horario').getList<RegistroHorario>(1, 20, {
-        filter: `data_utc >= "${todayStr}" || timestamp_utc >= "${todayStr} 00:00:00"`,
+      const registros = await pb.collection('registros_horario').getFullList<RegistroHorario>({
         sort: '-timestamp_utc,-created',
         expand: 'funcionario',
       })
-      return registros.items
+
+      // Filter in memory to ensure precise America/Sao_Paulo matching
+      const filtered = registros.filter((r) => {
+        const d = r.timestamp_utc ? new Date(r.timestamp_utc) : new Date(r.created)
+        const rSpDate = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Sao_Paulo',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(d)
+        return rSpDate === spNow
+      })
+
+      return filtered.slice(0, 20)
     } catch {
       return []
     }

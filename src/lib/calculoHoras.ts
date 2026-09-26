@@ -42,6 +42,12 @@ export interface DiaEspelhoCalculado {
   realizadoFormatado: string // Ex: "08:12"
   diferencaMinutos: number // realizado - previsto
   diferencaFormatada: string // Ex: "+00:12" ou "-00:45" ou "00:00"
+  horasBancoCreditoMinutos: number // Minutos trabalhados além do horário de saída previsto (banco de horas)
+  horasBancoCreditoFormatado: string
+  horasBancoDebitoMinutos: number // Minutos de débito / atraso que excederam a tolerância de 10 min
+  horasBancoDebitoFormatado: string
+  atrasoMinutos: number // Minutos de atraso além da tolerância de 10 min
+  entradaTolerada: boolean // Se chegou atrasado mas dentro da tolerância de 10 min (não gera ocorrência)
   ocorrencias: {
     tipo:
       | 'marcacao_incompleta'
@@ -58,6 +64,7 @@ export interface DiaEspelhoCalculado {
     atestadoId?: string
     atestadoNome?: string
     atestadoArquivo?: string
+    minutos?: number
   }[]
   temAtestado: boolean
   temFerias: boolean
@@ -73,9 +80,12 @@ export interface ResumoEspelhoMensal {
   saldoTotalMinutos: number // realizado - previsto
   horasExtrasMinutos: number // soma das diferenças positivas dos dias de trabalho
   horasFaltasMinutos: number // soma das diferenças negativas dos dias de trabalho
+  totalBancoCreditoMinutos: number // Total de crédito para Banco de Horas (após saída prevista + folgas trabalhadas)
+  totalBancoDebitoMinutos: number // Total de débito para Banco de Horas (atrasos > 10m + faltas)
   totalOcorrencias: number
   totalMarcacoesIncompletas: number
   totalAtestados: number
+  totalAtrasos: number
 }
 
 /**
@@ -634,9 +644,12 @@ export function construirEspelhoMensal(params: {
   let realizadoTotalMinutos = 0
   let horasExtrasMinutos = 0
   let horasFaltasMinutos = 0
+  let totalBancoCreditoMinutos = 0
+  let totalBancoDebitoMinutos = 0
   let totalOcorrencias = 0
   let totalMarcacoesIncompletas = 0
   let totalAtestados = 0
+  let totalAtrasos = 0
 
   for (let dia = 1; dia <= ultimoDia; dia++) {
     const padDia = String(dia).padStart(2, '0')
@@ -752,6 +765,89 @@ export function construirEspelhoMensal(params: {
       })
     }
 
+    // --- REGRAS DO USUÁRIO 2 E 3: CRÉDITO BANCO DE HORAS PÓS-SAÍDA PREVISTA E TOLERÂNCIA DE 10 MIN NA ENTRADA ---
+    const diaConfig = getHorarioDiaJornada(jornadaVigente, diaSigla)
+    const horaEntradaPrevista = diaConfig?.hora_entrada || jornadaVigente?.hora_entrada || ''
+    const horaSaidaPrevista = diaConfig?.hora_saida || jornadaVigente?.hora_saida || ''
+    const ehNoturno = Boolean(
+      diaConfig?.atravessa_meia_noite || jornadaVigente?.atravessa_meia_noite,
+    )
+
+    let horasBancoCreditoMinutos = 0
+    let horasBancoDebitoMinutos = 0
+    let atrasoMinutos = 0
+    let entradaTolerada = false
+
+    // 1. Tolerância de 10 minutos na entrada (Regra 3)
+    // Se o funcionário tem horário de entrada previsto e realizou marcações:
+    if (!ehDiaFolga && horaEntradaPrevista && todasMarcacoes.length > 0) {
+      const primeiraMarcacao = todasMarcacoes[0]
+      const minEntradaReal = timeStringToMinutes(primeiraMarcacao.horario)
+      const minEntradaPrev = timeStringToMinutes(horaEntradaPrevista)
+
+      if (minEntradaReal > minEntradaPrev) {
+        const diferencaEntrada = minEntradaReal - minEntradaPrev
+        if (diferencaEntrada <= 10) {
+          // Até 10 minutos de atraso: DENTRO DA TOLERÂNCIA
+          // NÃO gera ocorrência de atraso/débito
+          entradaTolerada = true
+        } else {
+          // Acima de 10 minutos: REGISTRAR OCORRÊNCIA DE ATRASO com o excedente (ou valor total do atraso)
+          atrasoMinutos = diferencaEntrada
+          totalAtrasos++
+          totalOcorrencias++
+          ocorrencias.push({
+            tipo: 'atraso',
+            descricao: `Atraso na entrada (${primeiraMarcacao.horario} vs previsto ${horaEntradaPrevista.slice(0, 5)}: +${diferencaEntrada}m - tolerância de 10m excedida)`,
+            severidade: diferencaEntrada > 30 ? 'alerta' : 'atencao',
+            minutos: diferencaEntrada,
+          })
+          horasBancoDebitoMinutos += diferencaEntrada
+        }
+      }
+    }
+
+    // 2. Crédito de Banco de Horas pós-saída prevista (Regra 2)
+    // "todas as batidas apos as 18h registrar como banco de horas."
+    // Tempo trabalhado após o horário de saída previsto da jornada do dia vai para crédito no Banco de Horas.
+    // Em dias de folga com trabalho: todo o tempo trabalhado vira crédito de banco de horas.
+    if (ehDiaFolga && minutosTrabalhados > 0) {
+      horasBancoCreditoMinutos = minutosTrabalhados
+    } else if (!ehDiaFolga && horaSaidaPrevista && todasMarcacoes.length >= 2) {
+      // Localiza a última batida (saída) realizada
+      const ultimaMarcacao = todasMarcacoes[todasMarcacoes.length - 1]
+      let minSaidaReal = timeStringToMinutes(ultimaMarcacao.horario)
+      let minSaidaPrev = timeStringToMinutes(horaSaidaPrevista)
+      const minEntradaPrev = timeStringToMinutes(horaEntradaPrevista)
+
+      if (ehNoturno || minSaidaPrev < minEntradaPrev) {
+        minSaidaPrev += 24 * 60
+        if (minSaidaReal < minEntradaPrev) {
+          minSaidaReal += 24 * 60
+        }
+      }
+
+      if (minSaidaReal > minSaidaPrev) {
+        const excedenteSaida = minSaidaReal - minSaidaPrev
+        // O tempo após a saída prevista alimenta o banco de horas
+        // Não pode ultrapassar o saldo positivo real trabalhado do dia (ou a diferença total de horas extras)
+        // Se trabalhou além da jornada, creditamos os minutos trabalhados após a saída prevista
+        horasBancoCreditoMinutos = excedenteSaida
+      } else if (diferencaMinutos > 0) {
+        // Caso haja horas extras durante a jornada mesmo com saída antes (ex: supressão de intervalo com saldo positivo)
+        horasBancoCreditoMinutos = diferencaMinutos
+      }
+    } else if (diferencaMinutos > 0) {
+      horasBancoCreditoMinutos = diferencaMinutos
+    }
+
+    if (horasBancoCreditoMinutos > 0) {
+      totalBancoCreditoMinutos += horasBancoCreditoMinutos
+    }
+    if (horasBancoDebitoMinutos > 0) {
+      totalBancoDebitoMinutos += horasBancoDebitoMinutos
+    }
+
     // Se é dia de trabalho, sem ausência/férias e sem nenhuma batida:
     const hojeStr = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Sao_Paulo',
@@ -769,13 +865,15 @@ export function construirEspelhoMensal(params: {
         descricao: 'Sem marcações registradas no dia de trabalho previsto',
         severidade: 'alerta',
       })
+      horasBancoDebitoMinutos += previstoMin
+      totalBancoDebitoMinutos += previstoMin
     }
 
     if (ehDiaFolga && minutosTrabalhados > 0) {
       totalOcorrencias++
       ocorrencias.push({
         tipo: 'folga_trabalhada',
-        descricao: 'Trabalho em dia de folga / descanso semanal remunerado',
+        descricao: `Trabalho em dia de folga / DSR (${minutesToHoursText(minutosTrabalhados)}) - crédito de banco de horas`,
         severidade: 'atencao',
       })
     }
@@ -799,6 +897,16 @@ export function construirEspelhoMensal(params: {
       realizadoFormatado: minutesToTimeString(minutosTrabalhados),
       diferencaMinutos,
       diferencaFormatada: minutesToSignedString(diferencaMinutos),
+      horasBancoCreditoMinutos,
+      horasBancoCreditoFormatado:
+        horasBancoCreditoMinutos > 0
+          ? `+${minutesToTimeString(horasBancoCreditoMinutos)}`
+          : '00:00',
+      horasBancoDebitoMinutos,
+      horasBancoDebitoFormatado:
+        horasBancoDebitoMinutos > 0 ? `-${minutesToTimeString(horasBancoDebitoMinutos)}` : '00:00',
+      atrasoMinutos,
+      entradaTolerada,
       ocorrencias,
       temAtestado: Boolean(ausenciaMatch && ausenciaMatch.categoria === 'atestado'),
       temFerias: Boolean(feriasMatch),
@@ -815,9 +923,12 @@ export function construirEspelhoMensal(params: {
     saldoTotalMinutos: realizadoTotalMinutos - previstoTotalMinutos,
     horasExtrasMinutos,
     horasFaltasMinutos,
+    totalBancoCreditoMinutos,
+    totalBancoDebitoMinutos,
     totalOcorrencias,
     totalMarcacoesIncompletas,
     totalAtestados,
+    totalAtrasos,
   }
 
   return { dias, resumo }

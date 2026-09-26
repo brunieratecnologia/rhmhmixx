@@ -155,18 +155,33 @@ export default function PortalMeusHorarios() {
             })}
           </div>
 
-          <div className="mt-6 flex items-start gap-3 p-3.5 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/30 text-xs text-slate-300">
-            <Info className="w-4 h-4 text-purple-300 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-purple-200 mb-0.5">
-                Orientações de Registro no Terminal
-              </p>
-              <p className="text-[11px] text-slate-400">
-                Lembre-se de registrar suas batidas diretamente no terminal de ponto da unidade
-                utilizando o seu <strong>PIN de 4 a 6 dígitos</strong>. Caso ocorra qualquer
-                divergência ou esquecimento, solicite a inclusão através do fechamento mensal ou na
-                aba <strong>Minhas Solicitações</strong>.
-              </p>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-xs text-slate-300">
+              <Clock className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-amber-200 mb-0.5">
+                  Tolerância de Entrada e Horas Extras
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Entradas com até <strong>10 minutos</strong> de atraso em relação ao horário
+                  previsto não geram ocorrência de atraso. Horas trabalhadas após o horário previsto
+                  de saída da sua escala são apuradas e creditadas no seu{' '}
+                  <strong>Banco de Horas</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#7C3AED]/10 border border-[#7C3AED]/30 text-xs text-slate-300">
+              <Info className="w-4 h-4 text-purple-300 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-purple-200 mb-0.5">
+                  Proteção de Batida Dupla no Terminal
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Batidas consecutivas do mesmo funcionário em intervalo muito curto são
+                  consolidadas automaticamente em 1 único registro para evitar duplicidade.
+                </p>
+              </div>
             </div>
           </div>
         </CardContent>

@@ -217,6 +217,7 @@ export default function PortalMeuEspelho() {
                     <th className="py-3 px-4 font-semibold">Horários Registrados</th>
                     <th className="py-3 px-4 font-semibold">Previsto</th>
                     <th className="py-3 px-4 font-semibold">Trabalhado</th>
+                    <th className="py-3 px-4 font-semibold">Banco Horas</th>
                     <th className="py-3 px-4 font-semibold">Saldo</th>
                     <th className="py-3 px-4 font-semibold">Ocorrência / Situação</th>
                   </tr>
@@ -298,6 +299,19 @@ export default function PortalMeuEspelho() {
 
                         <td className="py-2.5 px-4 font-mono font-semibold text-slate-200">
                           {dia.realizadoFormatado}
+                        </td>
+
+                        <td className="py-2.5 px-4 font-mono">
+                          {dia.horasBancoCreditoMinutos > 0 ? (
+                            <span
+                              className="font-bold text-amber-300 bg-amber-950/50 px-1.5 py-0.5 rounded border border-[#D4AF37]/30 text-[11px]"
+                              title="Tempo trabalhado além da saída prevista -> Banco de Horas"
+                            >
+                              {dia.horasBancoCreditoFormatado}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">--</span>
+                          )}
                         </td>
 
                         <td className={`py-2.5 px-4 font-mono font-bold ${saldoColor}`}>

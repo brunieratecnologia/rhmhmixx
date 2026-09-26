@@ -184,6 +184,52 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
     } catch (_) {}
   }
 
+  // 4.1 Deduplicação de batidas consecutivas em janela muito curta (mesmo funcionário)
+  // Regra do usuário: "quando o funcionario bater 2 vezes o ponto no intervalo pequeno, registrar apenas 1. nao registrar duas vezes."
+  // Se houver uma batida recente do mesmo funcionário nos últimos 90 segundos (1,5 min),
+  // consolida na mesma marcação retornando o registro recente como deduplicado (sem gravar duplicata no banco).
+  const DEDUP_WINDOW_MS = 90 * 1000 // 90 segundos
+  try {
+    const colRegistros = $app.findCollectionByNameOrId('registros_horario')
+    const recsRecentes = $app.findRecordsByFilter(
+      colRegistros.id,
+      "funcionario = '" + func.id + "'",
+      '-created',
+      1,
+      0,
+    )
+
+    if (recsRecentes && recsRecentes.length > 0) {
+      const ultRec = recsRecentes[0]
+      const ultUtcStr = ultRec.getString('timestamp_utc') || ultRec.getString('created')
+      if (ultUtcStr) {
+        const tsUlt = new Date(ultUtcStr).getTime()
+        const tsNow = now.getTime()
+        const diffMs = tsNow - tsUlt
+
+        if (diffMs >= 0 && diffMs < DEDUP_WINDOW_MS) {
+          const spParts = formatSaoPauloDateTime(new Date(ultUtcStr))
+          return e.json(200, {
+            success: true,
+            idempotent: true,
+            deduplicated: true,
+            identificador: ultRec.id,
+            funcionario_nome: func.getString('nome'),
+            data_formatada: spParts.dateFormatted,
+            horario_formatado: spParts.timeFormatted,
+            timestamp_utc: ultUtcStr,
+            server_timestamp_ms: tsUlt,
+            fuso_horario: 'America/Sao_Paulo',
+            mensagem:
+              'Marcação já registrada recentemente às ' +
+              spParts.timeFormatted +
+              '. Batida duplicada consolidada em 1 único registro.',
+          })
+        }
+      }
+    }
+  } catch (_) {}
+
   // 5. Horário oficial do servidor em UTC
   const officialServerTime = new Date()
   const officialUtcIso = officialServerTime.toISOString()

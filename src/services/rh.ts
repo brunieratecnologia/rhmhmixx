@@ -290,6 +290,19 @@ export const bancoHorasService = {
     })
   },
 
+  async apurarDia(data: {
+    funcionario: string
+    data_referencia: string
+    minutos_credito?: number
+    minutos_debito?: number
+    motivo?: string
+  }): Promise<{ success: boolean; message: string; lancamentos?: string[] }> {
+    return await pb.send('/backend/v1/rh/banco-horas/apurar-dia', {
+      method: 'POST',
+      body: data,
+    })
+  },
+
   async getSaldoFuncionario(funcionarioId: string): Promise<{
     minutos: number
     horasFormatadas: string

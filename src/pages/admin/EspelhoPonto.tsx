@@ -647,7 +647,19 @@ export default function EspelhoPonto() {
           </div>
 
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-xs">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase block">
+            <span className="text-[11px] font-semibold text-amber-700 uppercase block">
+              Crédito Banco Horas
+            </span>
+            <p
+              className="text-xl font-bold font-mono text-amber-700 mt-0.5"
+              title="Horas trabalhadas após a saída prevista (ou em folgas)"
+            >
+              +{minutesToHoursText(resumo.totalBancoCreditoMinutos)}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-xs">
+            <span className="text-[11px] font-semibold text-emerald-700 uppercase block">
               Saldo do Mês
             </span>
             <p
@@ -661,23 +673,14 @@ export default function EspelhoPonto() {
           </div>
 
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-xs">
-            <span className="text-[11px] font-semibold text-emerald-700 uppercase block">
-              Horas Extras
-            </span>
-            <p className="text-xl font-bold font-mono text-emerald-700 mt-0.5">
-              +{minutesToHoursText(resumo.horasExtrasMinutos)}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase block">
               Ocorrências
             </span>
             <p className="text-xl font-bold font-mono text-slate-900 mt-0.5">
               {resumo.totalOcorrencias}
-              {resumo.totalMarcacoesIncompletas > 0 && (
-                <span className="text-[11px] text-amber-600 font-semibold ml-1">
-                  ({resumo.totalMarcacoesIncompletas} inc.)
+              {resumo.totalAtrasos > 0 && (
+                <span className="text-[11px] text-red-600 font-semibold ml-1">
+                  ({resumo.totalAtrasos} atr.)
                 </span>
               )}
             </p>
@@ -717,6 +720,7 @@ export default function EspelhoPonto() {
                     Marcações Realizadas (Entrada / Intervalos / Saída)
                   </th>
                   <th className="py-3 px-3 w-20 text-right">Realizado</th>
+                  <th className="py-3 px-3 w-24 text-right">Banco Horas</th>
                   <th className="py-3 px-3 w-20 text-right">Diferença</th>
                   <th className="py-3 px-3 min-w-[220px]">Ocorrências e Atestados</th>
                   <th className="py-3 px-3 w-28 text-right print:hidden">Ações</th>
@@ -836,6 +840,20 @@ export default function EspelhoPonto() {
                       {/* Horas Trabalhadas */}
                       <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800">
                         {dia.realizadoFormatado !== '00:00' ? dia.realizadoFormatado : '--'}
+                      </td>
+
+                      {/* Banco de Horas (Crédito pós-saída prevista) */}
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        {dia.horasBancoCreditoMinutos > 0 ? (
+                          <span
+                            className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[11px]"
+                            title="Tempo trabalhado além da saída prevista -> Banco de Horas"
+                          >
+                            {dia.horasBancoCreditoFormatado}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">--</span>
+                        )}
                       </td>
 
                       {/* Diferença */}

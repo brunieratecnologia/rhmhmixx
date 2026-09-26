@@ -470,6 +470,135 @@ export function executarTestesIntervaloAutomatico(): {
     })
   }
 
+  // TESTE 8: Tolerância de 10 minutos na entrada (Regra 3)
+  // Jornada padrão entra 08:00
+  // Caso A: Entrou 08:08 (atraso de 8 min <= 10 min de tolerância) -> NÃO gera ocorrência de atraso
+  // Caso B: Entrou 08:15 (atraso de 15 min > 10 min de tolerância) -> GERA ocorrência de atraso de 15 min
+  {
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        // Dia 15 (terça): entrou 08:08 e saiu 17:00 (atraso 8 min, dentro da tolerância de 10 min)
+        {
+          id: 'tol1',
+          funcionario: 'f1',
+          data_utc: '2026-09-15',
+          hora_utc: '08:08:00',
+          timestamp_utc: '2026-09-15T11:08:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'tol2',
+          funcionario: 'f1',
+          data_utc: '2026-09-15',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-15T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        // Dia 16 (quarta): entrou 08:15 e saiu 17:00 (atraso 15 min, excede tolerância de 10 min)
+        {
+          id: 'atr1',
+          funcionario: 'f1',
+          data_utc: '2026-09-16',
+          hora_utc: '08:15:00',
+          timestamp_utc: '2026-09-16T11:15:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'atr2',
+          funcionario: 'f1',
+          data_utc: '2026-09-16',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-16T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const dia15 = espelho.dias.find((d) => d.data === '2026-09-15')
+    const dia16 = espelho.dias.find((d) => d.data === '2026-09-16')
+
+    const temAtrasoDia15 = dia15?.ocorrencias.some((o) => o.tipo === 'atraso')
+    const toleradoDia15 = dia15?.entradaTolerada === true
+    const temAtrasoDia16 = dia16?.ocorrencias.some((o) => o.tipo === 'atraso')
+    const atrasoMinDia16 = dia16?.atrasoMinutos === 15
+
+    const passouTolerancia =
+      !temAtrasoDia15 && toleradoDia15 && Boolean(temAtrasoDia16) && atrasoMinDia16
+
+    resultados.push({
+      nome: 'Teste (h): Tolerância de 10 min na entrada (08:08 sem atraso vs 08:15 com ocorrência de atraso)',
+      passou: passouTolerancia,
+      detalhe: `Dia 15 tolerado: ${toleradoDia15} (temAtraso: ${temAtrasoDia15}); Dia 16 atraso detectado: ${temAtrasoDia16} (${dia16?.atrasoMinutos}m)`,
+    })
+  }
+
+  // TESTE 9: Banco de horas para batidas após a saída prevista (Regra 2)
+  // Jornada padrão sai às 17:00 (ou às 18:00 na jornada "SÁBADO")
+  // Colaborador trabalhou até as 19:30 -> 1h30 (90 min) de trabalho pós-saída prevista deve virar crédito de Banco de Horas
+  {
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao, // saída prevista 17:00
+      historicoJornadas: [],
+      registrosMes: [
+        // Dia 21 (segunda): entrou 08:00, saiu 19:30 (saída prevista 17:00 -> +150 min pós saída)
+        {
+          id: 'bh1',
+          funcionario: 'f1',
+          data_utc: '2026-09-21',
+          hora_utc: '08:00:00',
+          timestamp_utc: '2026-09-21T11:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'bh2',
+          funcionario: 'f1',
+          data_utc: '2026-09-21',
+          hora_utc: '19:30:00',
+          timestamp_utc: '2026-09-21T22:30:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const dia21 = espelho.dias.find((d) => d.data === '2026-09-21')
+    // 17:00 (1020m) às 19:30 (1170m) = 150m pós-saída
+    const passouBancoHoras =
+      Boolean(dia21) &&
+      dia21?.horasBancoCreditoMinutos === 150 &&
+      dia21?.horasBancoCreditoFormatado === '+02:30' &&
+      espelho.resumo.totalBancoCreditoMinutos >= 150
+
+    resultados.push({
+      nome: 'Teste (i): Horas após a saída prevista são contabilizadas como crédito no Banco de Horas (+150m)',
+      passou: passouBancoHoras,
+      detalhe: `Crédito apurado: ${dia21?.horasBancoCreditoMinutos}m (${dia21?.horasBancoCreditoFormatado}), Resumo total: ${espelho.resumo.totalBancoCreditoMinutos}m`,
+    })
+  }
+
   const todosPassaram = resultados.every((r) => r.passou)
   return { todosPassaram, resultados }
 }

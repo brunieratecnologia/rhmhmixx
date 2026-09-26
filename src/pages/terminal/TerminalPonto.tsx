@@ -61,7 +61,8 @@ export default function TerminalPonto() {
       const clientReqTime = Date.now()
       const info = await terminalService.getInfo()
       const clientResTime = Date.now()
-      const roundTripLatency = (clientResTime - clientReqTime) / 2
+      // SNTP Cristian's algorithm: estimated server time at response arrival
+      const roundTripLatency = Math.max(0, (clientResTime - clientReqTime) / 2)
 
       let serverTimestampMs = 0
       if (typeof info.server_time_ms === 'number' && !isNaN(info.server_time_ms)) {
@@ -71,9 +72,10 @@ export default function TerminalPonto() {
       }
 
       if (serverTimestampMs > 0) {
-        // Calculate offset: serverTime = clientNow + offset
-        // Estimated server time at response arrival: serverTimestampMs + roundTripLatency
-        serverOffsetRef.current = serverTimestampMs + roundTripLatency - clientResTime
+        // Estimated server time when response arrived = serverTimestampMs + roundTripLatency
+        // Offset = estimatedServerTimeNow - clientNow
+        const nowAtArrival = Date.now()
+        serverOffsetRef.current = serverTimestampMs + roundTripLatency - nowAtArrival
         setCurrentTime(new Date(Date.now() + serverOffsetRef.current))
       }
 
@@ -183,14 +185,31 @@ export default function TerminalPonto() {
     // Unique idempotency key
     const idRequisicao = generateIdempotencyKey()
 
+    const clientReqTime = Date.now()
+
     try {
       const res = await terminalService.registrarPonto({
         matricula: '', // Requisito: apenas PIN, sem matrícula
         pin: cleanPin,
         id_requisicao: idRequisicao,
       })
+      const clientResTime = Date.now()
 
       if (res.success) {
+        // Se a resposta contiver o timestamp oficial do servidor gravado, sincronizar o offset
+        const serverMs =
+          typeof res.server_timestamp_ms === 'number'
+            ? res.server_timestamp_ms
+            : res.timestamp_utc
+              ? new Date(res.timestamp_utc).getTime()
+              : 0
+
+        if (serverMs > 0) {
+          const latency = Math.max(0, (clientResTime - clientReqTime) / 2)
+          serverOffsetRef.current = serverMs + latency - clientResTime
+          setCurrentTime(new Date(Date.now() + serverOffsetRef.current))
+        }
+
         setConfirmation(res)
       } else {
         setErrorMessage(res.message || res.mensagem || 'Falha ao registrar ponto. Tente novamente.')
@@ -329,39 +348,81 @@ export default function TerminalPonto() {
                 </p>
               </div>
 
-              {/* Data & Horário Oficial Boxes */}
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="text-center">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Data da Marcação
-                  </span>
-                  <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 mt-1 block">
-                    {confirmation.data_formatada || shortDateBR}
-                  </span>
-                </div>
-                <div className="text-center border-l border-slate-200 pl-3">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    Horário Oficial (SP)
-                  </span>
-                  <span className="text-lg sm:text-xl font-extrabold font-mono text-[#D4AF37] mt-1 block">
-                    {confirmation.horario_formatado || `${hours}:${minutes}:${seconds}`}
-                  </span>
-                </div>
-              </div>
+              {/* Data & Horário Oficial Boxes — 100% derivado da gravação no banco */}
+              {(() => {
+                // Formatação garantida em America/Sao_Paulo a partir do timestamp_utc gravado
+                let displayDate = confirmation.data_formatada || ''
+                let displayTime = confirmation.horario_formatado || ''
 
-              {/* Identificador Único */}
-              <div className="p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl text-left">
-                <div className="flex items-center justify-between text-xs text-amber-200 font-semibold">
-                  <span>Identificador Único:</span>
-                  <span className="font-mono text-[11px] text-slate-200 bg-black/40 px-2 py-0.5 rounded border border-[#D4AF37]/30">
-                    {confirmation.identificador || 'N/A'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 mt-1">
-                  Fuso horário oficial: {confirmation.fuso_horario || 'America/Sao_Paulo'} (UTC:{' '}
-                  {confirmation.timestamp_utc?.slice(11, 19)})
-                </div>
-              </div>
+                if (confirmation.timestamp_utc) {
+                  try {
+                    const savedDateObj = new Date(confirmation.timestamp_utc)
+                    if (!isNaN(savedDateObj.getTime())) {
+                      // Usar Intl do navegador para formatar America/Sao_Paulo com precisão
+                      const formattedTime = new Intl.DateTimeFormat('pt-BR', {
+                        timeZone: targetTimeZone,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false,
+                      }).format(savedDateObj)
+
+                      const formattedDate = new Intl.DateTimeFormat('pt-BR', {
+                        timeZone: targetTimeZone,
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      }).format(savedDateObj)
+
+                      if (formattedTime) displayTime = formattedTime
+                      if (formattedDate) displayDate = formattedDate
+                    }
+                  } catch {
+                    /* fallback para os campos já retornados pelo backend */
+                  }
+                }
+
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <div className="text-center">
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                          Data da Marcação
+                        </span>
+                        <span className="text-lg sm:text-xl font-bold font-mono text-slate-900 mt-1 block">
+                          {displayDate || shortDateBR}
+                        </span>
+                      </div>
+                      <div className="text-center border-l border-slate-200 pl-3">
+                        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                          Horário Oficial (SP)
+                        </span>
+                        <span className="text-lg sm:text-xl font-extrabold font-mono text-[#D4AF37] mt-1 block">
+                          {displayTime || `${hours}:${minutes}:${seconds}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Identificador Único */}
+                    <div className="p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl text-left">
+                      <div className="flex items-center justify-between text-xs text-amber-200 font-semibold">
+                        <span>Identificador Único:</span>
+                        <span className="font-mono text-[11px] text-slate-200 bg-black/40 px-2 py-0.5 rounded border border-[#D4AF37]/30">
+                          {confirmation.identificador || 'N/A'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-1">
+                        Fuso horário oficial: {confirmation.fuso_horario || 'America/Sao_Paulo'}{' '}
+                        (UTC:{' '}
+                        {confirmation.timestamp_utc
+                          ? confirmation.timestamp_utc.replace('T', ' ').slice(0, 19)
+                          : 'N/A'}
+                        )
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
 
               {/* Automatic Countdown return */}
               <div className="pt-2 flex flex-col items-center gap-3">

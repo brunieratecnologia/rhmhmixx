@@ -131,6 +131,30 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
     } catch (_) {}
   }
 
+  // Função interna para formatar timestamp UTC no fuso oficial America/Sao_Paulo (UTC-3)
+  // Sem depender do objeto Intl (que não existe no runtime Goja do backend)
+  const pad = function (n) {
+    return n < 10 ? '0' + n : '' + n
+  }
+
+  const formatSaoPauloDateTime = function (d) {
+    const spOffsetMs = -3 * 3600 * 1000
+    const spDateObj = new Date(d.getTime() + spOffsetMs)
+
+    const year = spDateObj.getUTCFullYear()
+    const month = pad(spDateObj.getUTCMonth() + 1)
+    const day = pad(spDateObj.getUTCDate())
+    const hours = pad(spDateObj.getUTCHours())
+    const minutes = pad(spDateObj.getUTCMinutes())
+    const seconds = pad(spDateObj.getUTCSeconds())
+
+    return {
+      dateFormatted: day + '/' + month + '/' + year,
+      timeFormatted: hours + ':' + minutes + ':' + seconds,
+      spDateIso: year + '-' + month + '-' + day,
+    }
+  }
+
   // 4. Checagem de idempotência com id_requisicao
   if (idRequisicao) {
     try {
@@ -140,30 +164,19 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
         idRequisicao,
       )
       if (existing) {
-        const tsExisting = new Date(existing.getString('timestamp_utc'))
-        const spTimeExisting = new Intl.DateTimeFormat('pt-BR', {
-          timeZone: 'America/Sao_Paulo',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false,
-        }).format(tsExisting)
-
-        const spDateExisting = new Intl.DateTimeFormat('pt-BR', {
-          timeZone: 'America/Sao_Paulo',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(tsExisting)
+        const existingUtcStr = existing.getString('timestamp_utc')
+        const tsExisting = new Date(existingUtcStr)
+        const spParts = formatSaoPauloDateTime(tsExisting)
 
         return e.json(200, {
           success: true,
           idempotent: true,
           identificador: existing.id,
           funcionario_nome: func.getString('nome'),
-          data_formatada: spDateExisting,
-          horario_formatado: spTimeExisting,
-          timestamp_utc: existing.getString('timestamp_utc'),
+          data_formatada: spParts.dateFormatted,
+          horario_formatado: spParts.timeFormatted,
+          timestamp_utc: existingUtcStr,
+          server_timestamp_ms: tsExisting.getTime(),
           fuso_horario: 'America/Sao_Paulo',
           mensagem: 'Marcação confirmada com sucesso (registro previamente recebido).',
         })
@@ -190,34 +203,18 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
   }
   $app.save(newReg)
 
-  // 7. Formatar fuso horário America/Sao_Paulo
-  let spTimeFormatted = timeUtc
-  let spDateFormatted = dateUtc
-  try {
-    spTimeFormatted = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(officialServerTime)
-
-    spDateFormatted = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(officialServerTime)
-  } catch (_) {}
+  // 7. Formatar fuso horário oficial America/Sao_Paulo
+  const spParts = formatSaoPauloDateTime(officialServerTime)
 
   return e.json(200, {
     success: true,
     idempotent: false,
     identificador: newReg.id,
     funcionario_nome: func.getString('nome'),
-    data_formatada: spDateFormatted,
-    horario_formatado: spTimeFormatted,
+    data_formatada: spParts.dateFormatted,
+    horario_formatado: spParts.timeFormatted,
     timestamp_utc: officialUtcIso,
+    server_timestamp_ms: officialServerTime.getTime(),
     fuso_horario: 'America/Sao_Paulo',
     mensagem: 'Ponto registrado com sucesso!',
   })

@@ -20,10 +20,33 @@ routerAdd('GET', '/backend/v1/rh/terminal/info', (e) => {
   }
 
   const serverTime = new Date()
+  const serverTimeMs = serverTime.getTime()
+
+  // Formatar explicitamente o horário no fuso da empresa (UTC-3 / America/Sao_Paulo)
+  // Sem depender do Intl no runtime Goja que pode não estar presente
+  const spOffsetMs = -3 * 3600 * 1000
+  const spDateObj = new Date(serverTimeMs + spOffsetMs)
+
+  const pad = function (n) {
+    return n < 10 ? '0' + n : '' + n
+  }
+
+  const spYear = spDateObj.getUTCFullYear()
+  const spMonth = pad(spDateObj.getUTCMonth() + 1)
+  const spDay = pad(spDateObj.getUTCDate())
+  const spHours = pad(spDateObj.getUTCHours())
+  const spMinutes = pad(spDateObj.getUTCMinutes())
+  const spSeconds = pad(spDateObj.getUTCSeconds())
+
+  const dataFormatada = spDay + '/' + spMonth + '/' + spYear
+  const horarioFormatado = spHours + ':' + spMinutes + ':' + spSeconds
 
   return e.json(200, {
     status: 'online',
     server_time_utc: serverTime.toISOString(),
+    server_time_ms: serverTimeMs,
+    sp_time_formatted: horarioFormatado,
+    sp_date_formatted: dataFormatada,
     empresa: {
       id: id,
       nome_fantasia: nomeFantasia,

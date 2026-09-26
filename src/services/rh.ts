@@ -1364,6 +1364,8 @@ export interface TerminalInfo {
   status: string
   server_time_utc: string
   server_time_ms?: number
+  sp_time_formatted?: string
+  sp_date_formatted?: string
   empresa: {
     id: string
     nome_fantasia: string
@@ -1381,6 +1383,7 @@ export interface RegistroPontoResult {
   data_formatada?: string
   horario_formatado?: string
   timestamp_utc?: string
+  server_timestamp_ms?: number
   fuso_horario?: string
   mensagem?: string
   message?: string

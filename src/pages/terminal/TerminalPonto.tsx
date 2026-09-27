@@ -36,7 +36,7 @@ export default function TerminalPonto() {
   // Status & Confirmation
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [confirmation, setConfirmation] = useState<RegistroPontoResult | null>(null)
-  const [countdown, setCountdown] = useState<number>(8)
+  const [countdown, setCountdown] = useState<number>(4)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLocked, setIsLocked] = useState<boolean>(false)
 
@@ -96,9 +96,9 @@ export default function TerminalPonto() {
     return () => clearInterval(interval)
   }, [checkStatus])
 
-  // 3. Clear Confirmation and Reset
-  const resetForm = useCallback(() => {
-    setPin('')
+  // 3. Clear Confirmation and Reset (opcionalmente aceita dígito inicial para o próximo PIN)
+  const resetForm = useCallback((initialDigit?: string) => {
+    setPin(initialDigit && /^\d$/.test(initialDigit) ? initialDigit : '')
     setConfirmation(null)
     setErrorMessage(null)
     setIsLocked(false)
@@ -108,13 +108,13 @@ export default function TerminalPonto() {
     }
     setTimeout(() => {
       pinInputRef.current?.focus()
-    }, 100)
+    }, 50)
   }, [])
 
-  // 4. Handle Confirmation Countdown
+  // 4. Handle Confirmation Countdown (4 segundos para leitura sem travar a fila)
   useEffect(() => {
     if (confirmation) {
-      setCountdown(8)
+      setCountdown(4)
       countdownTimerRef.current = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -131,9 +131,44 @@ export default function TerminalPonto() {
     }
   }, [confirmation, resetForm])
 
+  // 5. Interceptação global de teclado durante a tela de confirmação:
+  // Se o próximo funcionário na fila começar a digitar seu PIN no teclado físico/numérico,
+  // avança imediatamente para a tela de PIN já com o dígito inicial preenchido sem perder a tecla.
+  useEffect(() => {
+    if (!confirmation) return
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignorar teclas modificadoras ou combinações
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+
+      // Teclas numéricas do teclado padrão (0-9) e teclado numérico lateral (Numpad0-Numpad9)
+      const isDigit = /^[0-9]$/.test(e.key)
+      if (isDigit) {
+        e.preventDefault()
+        resetForm(e.key)
+      } else if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') {
+        e.preventDefault()
+        resetForm()
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown)
+    }
+  }, [confirmation, resetForm])
+
   // Virtual Keypad Handler
   const handleKeypadPress = (val: string) => {
-    if (confirmation) return
+    // Se estiver em confirmação e tocar no teclado virtual, inicia o próximo registro imediatamente
+    if (confirmation) {
+      if (/^\d$/.test(val)) {
+        resetForm(val)
+      } else {
+        resetForm()
+      }
+      return
+    }
     setErrorMessage(null)
 
     if (val === 'clear') {
@@ -334,22 +369,9 @@ export default function TerminalPonto() {
                 <CheckCircle2 className="w-12 h-12" />
               </div>
 
-              <div>
-                <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 mb-2">
-                  {confirmation.idempotent
-                    ? 'Marcação Confirmada (Preexistente)'
-                    : 'Ponto Registrado com Sucesso'}
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-                  {confirmation.funcionario_nome}
-                </h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Horário oficial do servidor registrado de forma persistente e imutável
-                </p>
-              </div>
-
-              {/* Data & Horário Oficial Boxes — 100% derivado da gravação no banco */}
               {(() => {
+                const isRepetida = Boolean(confirmation.idempotent || confirmation.deduplicated)
+
                 // Formatação garantida em America/Sao_Paulo a partir do timestamp_utc gravado
                 let displayDate = confirmation.data_formatada || ''
                 let displayTime = confirmation.horario_formatado || ''
@@ -358,7 +380,6 @@ export default function TerminalPonto() {
                   try {
                     const savedDateObj = new Date(confirmation.timestamp_utc)
                     if (!isNaN(savedDateObj.getTime())) {
-                      // Usar Intl do navegador para formatar America/Sao_Paulo com precisão
                       const formattedTime = new Intl.DateTimeFormat('pt-BR', {
                         timeZone: targetTimeZone,
                         hour: '2-digit',
@@ -378,12 +399,42 @@ export default function TerminalPonto() {
                       if (formattedDate) displayDate = formattedDate
                     }
                   } catch {
-                    /* fallback para os campos já retornados pelo backend */
+                    /* fallback para os campos retornados */
                   }
                 }
 
+                // Horário simples HH:MM para subtítulo amigável
+                const horaSimples = displayTime ? displayTime.slice(0, 5) : ''
+
                 return (
                   <>
+                    <div>
+                      {/* Badge amigável sem jargão técnico */}
+                      <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 mb-2">
+                        {isRepetida
+                          ? 'Você já bateu o ponto agora'
+                          : 'Ponto Registrado com Sucesso'}
+                      </span>
+                      <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                        {confirmation.funcionario_nome}
+                      </h2>
+
+                      {/* Subtítulo amigável e claro */}
+                      {isRepetida ? (
+                        <p className="text-xs sm:text-sm text-emerald-700 font-medium mt-1">
+                          {confirmation.mensagem ||
+                            (horaSimples
+                              ? `Sua batida às ${horaSimples} já valeu — não precisa bater de novo.`
+                              : 'Sua batida já valeu — não precisa bater de novo.')}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Horário oficial do servidor registrado de forma persistente e imutável
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Data & Horário Oficial Boxes — 100% derivado da gravação no banco */}
                     <div className="grid grid-cols-2 gap-3 sm:gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                       <div className="text-center">
                         <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
@@ -403,28 +454,18 @@ export default function TerminalPonto() {
                       </div>
                     </div>
 
-                    {/* Identificador Único */}
-                    <div className="p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl text-left">
-                      <div className="flex items-center justify-between text-xs text-amber-200 font-semibold">
-                        <span>Identificador Único:</span>
-                        <span className="font-mono text-[11px] text-slate-200 bg-black/40 px-2 py-0.5 rounded border border-[#D4AF37]/30">
-                          {confirmation.identificador || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        Fuso horário oficial: {confirmation.fuso_horario || 'America/Sao_Paulo'}{' '}
-                        (UTC:{' '}
-                        {confirmation.timestamp_utc
-                          ? confirmation.timestamp_utc.replace('T', ' ').slice(0, 19)
-                          : 'N/A'}
-                        )
-                      </div>
+                    {/* Identificador Único discreto/pequeno */}
+                    <div className="py-1.5 px-3 bg-slate-50 border border-slate-200/80 rounded-lg flex items-center justify-between text-[11px] text-slate-500">
+                      <span className="text-slate-400">Identificador:</span>
+                      <span className="font-mono text-[10px] text-slate-600 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        {confirmation.identificador || 'N/A'}
+                      </span>
                     </div>
                   </>
                 )
               })()}
 
-              {/* Automatic Countdown return */}
+              {/* Automatic Countdown return (4s) & Botão Novo Registro Agora */}
               <div className="pt-2 flex flex-col items-center gap-3">
                 <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-[#D4AF37] animate-spin" />
@@ -432,8 +473,12 @@ export default function TerminalPonto() {
                   <span className="font-mono text-sm font-bold text-[#D4AF37]">{countdown}s</span>
                 </p>
 
+                <p className="text-[11px] text-slate-400 -mt-1 hidden sm:block">
+                  Dica: o próximo funcionário pode começar a digitar o PIN direto no teclado
+                </p>
+
                 <Button
-                  onClick={resetForm}
+                  onClick={() => resetForm()}
                   className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-sm px-6 h-10 shadow-sm border-0 hover:brightness-110"
                 >
                   Novo Registro Agora

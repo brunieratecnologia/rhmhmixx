@@ -209,6 +209,7 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
 
         if (diffMs >= 0 && diffMs < DEDUP_WINDOW_MS) {
           const spParts = formatSaoPauloDateTime(new Date(ultUtcStr))
+          const horaSimples = spParts.timeFormatted.slice(0, 5) // HH:MM
           return e.json(200, {
             success: true,
             idempotent: true,
@@ -220,10 +221,7 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
             timestamp_utc: ultUtcStr,
             server_timestamp_ms: tsUlt,
             fuso_horario: 'America/Sao_Paulo',
-            mensagem:
-              'Marcação já registrada recentemente às ' +
-              spParts.timeFormatted +
-              '. Batida duplicada consolidada em 1 único registro.',
+            mensagem: 'Sua batida às ' + horaSimples + ' já valeu — não precisa bater de novo.',
           })
         }
       }

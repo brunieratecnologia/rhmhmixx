@@ -1391,6 +1391,7 @@ export interface TerminalInfo {
 export interface RegistroPontoResult {
   success: boolean
   idempotent?: boolean
+  deduplicated?: boolean
   identificador?: string
   funcionario_nome?: string
   data_formatada?: string

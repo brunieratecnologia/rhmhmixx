@@ -255,28 +255,38 @@ export default function PortalMeuEspelho() {
                                 {dia.todasMarcacoes.map((m, idx) => {
                                   const ehAuto = m.origem === 'intervalo_automatico'
                                   const ehAjuste = m.origem === 'tratamento_fechamento'
+                                  const ehAnulado = Boolean(m.anulado)
                                   return (
                                     <span
                                       key={idx}
                                       className={`px-1.5 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 ${
-                                        ehAuto
-                                          ? 'bg-[#7C3AED]/20 text-purple-300 border-[#7C3AED]/40'
-                                          : ehAjuste
-                                            ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
-                                            : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
+                                        ehAnulado
+                                          ? 'bg-rose-950/30 text-rose-400/80 border-rose-500/30 line-through opacity-70'
+                                          : ehAuto
+                                            ? 'bg-[#7C3AED]/20 text-purple-300 border-[#7C3AED]/40'
+                                            : ehAjuste
+                                              ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
+                                              : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
                                       }`}
                                       title={
-                                        ehAuto
-                                          ? 'Intervalo automático da jornada'
-                                          : ehAjuste
-                                            ? 'Ajuste de fechamento'
-                                            : 'Batida registrada'
+                                        ehAnulado
+                                          ? `Marcação Anulada (${m.motivoAnulacao || 'Desconsiderada no fechamento'})`
+                                          : ehAuto
+                                            ? 'Intervalo automático da jornada'
+                                            : ehAjuste
+                                              ? 'Ajuste de fechamento'
+                                              : 'Batida registrada'
                                       }
                                     >
                                       {m.horario}
                                       {ehAuto && (
                                         <span className="text-[9px] bg-[#7C3AED]/40 text-purple-200 px-1 rounded uppercase tracking-wider">
                                           Auto
+                                        </span>
+                                      )}
+                                      {ehAnulado && (
+                                        <span className="text-[9px] bg-rose-500/20 text-rose-300 px-1 rounded font-bold uppercase">
+                                          Anulada
                                         </span>
                                       )}
                                     </span>

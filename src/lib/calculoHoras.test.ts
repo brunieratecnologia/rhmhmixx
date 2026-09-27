@@ -599,6 +599,126 @@ export function executarTestesIntervaloAutomatico(): {
     })
   }
 
+  // TESTE 10: Deduplicação e normalização de marcações repetidas/anuladas no dia de folga (Problema 1)
+  // Caso similar ao dia 26/09: sábado de folga com 3 batidas "10:40" (duplicatas), uma 10:51 e uma 22:11
+  // As duas batidas 10:40 excedentes são anuladas (ou por tratamento_ponto ou dinamicamente <90s)
+  // Resta 10:40 (válida) e 22:11 (válida) -> batida ímpar (3 batidas válidas: 10:40, 10:51, 22:11 se 10:51 não for anulada;
+  // se o admin anular 10:51 ou se for anulação de marcação errada, restam apenas as válidas sem +00:11 indevido).
+  {
+    const regsSabado26: RegistroHorario[] = [
+      {
+        id: 'r_1040_1',
+        funcionario: 'f1',
+        data_utc: '2026-09-26',
+        hora_utc: '13:40:06',
+        timestamp_utc: '2026-09-26T13:40:06.800Z', // 10:40:06 SP
+        origem: 'terminal',
+        created: '2026-09-26T13:40:06.800Z',
+        updated: '',
+      },
+      {
+        id: 'r_1040_2',
+        funcionario: 'f1',
+        data_utc: '2026-09-26',
+        hora_utc: '13:40:39',
+        timestamp_utc: '2026-09-26T13:40:39.062Z', // 10:40:39 SP (32s depois -> duplicata)
+        origem: 'terminal',
+        created: '2026-09-26T13:40:39.062Z',
+        updated: '',
+      },
+      {
+        id: 'r_1040_3',
+        funcionario: 'f1',
+        data_utc: '2026-09-26',
+        hora_utc: '13:40:58',
+        timestamp_utc: '2026-09-26T13:40:58.021Z', // 10:40:58 SP (51s depois -> duplicata)
+        origem: 'terminal',
+        created: '2026-09-26T13:40:58.021Z',
+        updated: '',
+      },
+      {
+        id: 'r_1051',
+        funcionario: 'f1',
+        data_utc: '2026-09-26',
+        hora_utc: '13:51:42',
+        timestamp_utc: '2026-09-26T13:51:42.859Z', // 10:51:42 SP
+        origem: 'terminal',
+        created: '2026-09-26T13:51:42.859Z',
+        updated: '',
+      },
+      {
+        id: 'r_2211',
+        funcionario: 'f1',
+        data_utc: '2026-09-27',
+        hora_utc: '01:11:56',
+        timestamp_utc: '2026-09-27T01:11:56.745Z', // 22:11:56 SP do dia 26/09
+        origem: 'terminal',
+        created: '2026-09-27T01:11:56.745Z',
+        updated: '',
+      },
+    ]
+
+    // Tratamentos de anulação para as 2 batidas excedentes
+    const tratamentosAnulacao: TratamentoPonto[] = [
+      {
+        id: 't_anula_2',
+        funcionario: 'f1',
+        registro: 'r_1040_2',
+        tipo: 'anulacao',
+        justificativa: 'Normalização retroativa',
+        data_tratamento: '2026-09-27T00:00:00Z',
+        data_registro: '2026-09-26',
+        hora_registro: '13:40',
+        origem_ajuste: 'anulacao_marcacao_duplicada',
+        created: '',
+        updated: '',
+      },
+      {
+        id: 't_anula_3',
+        funcionario: 'f1',
+        registro: 'r_1040_3',
+        tipo: 'anulacao',
+        justificativa: 'Normalização retroativa',
+        data_tratamento: '2026-09-27T00:00:00Z',
+        data_registro: '2026-09-26',
+        hora_registro: '13:40',
+        origem_ajuste: 'anulacao_marcacao_duplicada',
+        created: '',
+        updated: '',
+      },
+    ]
+
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao, // sábado é folga
+      historicoJornadas: [],
+      registrosMes: regsSabado26,
+      tratamentosMes: tratamentosAnulacao,
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const dia26 = espelho.dias.find((d) => d.data === '2026-09-26')
+    const marcacoesValidas = dia26?.todasMarcacoes.filter((m) => !m.anulado) || []
+    const marcacoesAnuladas = dia26?.todasMarcacoes.filter((m) => m.anulado) || []
+
+    // Deve ter exatamente 2 anuladas (as duas duplicatas de 10:40) e 3 válidas (10:40, 10:51, 22:11)
+    const passouAnulacao =
+      Boolean(dia26) &&
+      marcacoesAnuladas.length === 2 &&
+      marcacoesValidas.length === 3 &&
+      marcacoesValidas[0].horario === '10:40' &&
+      marcacoesValidas[1].horario === '10:51' &&
+      marcacoesValidas[2].horario === '22:11'
+
+    resultados.push({
+      nome: 'Teste (j): Normalização retroativa de batidas duplicadas desconsidera anuladas nos cálculos do espelho',
+      passou: passouAnulacao,
+      detalhe: `Válidas: ${marcacoesValidas.length} (horários: ${marcacoesValidas.map((m) => m.horario).join(', ')}), Anuladas: ${marcacoesAnuladas.length}`,
+    })
+  }
+
   const todosPassaram = resultados.every((r) => r.passou)
   return { todosPassaram, resultados }
 }

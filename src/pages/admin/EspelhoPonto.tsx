@@ -34,7 +34,11 @@ import {
   ShieldCheck,
   Building2,
   Paperclip,
+  Trash2,
+  Ban,
+  HelpCircle,
 } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -99,9 +103,11 @@ export default function EspelhoPonto() {
   const [obsFechamento, setObsFechamento] = useState('')
   const [processandoFechamento, setProcessandoFechamento] = useState(false)
 
-  // 2. Inclusão / Ajuste de Ponto Faltante no Fechamento
+  // 2. Inclusão / Ajuste de Ponto Faltante ou Anulação no Fechamento
   const [ajustePontoModalOpen, setAjustePontoModalOpen] = useState(false)
   const [ajusteDia, setAjusteDia] = useState<DiaEspelhoCalculado | null>(null)
+  const [ajusteModo, setAjusteModo] = useState<'incluir' | 'anular'>('incluir')
+  const [registroParaAnular, setRegistroParaAnular] = useState<string>('')
   const [ajusteHora, setAjusteHora] = useState('08:00')
   const [ajusteTipoMarcacao, setAjusteTipoMarcacao] = useState<
     'entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida' | 'outro'
@@ -333,31 +339,69 @@ export default function EspelhoPonto() {
     }
   }
 
-  // Salvar Ajuste / Inclusão de Ponto Faltante
+  // Salvar Ajuste / Inclusão de Ponto Faltante ou Anulação de Marcação
   const handleSalvarAjustePonto = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!ajusteDia || !selectedFuncId || !ajusteMotivo.trim()) return
 
+    if (ajusteModo === 'anular' && !registroParaAnular) {
+      toast({
+        title: 'Selecione a marcação para anular',
+        description: 'É necessário indicar qual marcação original será anulada.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSalvandoAjuste(true)
     try {
-      await fechamentoFolhaService.ajustarPonto({
-        funcionario: selectedFuncId,
-        data_registro: ajusteDia.data,
-        hora_registro: ajusteHora,
-        tipo: 'correcao',
-        tipo_marcacao: ajusteTipoMarcacao,
-        justificativa: ajusteMotivo.trim(),
-      })
+      if (ajusteModo === 'anular') {
+        // Encontrar horário do registro selecionado para salvar no tratamento
+        const regAlvo = ajusteDia.marcacoesOriginais.find((r) => r.id === registroParaAnular)
+        const horaAlvo = regAlvo
+          ? regAlvo.timestamp_utc
+            ? regAlvo.timestamp_utc.slice(11, 16)
+            : regAlvo.hora_utc.slice(0, 5)
+          : ajusteHora
 
-      toast({
-        title: 'Marcação complementar incluída.',
-        description:
-          'O registro foi auditado e anexado ao espelho como tratamento de fechamento. O registro original permanece intacto.',
-        className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
-      })
+        await fechamentoFolhaService.ajustarPonto({
+          funcionario: selectedFuncId,
+          data_registro: ajusteDia.data,
+          hora_registro: horaAlvo,
+          tipo: 'anulacao',
+          justificativa: ajusteMotivo.trim(),
+          registro: registroParaAnular,
+          acao_tipo: 'anular',
+        })
+
+        toast({
+          title: 'Marcação anulada com sucesso.',
+          description:
+            'A marcação foi anulada por registro complementar auditado (AJ). O registro original permanece intacto no histórico imutável.',
+          className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        })
+      } else {
+        await fechamentoFolhaService.ajustarPonto({
+          funcionario: selectedFuncId,
+          data_registro: ajusteDia.data,
+          hora_registro: ajusteHora,
+          tipo: 'correcao',
+          tipo_marcacao: ajusteTipoMarcacao,
+          justificativa: ajusteMotivo.trim(),
+          acao_tipo: 'incluir',
+        })
+
+        toast({
+          title: 'Marcação complementar incluída.',
+          description:
+            'O registro foi auditado e anexado ao espelho como tratamento de fechamento. O registro original permanece intacto.',
+          className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        })
+      }
 
       setAjustePontoModalOpen(false)
       setAjusteMotivo('')
+      setRegistroParaAnular('')
       carregarEspelho()
     } catch (err: any) {
       toast({
@@ -368,6 +412,13 @@ export default function EspelhoPonto() {
     } finally {
       setSalvandoAjuste(false)
     }
+  }
+
+  // Atalho para abrir o fechamento diretamente
+  const handleAbrirFechamentoRapido = () => {
+    setAcaoFechamento('abrir_fechamento')
+    setObsFechamento('Abertura de fechamento para ajustes de ponto no espelho')
+    setFechamentoModalOpen(true)
   }
 
   // Salvar Atestado Médico
@@ -780,22 +831,29 @@ export default function EspelhoPonto() {
                               {dia.todasMarcacoes.map((m, idx) => {
                                 const ehAjuste = m.origem === 'tratamento_fechamento'
                                 const ehAuto = m.origem === 'intervalo_automatico'
+                                const ehAnulado = Boolean(m.anulado)
                                 return (
                                   <span
                                     key={idx}
-                                    title={`${m.tipo.replace('_', ' ')} (${
-                                      ehAuto
-                                        ? 'Intervalo Automático derivado da jornada'
-                                        : ehAjuste
-                                          ? 'Ajuste Fechamento Folha'
-                                          : 'Terminal Coletivo Imutável'
-                                    })`}
+                                    title={
+                                      ehAnulado
+                                        ? `Marcação Anulada: ${m.motivoAnulacao || 'Desconsiderada por registro complementar'}`
+                                        : `${m.tipo.replace('_', ' ')} (${
+                                            ehAuto
+                                              ? 'Intervalo Automático derivado da jornada'
+                                              : ehAjuste
+                                                ? 'Ajuste Fechamento Folha'
+                                                : 'Terminal Coletivo Imutável'
+                                          })`
+                                    }
                                     className={`px-2 py-0.5 rounded text-xs font-semibold border flex items-center gap-1 ${
-                                      ehAuto
-                                        ? 'bg-purple-50 text-purple-900 border-purple-300 shadow-xs'
-                                        : ehAjuste
-                                          ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                          : 'bg-slate-100 text-slate-800 border-slate-200'
+                                      ehAnulado
+                                        ? 'bg-red-50 text-red-700/80 border-red-200 line-through opacity-75'
+                                        : ehAuto
+                                          ? 'bg-purple-50 text-purple-900 border-purple-300 shadow-xs'
+                                          : ehAjuste
+                                            ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                            : 'bg-slate-100 text-slate-800 border-slate-200'
                                     }`}
                                   >
                                     {m.horario}
@@ -807,12 +865,20 @@ export default function EspelhoPonto() {
                                         Auto
                                       </span>
                                     )}
-                                    {ehAjuste && (
+                                    {ehAjuste && !ehAnulado && (
                                       <span
                                         className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded font-bold"
                                         title="Incluído pelo gestor no fechamento"
                                       >
                                         AJ
+                                      </span>
+                                    )}
+                                    {ehAnulado && (
+                                      <span
+                                        className="text-[9px] bg-red-200 text-red-900 px-1 rounded font-bold"
+                                        title={m.motivoAnulacao || 'Marcação anulada'}
+                                      >
+                                        ANULADA
                                       </span>
                                     )}
                                   </span>
@@ -941,31 +1007,72 @@ export default function EspelhoPonto() {
                           </Button>
 
                           {/* Ajustar / Incluir Ponto (Habilitado durante fechamento do mês) */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!isFechamentoAberto}
-                            onClick={() => {
-                              setAjusteDia(dia)
-                              setAjusteHora('08:00')
-                              setAjusteTipoMarcacao('entrada')
-                              setAjusteMotivo('')
-                              setAjustePontoModalOpen(true)
-                            }}
-                            title={
-                              isFechamentoAberto
-                                ? 'Incluir marcação faltante no fechamento'
-                                : 'Disponível apenas durante o fechamento mensal da folha'
-                            }
-                            className={`h-7 px-2 text-[11px] border-slate-200 ${
-                              isFechamentoAberto
-                                ? 'text-amber-700 hover:bg-amber-50 font-semibold'
-                                : 'text-slate-400 opacity-50 cursor-not-allowed'
-                            }`}
-                          >
-                            <PlusCircle className="w-3 h-3 mr-1" />
-                            Ajustar
-                          </Button>
+                          {isFechamentoAberto ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setAjusteDia(dia)
+                                setAjusteModo('incluir')
+                                setAjusteHora('08:00')
+                                setAjusteTipoMarcacao('entrada')
+                                setAjusteMotivo('')
+                                setRegistroParaAnular('')
+                                setAjustePontoModalOpen(true)
+                              }}
+                              className="h-7 px-2 text-[11px] border-amber-300 text-amber-800 bg-amber-50/70 hover:bg-amber-100 font-semibold"
+                            >
+                              <PlusCircle className="w-3 h-3 mr-1 text-amber-600" />
+                              Ajustar
+                            </Button>
+                          ) : (
+                            <TooltipProvider delayDuration={150}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span tabIndex={0} className="inline-block">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled
+                                      className="h-7 px-2 text-[11px] border-slate-200 text-slate-400 opacity-60 cursor-not-allowed"
+                                    >
+                                      <PlusCircle className="w-3 h-3 mr-1" />
+                                      Ajustar
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  className="max-w-xs text-xs space-y-2 p-3 bg-slate-900 text-white border-slate-800 shadow-xl"
+                                >
+                                  <p>
+                                    O botão <strong>Ajustar</strong> fica ativo apenas durante o
+                                    período de <strong>Fechamento da Folha</strong> deste mês.
+                                  </p>
+                                  {!isPeriodoFuturo && !isFechamentoFechado && (
+                                    <button
+                                      type="button"
+                                      onClick={handleAbrirFechamentoRapido}
+                                      className="text-amber-300 hover:underline font-semibold block text-[11px] text-left pt-1 border-t border-slate-700"
+                                    >
+                                      → Abrir Fechamento do Mês agora
+                                    </button>
+                                  )}
+                                  {isFechamentoFechado && (
+                                    <p className="text-amber-200 text-[11px]">
+                                      A folha deste mês está encerrada. Administradores podem
+                                      reabrir no topo da página.
+                                    </p>
+                                  )}
+                                  {isPeriodoFuturo && (
+                                    <p className="text-amber-200 text-[11px]">
+                                      Meses futuros não podem ser abertos para fechamento.
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1064,69 +1171,181 @@ export default function EspelhoPonto() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Inclusão de Ponto Faltante no Fechamento */}
+      {/* Modal Ajuste de Ponto (Inclusão ou Anulação) no Fechamento */}
       <Dialog open={ajustePontoModalOpen} onOpenChange={setAjustePontoModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-1">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-1">
               <Clock className="w-5 h-5" />
             </div>
-            <DialogTitle>Incluir Marcação Faltante (Fechamento)</DialogTitle>
+            <DialogTitle>Ajustar Marcações de Ponto (Fechamento)</DialogTitle>
             <DialogDescription>
-              Incluir batida esquecida para <strong>{funcionarioAtual?.nome}</strong> na data{' '}
-              <strong>{ajusteDia ? formatBRDate(ajusteDia.data) : ''}</strong>. O registro original
-              permanece intacto; um registro complementar rastreável será criado.
+              Colaborador: <strong>{funcionarioAtual?.nome}</strong> — Data:{' '}
+              <strong>{ajusteDia ? formatBRDate(ajusteDia.data) : ''}</strong>. Os registros
+              originais permanecem imutáveis. Correções são feitas via registros complementares
+              auditados (AJ).
             </DialogDescription>
           </DialogHeader>
 
+          {/* Alternador de Ação: Incluir Batida Faltante vs Anular Marcação Errada */}
+          <div className="flex border border-slate-200 rounded-lg p-1 bg-slate-50 gap-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setAjusteModo('incluir')}
+              className={`flex-1 py-1.5 px-3 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                ajusteModo === 'incluir'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              Incluir Batida Esquecida
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAjusteModo('anular')
+                // Se houver marcações originais, pré-seleciona a primeira que não estiver já anulada
+                if (ajusteDia && ajusteDia.marcacoesOriginais.length > 0) {
+                  const jaAnuladas = new Set(
+                    ajusteDia.todasMarcacoes.filter((m) => m.anulado).map((m) => m.id),
+                  )
+                  const primeiraValida = ajusteDia.marcacoesOriginais.find(
+                    (r) => !jaAnuladas.has(r.id),
+                  )
+                  if (primeiraValida) {
+                    setRegistroParaAnular(primeiraValida.id)
+                  }
+                }
+              }}
+              className={`flex-1 py-1.5 px-3 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                ajusteModo === 'anular'
+                  ? 'bg-rose-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Ban className="w-3.5 h-3.5" />
+              Anular Marcação Errada
+            </button>
+          </div>
+
           <form onSubmit={handleSalvarAjustePonto} className="space-y-4 pt-1">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tipo da Marcação</Label>
-                <Select
-                  value={ajusteTipoMarcacao}
-                  onValueChange={(val: any) => setAjusteTipoMarcacao(val)}
-                >
-                  <SelectTrigger className="text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="entrada">Entrada</SelectItem>
-                    <SelectItem value="inicio_intervalo">Início Intervalo</SelectItem>
-                    <SelectItem value="retorno_intervalo">Retorno Intervalo</SelectItem>
-                    <SelectItem value="saida">Saída</SelectItem>
-                    <SelectItem value="outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {ajusteModo === 'incluir' ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Tipo da Marcação</Label>
+                    <Select
+                      value={ajusteTipoMarcacao}
+                      onValueChange={(val: any) => setAjusteTipoMarcacao(val)}
+                    >
+                      <SelectTrigger className="text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entrada">Entrada</SelectItem>
+                        <SelectItem value="inicio_intervalo">Início Intervalo</SelectItem>
+                        <SelectItem value="retorno_intervalo">Retorno Intervalo</SelectItem>
+                        <SelectItem value="saida">Saída</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="ajusteHoraInput" className="text-xs font-semibold">
-                  Horário (24h) <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="ajusteHoraInput"
-                  type="time"
-                  required
-                  value={ajusteHora}
-                  onChange={(e) => setAjusteHora(e.target.value)}
-                  className="font-mono text-xs"
-                />
-              </div>
-            </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ajusteHoraInput" className="text-xs font-semibold">
+                      Horário (24h) <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="ajusteHoraInput"
+                      type="time"
+                      required
+                      value={ajusteHora}
+                      onChange={(e) => setAjusteHora(e.target.value)}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="ajusteMotivoInput" className="text-xs font-semibold">
-                Motivo / Justificativa do Esquecimento <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="ajusteMotivoInput"
-                required
-                placeholder="Ex: Colaborador esqueceu de registrar o retorno do intervalo"
-                value={ajusteMotivo}
-                onChange={(e) => setAjusteMotivo(e.target.value)}
-              />
-            </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ajusteMotivoInput" className="text-xs font-semibold">
+                    Motivo / Justificativa do Esquecimento <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="ajusteMotivoInput"
+                    required
+                    placeholder="Ex: Colaborador esqueceu de registrar o retorno do intervalo"
+                    value={ajusteMotivo}
+                    onChange={(e) => setAjusteMotivo(e.target.value)}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">
+                    Selecione a marcação original a anular <span className="text-red-500">*</span>
+                  </Label>
+                  {ajusteDia && ajusteDia.marcacoesOriginais.length > 0 ? (
+                    <Select
+                      value={registroParaAnular}
+                      onValueChange={(val) => setRegistroParaAnular(val)}
+                    >
+                      <SelectTrigger className="text-xs">
+                        <SelectValue placeholder="Selecione o registro..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ajusteDia.marcacoesOriginais.map((reg) => {
+                          const horaFormatada = reg.timestamp_utc
+                            ? new Intl.DateTimeFormat('pt-BR', {
+                                timeZone: 'America/Sao_Paulo',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false,
+                              }).format(new Date(reg.timestamp_utc))
+                            : reg.hora_utc
+                          const jaAnulado = ajusteDia.todasMarcacoes.some(
+                            (m) => m.id === reg.id && m.anulado,
+                          )
+                          return (
+                            <SelectItem
+                              key={reg.id}
+                              value={reg.id}
+                              disabled={jaAnulado}
+                              className="font-mono text-xs"
+                            >
+                              Batida às {horaFormatada} {jaAnulado ? '(Já Anulada)' : '(Terminal)'}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic p-2 bg-slate-50 rounded border">
+                      Não há marcações originais do terminal para anular nesta data.
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-500">
+                    O registro original do terminal NUNCA é excluído. Ele é anulado por um registro
+                    complementar e deixará de contar nas horas do espelho.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="anulacaoMotivoInput" className="text-xs font-semibold">
+                    Motivo da Anulação <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="anulacaoMotivoInput"
+                    required
+                    placeholder="Ex: Batida duplicada em duplicidade ou marcação acidental"
+                    value={ajusteMotivo}
+                    onChange={(e) => setAjusteMotivo(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
 
             <DialogFooter className="pt-2">
               <Button
@@ -1139,10 +1358,22 @@ export default function EspelhoPonto() {
               </Button>
               <Button
                 type="submit"
-                disabled={salvandoAjuste || !ajusteMotivo.trim()}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
+                disabled={
+                  salvandoAjuste ||
+                  !ajusteMotivo.trim() ||
+                  (ajusteModo === 'anular' && !registroParaAnular)
+                }
+                className={
+                  ajusteModo === 'anular'
+                    ? 'bg-rose-700 hover:bg-rose-800 text-white'
+                    : 'bg-amber-600 hover:bg-amber-700 text-white'
+                }
               >
-                {salvandoAjuste ? 'Gravando...' : 'Salvar Marcação Complementar'}
+                {salvandoAjuste
+                  ? 'Processando...'
+                  : ajusteModo === 'anular'
+                    ? 'Confirmar Anulação'
+                    : 'Salvar Marcação Complementar'}
               </Button>
             </DialogFooter>
           </form>

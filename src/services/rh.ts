@@ -252,10 +252,11 @@ export const fechamentoFolhaService = {
     funcionario: string
     data_registro: string
     hora_registro?: string
-    tipo?: 'justificativa' | 'correcao' | 'classificacao'
+    tipo?: 'justificativa' | 'correcao' | 'classificacao' | 'anulacao'
     tipo_marcacao?: 'entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida' | 'outro'
     justificativa: string
     registro?: string
+    acao_tipo?: 'incluir' | 'anular'
   }): Promise<{ success: boolean; message: string; tratamento_id?: string }> {
     return await pb.send('/backend/v1/rh/fechamento/ajustar-ponto', {
       method: 'POST',

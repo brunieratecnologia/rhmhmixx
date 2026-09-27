@@ -22,15 +22,25 @@ routerAdd(
     const funcionarioId = (body.funcionario || '').toString().trim()
     const dataRegistro = (body.data_registro || '').toString().trim() // YYYY-MM-DD
     const horaRegistro = (body.hora_registro || '').toString().trim() // HH:MM
-    const tipo = (body.tipo || 'correcao').toString().trim() // correcao, justificativa, etc.
+    const tipo = (body.tipo || 'correcao').toString().trim() // correcao, justificativa, anulacao, etc.
     const tipoMarcacao = (body.tipo_marcacao || 'entrada').toString().trim()
     const justificativa = (body.justificativa || '').toString().trim()
-    const registroOriginalId = (body.registro || '').toString().trim() // opcional
+    const registroOriginalId = (body.registro || '').toString().trim() // opcional ou obrigatório em anulação
+    const acaoTipo = (body.acao_tipo || (tipo === 'anulacao' ? 'anular' : 'incluir'))
+      .toString()
+      .trim() // 'incluir' | 'anular'
 
     if (!funcionarioId || !dataRegistro || !justificativa) {
       return e.json(400, {
         success: false,
         message: 'Funcionário, data de referência e motivo/justificativa são obrigatórios.',
+      })
+    }
+
+    if (acaoTipo === 'anular' && !registroOriginalId) {
+      return e.json(400, {
+        success: false,
+        message: 'Para anular uma marcação, identifique o registro a ser anulado.',
       })
     }
 
@@ -112,11 +122,15 @@ routerAdd(
     const tratamentosCol = $app.findCollectionByNameOrId('tratamentos_ponto')
     const novoTratamento = new Record(tratamentosCol)
 
+    const ehAnulacao = acaoTipo === 'anular' || tipo === 'anulacao'
+    const finalTipo = ehAnulacao ? 'anulacao' : tipo
+    const finalOrigemAjuste = ehAnulacao ? 'anulacao_marcacao_indevida' : 'inclusao_ponto_faltante'
+
     novoTratamento.set('funcionario', func.id)
     if (registroOriginalId) {
       novoTratamento.set('registro', registroOriginalId)
     }
-    novoTratamento.set('tipo', tipo)
+    novoTratamento.set('tipo', finalTipo)
     novoTratamento.set('justificativa', justificativa)
     novoTratamento.set('usuario_responsavel', auth.id)
     novoTratamento.set('data_tratamento', new Date().toISOString())
@@ -124,21 +138,34 @@ routerAdd(
     if (horaRegistro) {
       novoTratamento.set('hora_registro', horaRegistro)
     }
-    if (tipoMarcacao) {
+    if (!ehAnulacao && tipoMarcacao) {
       novoTratamento.set('tipo_marcacao', tipoMarcacao)
     }
-    novoTratamento.set('origem_ajuste', 'inclusao_ponto_faltante')
-    novoTratamento.set(
-      'informacao_corrigida',
-      'Inclusão de marcação complementar em fechamento de folha: ' +
-        dataRegistro +
-        ' ' +
-        (horaRegistro || '') +
-        ' (' +
-        tipoMarcacao +
-        ') - Motivo: ' +
-        justificativa,
-    )
+    novoTratamento.set('origem_ajuste', finalOrigemAjuste)
+
+    if (ehAnulacao) {
+      novoTratamento.set(
+        'informacao_corrigida',
+        'Anulação de marcação errada por registro complementar em fechamento de folha: ' +
+          dataRegistro +
+          ' ' +
+          (horaRegistro || '') +
+          ' - Motivo: ' +
+          justificativa,
+      )
+    } else {
+      novoTratamento.set(
+        'informacao_corrigida',
+        'Inclusão de marcação complementar em fechamento de folha: ' +
+          dataRegistro +
+          ' ' +
+          (horaRegistro || '') +
+          ' (' +
+          tipoMarcacao +
+          ') - Motivo: ' +
+          justificativa,
+      )
+    }
 
     $app.save(novoTratamento)
 
@@ -147,12 +174,13 @@ routerAdd(
       const auditCol = $app.findCollectionByNameOrId('logs_auditoria')
       const audit = new Record(auditCol)
       audit.set('usuario', auth.id)
-      audit.set('acao', 'ajuste_ponto_fechamento')
+      audit.set('acao', ehAnulacao ? 'anulacao_ponto_fechamento' : 'ajuste_ponto_fechamento')
       audit.set('entidade', 'tratamentos_ponto')
       audit.set('entidade_id', novoTratamento.id)
       audit.set(
         'detalhes',
-        'Inclusão/ajuste de ponto complementar para o funcionário ' +
+        (ehAnulacao ? 'Anulação de marcação de ponto' : 'Inclusão/ajuste de ponto complementar') +
+          ' para o funcionário ' +
           func.getString('nome') +
           ' (' +
           dataRegistro +
@@ -168,7 +196,9 @@ routerAdd(
 
     return e.json(200, {
       success: true,
-      message: 'Marcação complementar registrada com sucesso no fechamento da folha.',
+      message: ehAnulacao
+        ? 'Marcação anulada com sucesso por registro complementar no fechamento.'
+        : 'Marcação complementar registrada com sucesso no fechamento da folha.',
       tratamento_id: novoTratamento.id,
     })
   },

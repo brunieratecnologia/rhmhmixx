@@ -140,7 +140,7 @@ export interface TratamentoPonto {
   id: string
   registro?: string
   funcionario: string
-  tipo: 'justificativa' | 'correcao' | 'classificacao'
+  tipo: 'justificativa' | 'correcao' | 'classificacao' | 'anulacao'
   justificativa: string
   usuario_responsavel?: string
   data_tratamento: string
@@ -148,7 +148,12 @@ export interface TratamentoPonto {
   data_registro?: string
   hora_registro?: string
   tipo_marcacao?: 'entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida' | 'outro'
-  origem_ajuste?: 'inclusao_ponto_faltante' | 'justificativa_inconsistencia' | 'abono_horas'
+  origem_ajuste?:
+    | 'inclusao_ponto_faltante'
+    | 'justificativa_inconsistencia'
+    | 'abono_horas'
+    | 'anulacao_marcacao_duplicada'
+    | 'anulacao_marcacao_indevida'
   created: string
   updated: string
   expand?: {

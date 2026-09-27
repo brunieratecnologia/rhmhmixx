@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-27T01:16:00.324Z",
+  "generatedAt": "2026-09-27T01:23:49.146Z",
   "collections": [
     {
       "name": "users",
@@ -627,7 +627,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["justificativa", "correcao", "classificacao"]
+          "selectValues": ["justificativa", "correcao", "classificacao", "anulacao"]
         },
         {
           "name": "justificativa",
@@ -692,7 +692,13 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["inclusao_ponto_faltante", "justificativa_inconsistencia", "abono_horas"]
+          "selectValues": [
+            "inclusao_ponto_faltante",
+            "justificativa_inconsistencia",
+            "abono_horas",
+            "anulacao_marcacao_duplicada",
+            "anulacao_marcacao_indevida"
+          ]
         }
       ],
       "indexes": ["CREATE INDEX idx_tratamentos_func ON tratamentos_ponto (funcionario)"]

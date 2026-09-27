@@ -16,6 +16,8 @@ export interface MarcacaoInterpreta {
   registroOriginal?: RegistroHorario
   tratamento?: TratamentoPonto
   automatico?: boolean
+  anulado?: boolean
+  motivoAnulacao?: string
 }
 
 export interface DiaEspelhoCalculado {
@@ -345,23 +347,79 @@ export function calcularHorasRealizadas(
 } {
   const listaFisica: MarcacaoInterpreta[] = []
 
+  // Mapeia registros que foram anulados por tratamentos complementares
+  const registrosAnuladosMap = new Map<string, TratamentoPonto>()
+  for (const trat of tratamentosDoDia) {
+    if (trat.tipo === 'anulacao' && trat.registro) {
+      registrosAnuladosMap.set(trat.registro, trat)
+    }
+  }
+
+  // Lista de marcações anuladas que ainda assim serão mostradas visualmente como anuladas
+  const marcacoesAnuladasAuditaveis: MarcacaoInterpreta[] = []
+
   // 1. Marcações originais batidas no terminal
-  for (const reg of marcacoesOriginais) {
+  // Regra de deduplicação retroativa de segurança: registros consecutivos com horário idêntico ou <90s
+  // Caso não tenham sido anulados no banco, anula os excedentes
+  const DEDUP_WINDOW_MS = 90 * 1000 // 90 segundos
+
+  // Ordenar registros originais por timestamp_utc / created
+  const regsOriginaisOrdenados = [...marcacoesOriginais].sort((a, b) => {
+    const tA = new Date(a.timestamp_utc || a.created).getTime()
+    const tB = new Date(b.timestamp_utc || b.created).getTime()
+    return tA - tB
+  })
+
+  let lastKeptTs: number | null = null
+
+  for (const reg of regsOriginaisOrdenados) {
     const horario = reg.timestamp_utc
       ? getSPTimeFromUtc(reg.timestamp_utc)
       : reg.hora_utc.slice(0, 5)
-    listaFisica.push({
-      id: reg.id,
-      horario,
-      tipo: 'avulsa',
-      origem: 'terminal',
-      registroOriginal: reg,
-    })
+
+    const ts = new Date(reg.timestamp_utc || reg.created).getTime()
+
+    // Checa se está explicitamente anulado no banco
+    const tratAnulacao = registrosAnuladosMap.get(reg.id)
+
+    // Checa também deduplicação retroativa dinâmica (<90s do anterior válido mantido)
+    let ehDuplicataJanela = false
+    if (!tratAnulacao && lastKeptTs !== null) {
+      const diff = ts - lastKeptTs
+      if (diff >= 0 && diff < DEDUP_WINDOW_MS) {
+        ehDuplicataJanela = true
+      }
+    }
+
+    if (tratAnulacao || ehDuplicataJanela) {
+      // Marcação anulada! Desconsiderada em todos os totais, mas visível com marcação auditável de anulação
+      marcacoesAnuladasAuditaveis.push({
+        id: reg.id,
+        horario,
+        tipo: 'avulsa',
+        origem: 'terminal',
+        registroOriginal: reg,
+        anulado: true,
+        motivoAnulacao:
+          tratAnulacao?.justificativa ||
+          'Batida duplicada consecutiva dentro de 90s desconsiderada pelo sistema',
+        tratamento: tratAnulacao,
+      })
+    } else {
+      listaFisica.push({
+        id: reg.id,
+        horario,
+        tipo: 'avulsa',
+        origem: 'terminal',
+        registroOriginal: reg,
+      })
+      lastKeptTs = ts
+    }
   }
 
-  // 2. Marcações adicionadas em tratamentos de fechamento
+  // 2. Marcações adicionadas em tratamentos de fechamento (que não sejam anulações)
   for (const trat of tratamentosDoDia) {
-    if (trat.hora_registro) {
+    if (trat.tipo !== 'anulacao' && trat.hora_registro) {
       listaFisica.push({
         id: trat.id,
         horario: trat.hora_registro.slice(0, 5),
@@ -379,11 +437,11 @@ export function calcularHorasRealizadas(
 
   const totalBatidasReais = listaFisica.length
 
-  // Casos sem batidas:
+  // Casos sem batidas válidas:
   if (totalBatidasReais === 0) {
     return {
       minutosTrabalhados: 0,
-      todasMarcacoes: [],
+      todasMarcacoes: marcacoesAnuladasAuditaveis,
       isIncompleto: false,
       intervaloAutomaticoAplicado: false,
     }
@@ -576,9 +634,15 @@ export function calcularHorasRealizadas(
   // É incompleto se o número de batidas REAIS (físicas/ajustes) for ímpar
   const isIncompleto = totalBatidasReais % 2 !== 0
 
+  // Combina listaFinal com as marcações anuladas para exibição visual auditável
+  // As marcações anuladas NÃO entram no cálculo de minutosTrabalhados nem no isIncompleto
+  const todasMarcacoesComAnuladas = [...listaFinal, ...marcacoesAnuladasAuditaveis].sort((a, b) => {
+    return timeStringToMinutes(a.horario) - timeStringToMinutes(b.horario)
+  })
+
   return {
     minutosTrabalhados,
-    todasMarcacoes: listaFinal,
+    todasMarcacoes: todasMarcacoesComAnuladas,
     isIncompleto,
     intervaloAutomaticoAplicado: aplicarIntervaloAutomatico,
     intervaloInfo,
@@ -778,10 +842,12 @@ export function construirEspelhoMensal(params: {
     let atrasoMinutos = 0
     let entradaTolerada = false
 
+    const marcacoesValidas = todasMarcacoes.filter((m) => !m.anulado)
+
     // 1. Tolerância de 10 minutos na entrada (Regra 3)
-    // Se o funcionário tem horário de entrada previsto e realizou marcações:
-    if (!ehDiaFolga && horaEntradaPrevista && todasMarcacoes.length > 0) {
-      const primeiraMarcacao = todasMarcacoes[0]
+    // Se o funcionário tem horário de entrada previsto e realizou marcações válidas:
+    if (!ehDiaFolga && horaEntradaPrevista && marcacoesValidas.length > 0) {
+      const primeiraMarcacao = marcacoesValidas[0]
       const minEntradaReal = timeStringToMinutes(primeiraMarcacao.horario)
       const minEntradaPrev = timeStringToMinutes(horaEntradaPrevista)
 
@@ -810,12 +876,13 @@ export function construirEspelhoMensal(params: {
     // 2. Crédito de Banco de Horas pós-saída prevista (Regra 2)
     // "todas as batidas apos as 18h registrar como banco de horas."
     // Tempo trabalhado após o horário de saída previsto da jornada do dia vai para crédito no Banco de Horas.
-    // Em dias de folga com trabalho: todo o tempo trabalhado vira crédito de banco de horas.
+    // Em dias de folga com trabalho: se houver minutos trabalhados válidos (>0), vira crédito de banco de horas.
+
     if (ehDiaFolga && minutosTrabalhados > 0) {
       horasBancoCreditoMinutos = minutosTrabalhados
-    } else if (!ehDiaFolga && horaSaidaPrevista && todasMarcacoes.length >= 2) {
-      // Localiza a última batida (saída) realizada
-      const ultimaMarcacao = todasMarcacoes[todasMarcacoes.length - 1]
+    } else if (!ehDiaFolga && horaSaidaPrevista && marcacoesValidas.length >= 2) {
+      // Localiza a última batida válida (saída) realizada
+      const ultimaMarcacao = marcacoesValidas[marcacoesValidas.length - 1]
       let minSaidaReal = timeStringToMinutes(ultimaMarcacao.horario)
       let minSaidaPrev = timeStringToMinutes(horaSaidaPrevista)
       const minEntradaPrev = timeStringToMinutes(horaEntradaPrevista)
@@ -858,7 +925,13 @@ export function construirEspelhoMensal(params: {
 
     const ehPassado = dataStr <= hojeStr
 
-    if (!ehDiaFolga && todasMarcacoes.length === 0 && !feriasMatch && !ausenciaMatch && ehPassado) {
+    if (
+      !ehDiaFolga &&
+      marcacoesValidas.length === 0 &&
+      !feriasMatch &&
+      !ausenciaMatch &&
+      ehPassado
+    ) {
       totalOcorrencias++
       ocorrencias.push({
         tipo: 'ausencia',

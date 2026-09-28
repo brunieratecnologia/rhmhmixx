@@ -606,11 +606,24 @@ export default function Configuracoes() {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-slate-700 font-mono text-xs">
-                          {j.hora_entrada || '--:--'} às {j.hora_saida || '--:--'}
-                          {j.hora_inicio_intervalo && j.hora_retorno_intervalo && (
-                            <span className="text-slate-400 block text-[11px]">
-                              Int: {j.hora_inicio_intervalo} - {j.hora_retorno_intervalo}
-                            </span>
+                          {j.grade_semanal && Object.keys(j.grade_semanal).length > 0 ? (
+                            <div>
+                              <span className="text-amber-900 font-bold bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded text-[10px]">
+                                Grade Semanal Flexível
+                              </span>
+                              <span className="text-slate-500 block text-[11px] mt-0.5">
+                                Horários por dia da semana
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              {j.hora_entrada || '--:--'} às {j.hora_saida || '--:--'}
+                              {j.hora_inicio_intervalo && j.hora_retorno_intervalo && (
+                                <span className="text-slate-400 block text-[11px]">
+                                  Int: {j.hora_inicio_intervalo} - {j.hora_retorno_intervalo}
+                                </span>
+                              )}
+                            </>
                           )}
                         </td>
                         <td className="py-3 px-4 text-slate-600 text-xs">

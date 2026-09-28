@@ -470,6 +470,223 @@ export function executarTestesIntervaloAutomatico(): {
     })
   }
 
+  // TESTE 7B: Validar as duas jornadas reais do usuário (Segunda a Sexta 44h e SABADO)
+  {
+    // 1. Jornada "Segunda a Sexta" (44h): Seg-Qui 08:00-18:00 (almoço 12:00-13:00 = 9h liq = 540 min), Sex 08:00-17:00 (almoço 12:00-13:00 = 8h liq = 480 min)
+    const jornadaSegSexReal: Jornada = {
+      id: 'j-seg-sex-real',
+      nome: 'Segunda a Sexta',
+      hora_entrada: '08:00',
+      hora_inicio_intervalo: '12:00',
+      hora_retorno_intervalo: '13:00',
+      hora_saida: '18:00',
+      duracao_jornada_min: 528,
+      dias_trabalho: ['seg', 'ter', 'qua', 'qui', 'sex'],
+      dias_folga: ['sab', 'dom'],
+      grade_semanal: {
+        seg: {
+          ativo: true,
+          hora_entrada: '08:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:00',
+          hora_saida: '18:00',
+          duracao_min: 540,
+          atravessa_meia_noite: false,
+        },
+        ter: {
+          ativo: true,
+          hora_entrada: '08:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:00',
+          hora_saida: '18:00',
+          duracao_min: 540,
+          atravessa_meia_noite: false,
+        },
+        qua: {
+          ativo: true,
+          hora_entrada: '08:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:00',
+          hora_saida: '18:00',
+          duracao_min: 540,
+          atravessa_meia_noite: false,
+        },
+        qui: {
+          ativo: true,
+          hora_entrada: '08:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:00',
+          hora_saida: '18:00',
+          duracao_min: 540,
+          atravessa_meia_noite: false,
+        },
+        sex: {
+          ativo: true,
+          hora_entrada: '08:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:00',
+          hora_saida: '17:00',
+          duracao_min: 480,
+          atravessa_meia_noite: false,
+        },
+        sab: {
+          ativo: false,
+          hora_entrada: '',
+          hora_inicio_intervalo: '',
+          hora_retorno_intervalo: '',
+          hora_saida: '',
+          duracao_min: 0,
+          atravessa_meia_noite: false,
+        },
+        dom: {
+          ativo: false,
+          hora_entrada: '',
+          hora_inicio_intervalo: '',
+          hora_retorno_intervalo: '',
+          hora_saida: '',
+          duracao_min: 0,
+          atravessa_meia_noite: false,
+        },
+      },
+      created: '',
+      updated: '',
+    }
+
+    const espelhoSegSex = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaSegSexReal,
+      historicoJornadas: [],
+      registrosMes: [],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    // 2026-09-07 (Seg): 540 min (9h)
+    // 2026-09-11 (Sex): 480 min (8h)
+    // 2026-09-12 (Sáb): Folga
+    const diaSegReal = espelhoSegSex.dias.find((d) => d.data === '2026-09-07')
+    const diaSexReal = espelhoSegSex.dias.find((d) => d.data === '2026-09-11')
+    const diaSabReal = espelhoSegSex.dias.find((d) => d.data === '2026-09-12')
+
+    const passouSegSexReal =
+      diaSegReal?.previstoMinutos === 540 &&
+      diaSexReal?.previstoMinutos === 480 &&
+      diaSabReal?.ehDiaFolga === true &&
+      diaSabReal?.previstoMinutos === 0
+
+    // 2. Jornada "SABADO": Seg 10:00-18:00 (1h30 almoço = 6h30 = 390 min), Ter-Sab 09:00-18:00 (1h30 almoço = 7h30 = 450 min), Dom Folga
+    const jornadaSabadoReal: Jornada = {
+      id: 'j-sabado-empresa-real',
+      nome: 'SABADO',
+      hora_entrada: '10:00',
+      hora_inicio_intervalo: '13:00',
+      hora_retorno_intervalo: '14:30',
+      hora_saida: '18:00',
+      duracao_jornada_min: 440,
+      dias_trabalho: ['seg', 'ter', 'qua', 'qui', 'sex', 'sab'],
+      dias_folga: ['dom'],
+      grade_semanal: {
+        seg: {
+          ativo: true,
+          hora_entrada: '10:00',
+          hora_inicio_intervalo: '13:00',
+          hora_retorno_intervalo: '14:30',
+          hora_saida: '18:00',
+          duracao_min: 390,
+          atravessa_meia_noite: false,
+        },
+        ter: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:30',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        qua: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:30',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        qui: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:30',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        sex: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:30',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        sab: {
+          ativo: true,
+          hora_entrada: '09:00',
+          hora_inicio_intervalo: '12:00',
+          hora_retorno_intervalo: '13:30',
+          hora_saida: '18:00',
+          duracao_min: 450,
+          atravessa_meia_noite: false,
+        },
+        dom: {
+          ativo: false,
+          hora_entrada: '',
+          hora_inicio_intervalo: '',
+          hora_retorno_intervalo: '',
+          hora_saida: '',
+          duracao_min: 0,
+          atravessa_meia_noite: false,
+        },
+      },
+      created: '',
+      updated: '',
+    }
+
+    const espelhoSabadoReal = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaSabadoReal,
+      historicoJornadas: [],
+      registrosMes: [],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const diaSegSabado = espelhoSabadoReal.dias.find((d) => d.data === '2026-09-07')
+    const diaTerSabado = espelhoSabadoReal.dias.find((d) => d.data === '2026-09-08')
+    const diaSabSabado = espelhoSabadoReal.dias.find((d) => d.data === '2026-09-12')
+    const diaDomSabado = espelhoSabadoReal.dias.find((d) => d.data === '2026-09-13')
+
+    const passouSabadoReal =
+      diaSegSabado?.previstoMinutos === 390 && // 6h30
+      diaTerSabado?.previstoMinutos === 450 && // 7h30
+      diaSabSabado?.previstoMinutos === 450 && // 7h30 no sábado trabalhado
+      diaSabSabado?.ehDiaFolga === false &&
+      diaDomSabado?.ehDiaFolga === true &&
+      diaDomSabado?.previstoMinutos === 0
+
+    resultados.push({
+      nome: 'Teste (g2): Jornadas reais da empresa MH MIXX ("Segunda a Sexta" 44h e "SABADO")',
+      passou: Boolean(passouSegSexReal && passouSabadoReal),
+      detalhe: `SegSex (Seg ${diaSegReal?.previstoMinutos}m, Sex ${diaSexReal?.previstoMinutos}m); SABADO (Seg ${diaSegSabado?.previstoMinutos}m, Ter ${diaTerSabado?.previstoMinutos}m, Sáb ${diaSabSabado?.previstoMinutos}m, Dom Folga)`,
+    })
+  }
+
   // TESTE 8: Tolerância de 10 minutos na entrada (Regra 3)
   // Jornada padrão entra 08:00
   // Caso A: Entrou 08:08 (atraso de 8 min <= 10 min de tolerância) -> NÃO gera ocorrência de atraso

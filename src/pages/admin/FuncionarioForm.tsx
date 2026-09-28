@@ -851,7 +851,10 @@ export default function FuncionarioForm() {
                     <SelectContent>
                       {jornadas.map((j) => (
                         <SelectItem key={j.id} value={j.id}>
-                          {j.nome} ({j.hora_entrada} - {j.hora_saida})
+                          {j.nome}{' '}
+                          {j.grade_semanal && Object.keys(j.grade_semanal).length > 0
+                            ? '(Horários flexíveis por dia)'
+                            : `(${j.hora_entrada} - ${j.hora_saida})`}
                         </SelectItem>
                       ))}
                     </SelectContent>

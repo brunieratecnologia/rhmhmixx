@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { timeStringToMinutes, minutesToHoursText } from '@/lib/calculoHoras'
 import { AlertCircle, Clock, Copy } from 'lucide-react'
 
@@ -373,14 +372,16 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-[#0F1624] text-slate-100 border-[#D4AF37]/30 shadow-2xl">
         <DialogHeader>
           <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center mb-1">
             <Clock className="w-5 h-5" />
           </div>
-          <DialogTitle>{jornada ? 'Editar Jornada' : 'Nova Jornada de Trabalho'}</DialogTitle>
-          <DialogDescription>
-            Configure turnos flexíveis, horários individuais por dia da semana (ex: Segunda
+          <DialogTitle className="text-amber-50 text-lg font-bold">
+            {jornada ? 'Editar Jornada' : 'Nova Jornada de Trabalho'}
+          </DialogTitle>
+          <DialogDescription className="text-slate-400 text-xs">
+            Configure dias, turnos flexíveis, horários individuais por dia da semana (ex: Segunda
             diferente de Ter–Sex), intervalos e escalas.
           </DialogDescription>
         </DialogHeader>
@@ -401,20 +402,21 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
               </Label>
               <Input
                 id="jornadaNome"
-                placeholder="Ex: Comercial 08h-17h, SÁBADO (Seg 10h-18h / Ter-Sex 09h-18h), etc."
+                placeholder="Ex: Segunda a Sexta, SABADO, etc."
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 required
+                className="bg-[#151D2C] border-slate-700 text-slate-100"
               />
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">Tipo de Escala</Label>
               <Select value={tipoEscala} onValueChange={setTipoEscala}>
-                <SelectTrigger className="text-xs">
+                <SelectTrigger className="text-xs bg-[#151D2C] border-slate-700 text-slate-100">
                   <SelectValue placeholder="Selecione a escala" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-[#151D2C] border-slate-700 text-slate-100">
                   <SelectItem value="semanal_fixa">Semanal Fixa (Seg a Sex / Seg a Sáb)</SelectItem>
                   <SelectItem value="escala_12x36">Plantão / Escala 12x36</SelectItem>
                   <SelectItem value="escala_6x1">Escala 6x1</SelectItem>
@@ -424,40 +426,83 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
             </div>
           </div>
 
-          {/* Alternância de Modo: Horário Único vs Horários Individuais por Dia */}
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold block text-slate-700">
-              Modo de Definição de Horários
-            </Label>
-            <Tabs
-              value={modoConfiguracao}
-              onValueChange={(v) => setModoConfiguracao(v as 'unico' | 'grade')}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-2 w-full bg-slate-100 p-1 rounded-xl">
-                <TabsTrigger
-                  value="unico"
-                  className="text-xs font-semibold py-1.5 data-[state=active]:bg-white data-[state=active]:shadow-xs"
-                >
-                  Horário único para todos os dias
-                </TabsTrigger>
-                <TabsTrigger
-                  value="grade"
-                  className="text-xs font-semibold py-1.5 data-[state=active]:bg-[#D4AF37]/20 data-[state=active]:text-slate-950 data-[state=active]:font-bold data-[state=active]:shadow-xs"
-                >
+          {/* Seletor Claro e Explícito: Horário Fixo vs Horários Individuais por Dia */}
+          <div className="space-y-2 p-3 bg-[#151D2C]/90 rounded-xl border border-slate-700/80">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold text-amber-200">
+                Formato de Horários da Jornada <span className="text-red-400">*</span>
+              </Label>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {modoConfiguracao === 'grade' ? 'Grade por dia ativa' : 'Horário único ativo'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setModoConfiguracao('unico')}
+                className={`flex flex-col text-left p-2.5 rounded-lg border transition-all ${
+                  modoConfiguracao === 'unico'
+                    ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-amber-100 ring-1 ring-[#D4AF37]/50'
+                    : 'bg-[#0B0F17] border-slate-700/70 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                }`}
+              >
+                <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                  <span
+                    className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                      modoConfiguracao === 'unico'
+                        ? 'border-[#D4AF37] bg-[#D4AF37]'
+                        : 'border-slate-500'
+                    }`}
+                  >
+                    {modoConfiguracao === 'unico' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                    )}
+                  </span>
+                  Horário Fixo Único
+                </span>
+                <span className="text-[11px] text-slate-400 mt-1 pl-5">
+                  Mesmo horário de entrada/saída para todos os dias úteis selecionados.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModoConfiguracao('grade')}
+                className={`flex flex-col text-left p-2.5 rounded-lg border transition-all ${
+                  modoConfiguracao === 'grade'
+                    ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-amber-100 ring-1 ring-[#D4AF37]/50'
+                    : 'bg-[#0B0F17] border-slate-700/70 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                }`}
+              >
+                <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
+                  <span
+                    className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                      modoConfiguracao === 'grade'
+                        ? 'border-[#D4AF37] bg-[#D4AF37]'
+                        : 'border-slate-500'
+                    }`}
+                  >
+                    {modoConfiguracao === 'grade' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />
+                    )}
+                  </span>
                   Horários individuais por dia da semana
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+                </span>
+                <span className="text-[11px] text-slate-400 mt-1 pl-5">
+                  Grade semanal (Seg a Dom) com horários e almoço próprios para cada dia.
+                </span>
+              </button>
+            </div>
           </div>
 
           {modoConfiguracao === 'unico' ? (
             <>
               {/* Horários Únicos */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <div className="p-3.5 bg-[#151D2C] border border-slate-700/80 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800">Horários Previstos (24h)</span>
-                  <span className="text-xs font-mono font-semibold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-300">
+                  <span className="text-xs font-bold text-amber-100">Horários Previstos (24h)</span>
+                  <span className="text-xs font-mono font-semibold text-amber-300 bg-[#D4AF37]/15 px-2 py-0.5 rounded border border-[#D4AF37]/40">
                     Líquido: {minutesToHoursText(duracaoMinUnico)} ({duracaoMinUnico} min)
                   </span>
                 </div>
@@ -466,7 +511,7 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                   <div className="space-y-1">
                     <Label
                       htmlFor="horaEntrada"
-                      className="text-[11px] font-semibold text-slate-600"
+                      className="text-[11px] font-semibold text-slate-300"
                     >
                       Entrada
                     </Label>
@@ -476,14 +521,14 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                       value={horaEntrada}
                       onChange={(e) => setHoraEntrada(e.target.value)}
                       required
-                      className="font-mono text-xs h-9"
+                      className="font-mono text-xs h-9 bg-[#0B0F17] border-slate-700 text-slate-100"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <Label
                       htmlFor="horaIniInt"
-                      className="text-[11px] font-semibold text-slate-600"
+                      className="text-[11px] font-semibold text-slate-300"
                     >
                       Início Intervalo
                     </Label>
@@ -492,14 +537,14 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                       type="time"
                       value={horaInicioIntervalo}
                       onChange={(e) => setHoraInicioIntervalo(e.target.value)}
-                      className="font-mono text-xs h-9"
+                      className="font-mono text-xs h-9 bg-[#0B0F17] border-slate-700 text-slate-100"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <Label
                       htmlFor="horaRetInt"
-                      className="text-[11px] font-semibold text-slate-600"
+                      className="text-[11px] font-semibold text-slate-300"
                     >
                       Fim Intervalo
                     </Label>
@@ -508,12 +553,12 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                       type="time"
                       value={horaRetornoIntervalo}
                       onChange={(e) => setHoraRetornoIntervalo(e.target.value)}
-                      className="font-mono text-xs h-9"
+                      className="font-mono text-xs h-9 bg-[#0B0F17] border-slate-700 text-slate-100"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="horaSaida" className="text-[11px] font-semibold text-slate-600">
+                    <Label htmlFor="horaSaida" className="text-[11px] font-semibold text-slate-300">
                       Saída Prevista
                     </Label>
                     <Input
@@ -522,18 +567,18 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                       value={horaSaida}
                       onChange={(e) => setHoraSaida(e.target.value)}
                       required
-                      className="font-mono text-xs h-9"
+                      className="font-mono text-xs h-9 bg-[#0B0F17] border-slate-700 text-slate-100"
                     />
                   </div>
                 </div>
 
                 {/* Virada de meia-noite switch */}
-                <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-semibold text-slate-800 block">
+                    <span className="text-xs font-semibold text-slate-200 block">
                       Ultrapassa a meia-noite (Turno Noturno)
                     </span>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-slate-400">
                       Ex: Entrada às 22:00 e término no dia seguinte às 06:00.
                     </p>
                   </div>
@@ -543,8 +588,8 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
 
               {/* Dias de Trabalho */}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold block">
-                  Dias de Trabalho na Semana <span className="text-red-500">*</span>
+                <Label className="text-xs font-semibold block text-slate-200">
+                  Dias de Trabalho na Semana <span className="text-red-400">*</span>
                 </Label>
                 <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
                   {DIAS_SEMANA.map((dia) => {
@@ -557,7 +602,7 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                         className={`py-2 text-xs font-bold rounded-lg border transition-all ${
                           ativo
                             ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA820A] text-slate-950 font-bold border-[#D4AF37] shadow-xs'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            : 'bg-[#151D2C] text-slate-300 border-slate-700 hover:bg-slate-800'
                         }`}
                       >
                         {dia.label}
@@ -565,7 +610,7 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                     )
                   })}
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-400">
                   Dias não selecionados são automaticamente computados como folga no espelho.
                 </p>
               </div>
@@ -573,23 +618,44 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
           ) : (
             /* Modo Grade Semanal por Dia */
             <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-amber-50/70 border border-amber-200 rounded-xl">
-                <div className="text-xs text-amber-950">
-                  <span className="font-bold block">Grade por Dia da Semana:</span>
-                  Defina entrada, intervalo e saída específicos para cada dia (ex: Segunda
-                  10:00–18:00 com 1h30 de almoço; Ter–Sex 09:00–18:00).
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-[#D4AF37]/15 border border-[#D4AF37]/40 rounded-xl">
+                <div className="text-xs text-amber-100">
+                  <span className="font-bold text-[#D4AF37] block">
+                    Grade por Dia da Semana (Seg a Dom):
+                  </span>
+                  Defina entrada, intervalo e saída próprios para cada dia ou marque folga semanal.
+                  Carga total semanal calculada automaticamente.
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => replicarParaTercaSexta('ter')}
-                  className="text-xs h-8 border-amber-300 bg-white hover:bg-amber-100/60 text-amber-900 shrink-0 font-semibold"
+                  className="text-xs h-8 border-[#D4AF37]/40 bg-[#0F1624] hover:bg-[#D4AF37]/20 text-[#D4AF37] shrink-0 font-semibold"
                 >
                   <Copy className="w-3.5 h-3.5 mr-1" />
                   Replicar Terça p/ Ter–Sex
                 </Button>
               </div>
+
+              {/* Total Semanal Acumulado */}
+              {(() => {
+                const totalMinutosSemana = DIAS_SEMANA.reduce((acc, d) => {
+                  const item = gradeSemanal[d.id]
+                  return acc + (item?.ativo ? item.duracao_min || 0 : 0)
+                }, 0)
+                const horasSemana = (totalMinutosSemana / 60).toFixed(1).replace('.0', '')
+                return (
+                  <div className="flex items-center justify-between px-3 py-2 bg-[#151D2C] border border-slate-700/80 rounded-lg">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Carga Total Semanal Programada:
+                    </span>
+                    <span className="text-xs font-mono font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/30">
+                      {horasSemana} horas semanais ({totalMinutosSemana} min)
+                    </span>
+                  </div>
+                )
+              })()}
 
               <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
                 {DIAS_SEMANA.map((dia) => {
@@ -609,8 +675,8 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                       key={dia.id}
                       className={`p-3 rounded-xl border transition-all ${
                         item.ativo
-                          ? 'bg-white border-slate-200 shadow-xs'
-                          : 'bg-slate-50/70 border-slate-200/60 opacity-70'
+                          ? 'bg-[#151D2C] border-slate-700/90 shadow-sm'
+                          : 'bg-[#0B0F17]/80 border-slate-800/80 opacity-60'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -631,10 +697,11 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                                 hora_saida: checked ? item.hora_saida || '17:00' : '',
                               })
                             }
+                            className="border-[#D4AF37] data-[state=checked]:bg-[#D4AF37] data-[state=checked]:text-slate-950"
                           />
                           <Label
                             htmlFor={`chk-${dia.id}`}
-                            className="text-xs font-bold text-slate-800 cursor-pointer flex items-center gap-1.5"
+                            className="text-xs font-bold text-slate-100 cursor-pointer flex items-center gap-1.5"
                           >
                             <span className="w-8 inline-block uppercase text-[#D4AF37] font-black">
                               {dia.label}
@@ -644,20 +711,20 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                         </div>
 
                         {item.ativo ? (
-                          <span className="text-[11px] font-mono font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                          <span className="text-[11px] font-mono font-semibold text-emerald-300 bg-emerald-950/50 border border-emerald-500/30 px-2 py-0.5 rounded">
                             Líquido: {minutesToHoursText(duracao)} ({duracao} min)
                           </span>
                         ) : (
-                          <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                          <span className="text-[11px] font-semibold text-slate-400 bg-slate-800/60 border border-slate-700/40 px-2 py-0.5 rounded">
                             Folga Semanal
                           </span>
                         )}
                       </div>
 
                       {item.ativo && (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-100">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800">
                           <div>
-                            <Label className="text-[10px] text-slate-500 font-semibold block mb-0.5">
+                            <Label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
                               Entrada
                             </Label>
                             <Input
@@ -666,13 +733,13 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                               onChange={(e) =>
                                 handleUpdateDiaGrade(dia.id, { hora_entrada: e.target.value })
                               }
-                              className="font-mono text-xs h-8"
+                              className="font-mono text-xs h-8 bg-[#0B0F17] border-slate-700 text-slate-100"
                               required
                             />
                           </div>
 
                           <div>
-                            <Label className="text-[10px] text-slate-500 font-semibold block mb-0.5">
+                            <Label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
                               Início Almoço
                             </Label>
                             <Input
@@ -683,12 +750,12 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                                   hora_inicio_intervalo: e.target.value,
                                 })
                               }
-                              className="font-mono text-xs h-8"
+                              className="font-mono text-xs h-8 bg-[#0B0F17] border-slate-700 text-slate-100"
                             />
                           </div>
 
                           <div>
-                            <Label className="text-[10px] text-slate-500 font-semibold block mb-0.5">
+                            <Label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
                               Fim Almoço
                             </Label>
                             <Input
@@ -699,12 +766,12 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                                   hora_retorno_intervalo: e.target.value,
                                 })
                               }
-                              className="font-mono text-xs h-8"
+                              className="font-mono text-xs h-8 bg-[#0B0F17] border-slate-700 text-slate-100"
                             />
                           </div>
 
                           <div>
-                            <Label className="text-[10px] text-slate-500 font-semibold block mb-0.5">
+                            <Label className="text-[10px] text-slate-400 font-semibold block mb-0.5">
                               Saída
                             </Label>
                             <Input
@@ -713,7 +780,7 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
                               onChange={(e) =>
                                 handleUpdateDiaGrade(dia.id, { hora_saida: e.target.value })
                               }
-                              className="font-mono text-xs h-8"
+                              className="font-mono text-xs h-8 bg-[#0B0F17] border-slate-700 text-slate-100"
                               required
                             />
                           </div>
@@ -726,12 +793,13 @@ export default function JornadaModal({ open, onOpenChange, jornada, onSave }: Jo
             </div>
           )}
 
-          <DialogFooter className="pt-3">
+          <DialogFooter className="pt-3 border-t border-slate-800">
             <Button
               type="button"
               variant="outline"
               disabled={salvando}
               onClick={() => onOpenChange(false)}
+              className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800"
             >
               Cancelar
             </Button>

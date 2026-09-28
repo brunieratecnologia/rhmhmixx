@@ -848,50 +848,119 @@ export default function FuncionarioFicha() {
 
               {/* Detalhes da Jornada Atual */}
               {funcionario.expand?.jornada_atual && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border border-slate-200 rounded-xl">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-400 block uppercase">
-                      Dias de Trabalho
-                    </span>
-                    <div className="flex items-center gap-1 mt-1 flex-wrap">
-                      {(funcionario.expand.jornada_atual.dias_trabalho || []).map((d) => (
-                        <span
-                          key={d}
-                          className="bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold uppercase px-2 py-0.5 rounded"
-                        >
-                          {d}
-                        </span>
-                      ))}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border border-slate-200 rounded-xl bg-white">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-400 block uppercase">
+                        Dias de Trabalho
+                      </span>
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {(funcionario.expand.jornada_atual.dias_trabalho || []).map((d) => (
+                          <span
+                            key={d}
+                            className="bg-amber-50 text-amber-900 border border-amber-300 text-xs font-bold uppercase px-2 py-0.5 rounded"
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-xs font-semibold text-slate-400 block uppercase">
+                        Intervalo Previsto
+                      </span>
+                      <p className="text-sm font-medium text-slate-800 mt-1 font-mono">
+                        {funcionario.expand.jornada_atual.hora_inicio_intervalo &&
+                        funcionario.expand.jornada_atual.hora_retorno_intervalo
+                          ? `${funcionario.expand.jornada_atual.hora_inicio_intervalo} às ${funcionario.expand.jornada_atual.hora_retorno_intervalo}`
+                          : 'Sem intervalo previsto'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-xs font-semibold text-slate-400 block uppercase">
+                        Dias de Folga
+                      </span>
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {(funcionario.expand.jornada_atual.dias_folga || []).map((d) => (
+                          <span
+                            key={d}
+                            className="bg-slate-100 text-slate-600 text-xs font-bold uppercase px-2 py-0.5 rounded"
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <span className="text-xs font-semibold text-slate-400 block uppercase">
-                      Intervalo Previsto
-                    </span>
-                    <p className="text-sm font-medium text-slate-800 mt-1 font-mono">
-                      {funcionario.expand.jornada_atual.hora_inicio_intervalo &&
-                      funcionario.expand.jornada_atual.hora_retorno_intervalo
-                        ? `${funcionario.expand.jornada_atual.hora_inicio_intervalo} às ${funcionario.expand.jornada_atual.hora_retorno_intervalo}`
-                        : 'Sem intervalo previsto'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-xs font-semibold text-slate-400 block uppercase">
-                      Dias de Folga
-                    </span>
-                    <div className="flex items-center gap-1 mt-1 flex-wrap">
-                      {(funcionario.expand.jornada_atual.dias_folga || []).map((d) => (
-                        <span
-                          key={d}
-                          className="bg-slate-100 text-slate-600 text-xs font-bold uppercase px-2 py-0.5 rounded"
-                        >
-                          {d}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Grade semanal individual por dia se configurada */}
+                  {funcionario.expand.jornada_atual.grade_semanal &&
+                    Object.keys(funcionario.expand.jornada_atual.grade_semanal).length > 0 && (
+                      <div className="p-4 border border-amber-200/80 bg-amber-50/40 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-amber-950 uppercase flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-[#D4AF37]" />
+                            Grade Semanal Individual por Dia
+                          </span>
+                          <span className="text-[11px] font-semibold text-amber-900">
+                            Horários específicos aplicados no cálculo do espelho
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
+                          {[
+                            { id: 'seg', label: 'Segunda' },
+                            { id: 'ter', label: 'Terça' },
+                            { id: 'qua', label: 'Quarta' },
+                            { id: 'qui', label: 'Quinta' },
+                            { id: 'sex', label: 'Sexta' },
+                            { id: 'sab', label: 'Sábado' },
+                            { id: 'dom', label: 'Domingo' },
+                          ].map((dia) => {
+                            const config = (
+                              funcionario.expand?.jornada_atual?.grade_semanal as any
+                            )?.[dia.id]
+                            const ativo = config?.ativo
+                            return (
+                              <div
+                                key={dia.id}
+                                className={`p-2.5 rounded-lg border text-xs ${
+                                  ativo
+                                    ? 'bg-white border-amber-200 text-slate-800 shadow-2xs'
+                                    : 'bg-slate-100/70 border-slate-200 text-slate-400'
+                                }`}
+                              >
+                                <span className="font-bold text-[11px] block text-[#D4AF37] uppercase">
+                                  {dia.label}
+                                </span>
+                                {ativo ? (
+                                  <div className="mt-1 space-y-0.5 font-mono text-[11px]">
+                                    <div className="font-semibold text-slate-900">
+                                      {config.hora_entrada} - {config.hora_saida}
+                                    </div>
+                                    {config.hora_inicio_intervalo &&
+                                      config.hora_retorno_intervalo && (
+                                        <div className="text-[10px] text-slate-500">
+                                          Almoço: {config.hora_inicio_intervalo}-
+                                          {config.hora_retorno_intervalo}
+                                        </div>
+                                      )}
+                                    <div className="text-[10px] text-emerald-700 font-semibold">
+                                      {minutesToHoursText(config.duracao_min || 0)}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 block mt-1">
+                                    Folga
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
 
@@ -1952,7 +2021,10 @@ export default function FuncionarioFicha() {
                 <SelectContent>
                   {todasJornadas.map((j) => (
                     <SelectItem key={j.id} value={j.id}>
-                      {j.nome} ({j.hora_entrada} às {j.hora_saida})
+                      {j.nome}{' '}
+                      {j.grade_semanal
+                        ? '(Horários flexíveis por dia)'
+                        : `(${j.hora_entrada} às ${j.hora_saida})`}
                     </SelectItem>
                   ))}
                 </SelectContent>

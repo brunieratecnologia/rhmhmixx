@@ -182,9 +182,16 @@ export const cargosService = {
   },
 }
 
+export interface JornadaVinculosInfo {
+  funcionariosAtivos: { id: string; nome: string; matricula: string }[]
+  historicoCount: number
+}
+
 export const jornadasService = {
-  async list() {
+  async list(apenasAtivas = false) {
+    const filter = apenasAtivas ? 'ativo != false' : ''
     return await pb.collection('jornadas').getFullList<Jornada>({
+      filter,
       sort: 'nome',
     })
   },
@@ -194,23 +201,115 @@ export const jornadasService = {
   },
 
   async create(data: Partial<Jornada>) {
-    return await pb.collection('jornadas').create<Jornada>(data)
+    return await pb.collection('jornadas').create<Jornada>({
+      ...data,
+      ativo: data.ativo !== undefined ? data.ativo : true,
+    })
   },
 
   async update(id: string, data: Partial<Jornada>) {
     return await pb.collection('jornadas').update<Jornada>(id, data)
   },
 
-  async delete(id: string) {
-    // Check if linked to any employee
+  async arquivar(id: string) {
+    return await pb.collection('jornadas').update<Jornada>(id, { ativo: false })
+  },
+
+  async desarquivar(id: string) {
+    return await pb.collection('jornadas').update<Jornada>(id, { ativo: true })
+  },
+
+  async checkVinculos(id: string): Promise<JornadaVinculosInfo> {
+    const [funcsLinked, histLinked] = await Promise.all([
+      pb.collection('funcionarios').getFullList<Funcionario>({
+        filter: `jornada_atual = "${id}"`,
+      }),
+      pb.collection('historico_jornadas').getList(1, 1, {
+        filter: `jornada = "${id}"`,
+      }),
+    ])
+
+    return {
+      funcionariosAtivos: funcsLinked.map((f) => ({
+        id: f.id,
+        nome: f.nome,
+        matricula: f.matricula,
+      })),
+      historicoCount: histLinked.totalItems,
+    }
+  },
+
+  async reatribuirFuncionarios(origemId: string, destinoId: string) {
+    const funcs = await pb.collection('funcionarios').getFullList<Funcionario>({
+      filter: `jornada_atual = "${origemId}"`,
+    })
+
+    const hojeStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date())
+
+    for (const f of funcs) {
+      await pb.collection('funcionarios').update(f.id, {
+        jornada_atual: destinoId,
+      })
+
+      // Atualiza também historico_jornadas aberto se houver
+      try {
+        const histAberto = await pb.collection('historico_jornadas').getList(1, 1, {
+          filter: `funcionario = "${f.id}" && jornada = "${origemId}" && (data_fim = "" || data_fim = null)`,
+        })
+        if (histAberto.items.length > 0) {
+          await pb.collection('historico_jornadas').update(histAberto.items[0].id, {
+            data_fim: hojeStr,
+          })
+          await pb.collection('historico_jornadas').create({
+            funcionario: f.id,
+            jornada: destinoId,
+            data_inicio: hojeStr,
+          })
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar histórico de jornada na reatribuição:', err)
+      }
+    }
+  },
+
+  async delete(id: string, options?: { reatribuirPara?: string; desvincularHistorico?: boolean }) {
+    // 1. Reatribuir funcionários se solicitado
+    if (options?.reatribuirPara) {
+      await this.reatribuirFuncionarios(id, options.reatribuirPara)
+    }
+
+    // 2. Verificar se ainda há funcionários vinculados
     const linked = await pb.collection('funcionarios').getList(1, 1, {
       filter: `jornada_atual = "${id}"`,
     })
     if (linked.totalItems > 0) {
       throw new Error(
-        'Não é possível excluir esta jornada: existem colaboradores vinculados a ela.',
+        'Não é possível excluir esta jornada: existem colaboradores com ela atribuída atualmente. Reatribua-os ou arquive a jornada.',
       )
     }
+
+    // 3. Se houver histórico de vigências referenciando esta jornada, podemos desvincular (set jornada = null ou reatribuir)
+    // para permitir a exclusão física do registro da jornada sem violar integridade
+    const histLinked = await pb.collection('historico_jornadas').getFullList({
+      filter: `jornada = "${id}"`,
+    })
+    for (const h of histLinked) {
+      if (options?.reatribuirPara) {
+        await pb.collection('historico_jornadas').update(h.id, {
+          jornada: options.reatribuirPara,
+        })
+      } else {
+        await pb.collection('historico_jornadas').update(h.id, {
+          jornada: null,
+        })
+      }
+    }
+
     return await pb.collection('jornadas').delete(id)
   },
 }

@@ -87,13 +87,13 @@ export default function AdminLayout() {
   }, [location.pathname])
 
   const navItems = [
-    { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+    { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Funcionários', path: '/admin/funcionarios', icon: Users },
     { name: 'Espelho de Ponto', path: '/admin/espelho-ponto', icon: FileCheck2 },
-    { name: 'Documentos', path: '/admin/documentos', icon: FolderOpen },
-    { name: 'Holerites', path: '/admin/holerites', icon: FileText },
     { name: 'Férias', path: '/admin/ferias', icon: Palmtree },
     { name: 'Ausências', path: '/admin/ausencias', icon: UserX },
+    { name: 'Documentos', path: '/admin/documentos', icon: FolderOpen },
+    { name: 'Holerites', path: '/admin/holerites', icon: FileText },
     { name: 'Departamentos', path: '/admin/departamentos', icon: Building2 },
     { name: 'Cargos', path: '/admin/cargos', icon: Briefcase },
     { name: 'Configurações', path: '/admin/configuracoes', icon: Settings },
@@ -126,7 +126,7 @@ export default function AdminLayout() {
   const logoUrl = empresa?.logotipo ? pb.files.getURL(empresa, empresa.logotipo) : null
   const companyName =
     empresa?.nome_fantasia || empresa?.razao_social || 'MH MIXX — Açaí e Frutas Congeladas'
-  const isDashboard = location.pathname === '/admin/dashboard'
+  const isDashboard = location.pathname === '/admin' || location.pathname === '/admin/dashboard'
 
   const userDisplayName = user?.nome || user?.name || user?.email || 'Usuário'
   const userInitials = userDisplayName.slice(0, 2).toUpperCase()
@@ -186,6 +186,8 @@ export default function AdminLayout() {
             const Icon = item.icon
             const isActive =
               location.pathname === item.path ||
+              (item.path === '/admin/dashboard' &&
+                (location.pathname === '/admin' || location.pathname === '/admin/dashboard')) ||
               (item.path !== '/admin/dashboard' && location.pathname.startsWith(item.path))
             return (
               <NavLink

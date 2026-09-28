@@ -15,14 +15,19 @@ import {
   Trash2,
   Edit2,
   AlertCircle,
+  AlertTriangle,
+  Archive,
+  ArchiveRestore,
   Eye,
   EyeOff,
   Clock,
   Plus,
+  Info,
 } from 'lucide-react'
 import JornadaModal from '@/components/admin/JornadaModal'
-import { jornadasService } from '@/services/rh'
+import { jornadasService, type JornadaVinculosInfo } from '@/services/rh'
 import type { Jornada } from '@/types/rh'
+import { Badge } from '@/components/ui/badge'
 import { minutesToHoursText } from '@/lib/calculoHoras'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,6 +59,12 @@ export default function Configuracoes() {
   const [jornadaToDelete, setJornadaToDelete] = useState<Jornada | null>(null)
   const [deletingJornadaModal, setDeletingJornadaModal] = useState(false)
   const [deletingJornada, setDeletingJornada] = useState(false)
+  const [checkingVinculos, setCheckingVinculos] = useState(false)
+  const [vinculosInfo, setVinculosInfo] = useState<JornadaVinculosInfo | null>(null)
+  const [reatribuirParaId, setReatribuirParaId] = useState<string>('')
+  const [filtroJornadasAtivas, setFiltroJornadasAtivas] = useState<
+    'todas' | 'ativas' | 'arquivadas'
+  >('todas')
 
   // Empresa Form State
   const [empresa, setEmpresa] = useState<Empresa | null>(null)
@@ -125,10 +136,70 @@ export default function Configuracoes() {
 
   const loadJornadas = async () => {
     try {
-      const list = await jornadasService.list()
+      const list = await jornadasService.list(false)
       setJornadasList(list)
     } catch (err) {
       console.error('Erro ao carregar jornadas:', err)
+    }
+  }
+
+  const handleOpenDeleteJornada = async (j: Jornada) => {
+    setJornadaToDelete(j)
+    setReatribuirParaId('')
+    setCheckingVinculos(true)
+    setDeletingJornadaModal(true)
+    try {
+      const info = await jornadasService.checkVinculos(j.id)
+      setVinculosInfo(info)
+      // Se houver colaboradores vinculados, pré-selecionar uma alternativa diferente
+      const outra = jornadasList.find((item) => item.id !== j.id && item.ativo !== false)
+      if (outra) {
+        setReatribuirParaId(outra.id)
+      }
+    } catch (err) {
+      console.error('Erro ao checar vínculos da jornada:', err)
+      setVinculosInfo({ funcionariosAtivos: [], historicoCount: 0 })
+    } finally {
+      setCheckingVinculos(false)
+    }
+  }
+
+  const handleArquivarJornada = async (j: Jornada) => {
+    try {
+      await jornadasService.arquivar(j.id)
+      toast({
+        title: 'Jornada arquivada.',
+        description: 'A jornada foi desativada e não aparecerá nas opções de seleção.',
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      })
+      if (deletingJornadaModal) {
+        setDeletingJornadaModal(false)
+      }
+      loadJornadas()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao arquivar jornada',
+        description: err?.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleDesarquivarJornada = async (j: Jornada) => {
+    try {
+      await jornadasService.desarquivar(j.id)
+      toast({
+        title: 'Jornada reativada.',
+        description: 'A jornada voltou a ficar ativa para novas atribuições.',
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      })
+      loadJornadas()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao reativar jornada',
+        description: err?.message,
+        variant: 'destructive',
+      })
     }
   }
 
@@ -545,134 +616,238 @@ export default function Configuracoes() {
         {/* TAB 3: JORNADAS DE TRABALHO */}
         {activeTab === 'jornadas' && (
           <div className="p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
                   Jornadas e Escalas Cadastradas
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Modelos de jornadas flexíveis, com suporte a turnos noturnos e escalas
-                  individualizadas
+                  Modelos de jornadas flexíveis, com suporte a turnos noturnos, escalas e controle
+                  de arquivamento seguro
                 </p>
               </div>
-              <Button
-                onClick={() => {
-                  setEditingJornada(null)
-                  setJornadaModalOpen(true)
-                }}
-                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-9 px-3.5 shadow-sm border-0 hover:brightness-110"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1.5" />
-                Nova Jornada
-              </Button>{' '}
+              <div className="flex items-center gap-2">
+                {/* Filtro ativas / todas */}
+                <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setFiltroJornadasAtivas('todas')}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                      filtroJornadasAtivas === 'todas'
+                        ? 'bg-white shadow-xs text-slate-900 font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Todas ({jornadasList.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroJornadasAtivas('ativas')}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                      filtroJornadasAtivas === 'ativas'
+                        ? 'bg-white shadow-xs text-slate-900 font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Ativas ({jornadasList.filter((j) => j.ativo !== false).length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltroJornadasAtivas('arquivadas')}
+                    className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
+                      filtroJornadasAtivas === 'arquivadas'
+                        ? 'bg-white shadow-xs text-slate-900 font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Arquivadas ({jornadasList.filter((j) => j.ativo === false).length})
+                  </button>
+                </div>
+
+                <Button
+                  onClick={() => {
+                    setEditingJornada(null)
+                    setJornadaModalOpen(true)
+                  }}
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-9 px-3.5 shadow-sm border-0 hover:brightness-110"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1.5" />
+                  Nova Jornada
+                </Button>
+              </div>
             </div>
 
-            {jornadasList.length === 0 ? (
-              <div className="py-12 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50">
-                <Clock className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-700">Nenhuma jornada cadastrada</p>
-                <p className="text-xs text-slate-500 mt-1">
-                  Cadastre jornadas para associar aos funcionários da empresa.
-                </p>
-              </div>
-            ) : (
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs sm:text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-semibold text-xs">
-                      <th className="py-3 px-4">Nome da Jornada</th>
-                      <th className="py-3 px-4">Horários Previstos</th>
-                      <th className="py-3 px-4">Dias de Trabalho</th>
-                      <th className="py-3 px-4">Carga Diária</th>
-                      <th className="py-3 px-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {jornadasList.map((j) => (
-                      <tr key={j.id} className="hover:bg-slate-50/80">
-                        <td className="py-3 px-4">
-                          <p className="font-semibold text-slate-900">{j.nome}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {j.atravessa_meia_noite && (
-                              <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full font-medium">
-                                Turno Noturno (Virada de Dia)
-                              </span>
-                            )}
-                            {j.tipo_escala && j.tipo_escala !== 'semanal_fixa' && (
-                              <span className="text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-medium capitalize">
-                                {j.tipo_escala.replace('_', ' ')}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-slate-700 font-mono text-xs">
-                          {j.grade_semanal && Object.keys(j.grade_semanal).length > 0 ? (
-                            <div>
-                              <span className="text-amber-900 font-bold bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded text-[10px]">
-                                Grade Semanal Flexível
-                              </span>
-                              <span className="text-slate-500 block text-[11px] mt-0.5">
-                                Horários por dia da semana
-                              </span>
-                            </div>
-                          ) : (
-                            <>
-                              {j.hora_entrada || '--:--'} às {j.hora_saida || '--:--'}
-                              {j.hora_inicio_intervalo && j.hora_retorno_intervalo && (
-                                <span className="text-slate-400 block text-[11px]">
-                                  Int: {j.hora_inicio_intervalo} - {j.hora_retorno_intervalo}
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 text-xs">
-                          <div className="flex items-center gap-1 flex-wrap">
-                            {(j.dias_trabalho || []).map((d) => (
-                              <span
-                                key={d}
-                                className="bg-slate-100 text-slate-700 font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded"
-                              >
-                                {d}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-mono font-semibold text-slate-800 text-xs">
-                          {minutesToHoursText(j.duracao_jornada_min || 0)}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingJornada(j)
-                                setJornadaModalOpen(true)
-                              }}
-                              className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#D4AF37]"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setJornadaToDelete(j)
-                                setDeletingJornadaModal(true)
-                              }}
-                              className="h-8 w-8 p-0 border-slate-200 text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
+            {(() => {
+              const filtradas = jornadasList.filter((j) => {
+                if (filtroJornadasAtivas === 'ativas') return j.ativo !== false
+                if (filtroJornadasAtivas === 'arquivadas') return j.ativo === false
+                return true
+              })
+
+              if (filtradas.length === 0) {
+                return (
+                  <div className="py-12 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                    <Clock className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-semibold text-slate-700">
+                      Nenhuma jornada encontrada
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {filtroJornadasAtivas === 'arquivadas'
+                        ? 'Não há jornadas arquivadas no momento.'
+                        : 'Cadastre jornadas para associar aos colaboradores da empresa.'}
+                    </p>
+                  </div>
+                )
+              }
+
+              return (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs sm:text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-semibold text-xs">
+                        <th className="py-3 px-4">Nome da Jornada</th>
+                        <th className="py-3 px-4">Horários Previstos</th>
+                        <th className="py-3 px-4">Dias de Trabalho</th>
+                        <th className="py-3 px-4">Carga Diária</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filtradas.map((j) => {
+                        const isArquivada = j.ativo === false
+                        return (
+                          <tr
+                            key={j.id}
+                            className={`hover:bg-slate-50/80 transition-colors ${
+                              isArquivada ? 'opacity-70 bg-slate-50/40' : ''
+                            }`}
+                          >
+                            <td className="py-3 px-4">
+                              <p className="font-semibold text-slate-900">{j.nome}</p>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {j.atravessa_meia_noite && (
+                                  <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full font-medium">
+                                    Turno Noturno
+                                  </span>
+                                )}
+                                {j.tipo_escala && j.tipo_escala !== 'semanal_fixa' && (
+                                  <span className="text-[10px] bg-amber-50 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full font-medium capitalize">
+                                    {j.tipo_escala.replace('_', ' ')}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-700 font-mono text-xs">
+                              {j.grade_semanal && Object.keys(j.grade_semanal).length > 0 ? (
+                                <div>
+                                  <span className="text-amber-900 font-bold bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded text-[10px]">
+                                    Grade Semanal Flexível
+                                  </span>
+                                  <span className="text-slate-500 block text-[11px] mt-0.5">
+                                    Horários por dia da semana
+                                  </span>
+                                </div>
+                              ) : (
+                                <>
+                                  {j.hora_entrada || '--:--'} às {j.hora_saida || '--:--'}
+                                  {j.hora_inicio_intervalo && j.hora_retorno_intervalo && (
+                                    <span className="text-slate-400 block text-[11px]">
+                                      Int: {j.hora_inicio_intervalo} - {j.hora_retorno_intervalo}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 text-xs">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {(j.dias_trabalho || []).map((d) => (
+                                  <span
+                                    key={d}
+                                    className="bg-slate-100 text-slate-700 font-semibold uppercase text-[10px] px-1.5 py-0.5 rounded"
+                                  >
+                                    {d}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 font-mono font-semibold text-slate-800 text-xs">
+                              {minutesToHoursText(j.duracao_jornada_min || 0)}
+                            </td>
+                            <td className="py-3 px-4">
+                              {isArquivada ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-slate-100 text-slate-600 border-slate-300"
+                                >
+                                  Arquivada
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200"
+                                >
+                                  Ativa
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {isArquivada ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDesarquivarJornada(j)}
+                                    title="Reativar Jornada"
+                                    className="h-8 px-2 text-xs border-slate-200 text-emerald-700 hover:bg-emerald-50"
+                                  >
+                                    <ArchiveRestore className="w-3.5 h-3.5 mr-1" />
+                                    Reativar
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleArquivarJornada(j)}
+                                    title="Arquivar / Desativar Jornada"
+                                    className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-amber-700"
+                                  >
+                                    <Archive className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingJornada(j)
+                                    setJornadaModalOpen(true)
+                                  }}
+                                  title="Editar"
+                                  className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#D4AF37]"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </Button>
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenDeleteJornada(j)}
+                                  title="Excluir"
+                                  className="h-8 w-8 p-0 border-slate-200 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -800,16 +975,117 @@ export default function Configuracoes() {
         }}
       />
 
-      {/* Modal Excluir Jornada */}
+      {/* Modal Excluir / Desativar Jornada com Verificação de Vínculos */}
       <Dialog open={deletingJornadaModal} onOpenChange={setDeletingJornadaModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Excluir Jornada</DialogTitle>
+            <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 text-amber-900 flex items-center justify-center mb-1">
+              <AlertTriangle className="w-5 h-5 text-[#D4AF37]" />
+            </div>
+            <DialogTitle>Gerenciar Exclusão de Jornada</DialogTitle>
             <DialogDescription>
-              Deseja remover a jornada <strong>{jornadaToDelete?.nome}</strong>?
+              A jornada <strong>{jornadaToDelete?.nome}</strong> está sendo verificada quanto a
+              vínculos contratuais e históricos.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="pt-2">
+
+          {checkingVinculos ? (
+            <div className="py-8 flex flex-col items-center justify-center gap-2">
+              <div className="w-6 h-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-slate-500">
+                Verificando vínculos com colaboradores e histórico...
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-1">
+              {vinculosInfo && vinculosInfo.funcionariosAtivos.length > 0 ? (
+                /* Há colaboradores com esta jornada atribuída */
+                <div className="space-y-3">
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 space-y-2">
+                    <p className="font-semibold flex items-center gap-1.5 text-amber-900">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      Esta jornada está atribuída a {vinculosInfo.funcionariosAtivos.length}{' '}
+                      colaborador(es) atualmente:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-0.5 text-slate-700 font-medium">
+                      {vinculosInfo.funcionariosAtivos.map((f) => (
+                        <li key={f.id}>
+                          {f.nome} (Matrícula: {f.matricula})
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-[11px] text-amber-800 pt-1">
+                      Para excluir fisicamente ou não utilizar mais, escolha uma das opções seguras
+                      abaixo:
+                    </p>
+                  </div>
+
+                  {/* Opção 1: Reatribuir e Excluir */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <span className="text-xs font-bold text-slate-900 block">
+                      Opção A: Reatribuir colaboradores e Excluir
+                    </span>
+                    <p className="text-[11px] text-slate-600">
+                      Mova os colaboradores ativos para outra jornada válida e remova esta jornada
+                      do catálogo.
+                    </p>
+                    <div className="space-y-1 pt-1">
+                      <Label className="text-[11px] font-semibold text-slate-700">
+                        Nova jornada para os colaboradores:
+                      </Label>
+                      <Select value={reatribuirParaId} onValueChange={setReatribuirParaId}>
+                        <SelectTrigger className="h-9 text-xs bg-white">
+                          <SelectValue placeholder="Selecione a nova jornada de destino" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {jornadasList
+                            .filter((j) => j.id !== jornadaToDelete?.id && j.ativo !== false)
+                            .map((j) => (
+                              <SelectItem key={j.id} value={j.id}>
+                                {j.nome} ({j.hora_entrada} - {j.hora_saida})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Opção 2: Arquivar / Desativar */}
+                  <div className="p-3.5 bg-purple-50/50 border border-purple-200 rounded-xl space-y-1.5">
+                    <span className="text-xs font-bold text-purple-950 block">
+                      Opção B: Apenas Arquivar / Desativar (Recomendado pela CLT)
+                    </span>
+                    <p className="text-[11px] text-slate-600">
+                      A jornada deixa de aparecer para novas seleções e formulários, mas o histórico
+                      de marcações passadas e espelhos continua 100% íntegro.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Não há colaboradores ativos vinculados */
+                <div className="space-y-3">
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <Info className="w-4 h-4 text-emerald-600 shrink-0" />
+                      Nenhum colaborador ativo está utilizando esta jornada no momento.
+                    </p>
+                    {vinculosInfo && vinculosInfo.historicoCount > 0 && (
+                      <p className="text-[11px] text-slate-600 pt-1">
+                        Existem {vinculosInfo.historicoCount} registro(s) no histórico de vigências
+                        passadas associados. A exclusão desvinculará com segurança essas vigências
+                        antigas sem corromper o cálculo.
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Confirma a exclusão definitiva desta jornada ou prefere apenas arquivá-la?
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-3">
             <Button
               type="button"
               variant="outline"
@@ -818,16 +1094,46 @@ export default function Configuracoes() {
             >
               Cancelar
             </Button>
+
+            {/* Botão Arquivar */}
+            {jornadaToDelete && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deletingJornada || checkingVinculos}
+                onClick={() => handleArquivarJornada(jornadaToDelete)}
+                className="border-amber-300 text-amber-900 hover:bg-amber-50"
+              >
+                <Archive className="w-3.5 h-3.5 mr-1 text-[#D4AF37]" />
+                Apenas Arquivar
+              </Button>
+            )}
+
+            {/* Botão Confirmar Exclusão */}
             <Button
               type="button"
-              disabled={deletingJornada}
+              disabled={
+                deletingJornada ||
+                checkingVinculos ||
+                Boolean(
+                  vinculosInfo && vinculosInfo.funcionariosAtivos.length > 0 && !reatribuirParaId,
+                )
+              }
               onClick={async () => {
                 if (!jornadaToDelete) return
                 setDeletingJornada(true)
                 try {
-                  await jornadasService.delete(jornadaToDelete.id)
+                  const options =
+                    vinculosInfo && vinculosInfo.funcionariosAtivos.length > 0
+                      ? { reatribuirPara: reatribuirParaId, desvincularHistorico: true }
+                      : { desvincularHistorico: true }
+
+                  await jornadasService.delete(jornadaToDelete.id, options)
                   toast({
-                    title: 'Jornada excluída com sucesso.',
+                    title: 'Jornada removida com sucesso.',
+                    description: options.reatribuirPara
+                      ? 'Colaboradores foram reatribuídos para a nova jornada e o registro foi excluído.'
+                      : 'O registro foi excluído de forma segura.',
                     className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
                   })
                   setDeletingJornadaModal(false)
@@ -844,7 +1150,11 @@ export default function Configuracoes() {
               }}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {deletingJornada ? 'Excluindo...' : 'Confirmar Exclusão'}
+              {deletingJornada
+                ? 'Processando...'
+                : vinculosInfo && vinculosInfo.funcionariosAtivos.length > 0
+                  ? 'Reatribuir e Excluir'
+                  : 'Confirmar Exclusão'}
             </Button>
           </DialogFooter>
         </DialogContent>

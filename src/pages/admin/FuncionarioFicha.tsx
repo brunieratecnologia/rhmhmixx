@@ -160,7 +160,7 @@ export default function FuncionarioFicha() {
       const [hist, jorHist, jorList, bhList, bhSaldo] = await Promise.all([
         historicoService.listByFuncionario(id),
         historicoJornadasService.listByFuncionario(id),
-        jornadasService.list(),
+        jornadasService.list(true),
         bancoHorasService.listByFuncionario(id),
         bancoHorasService.getSaldoFuncionario(id),
       ])

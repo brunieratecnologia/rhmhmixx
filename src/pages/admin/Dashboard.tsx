@@ -146,8 +146,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Top Header Strip with Action Shortcuts */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+      {/* Top Header Strip with Clean Action Shortcuts */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-amber-50 tracking-tight">
             Painel Geral
@@ -157,11 +157,11 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Shortcuts Buttons */}
-        <div className="flex items-center flex-wrap gap-2">
+        {/* Shortcuts Buttons Bar - alinhada em linha única / bloco ordenado com tema MH MIXX */}
+        <div className="flex items-center flex-wrap sm:flex-nowrap gap-2">
           <Button
             onClick={() => navigate('/admin/funcionarios/novo')}
-            className="bg-gradient-to-r from-[#D4AF37] to-[#AA820A] text-slate-950 hover:brightness-110 text-xs sm:text-sm font-bold h-9 px-3.5 shadow-md shadow-[#D4AF37]/20 border-0"
+            className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 hover:brightness-110 text-xs sm:text-sm font-bold h-9 px-3.5 shadow-sm border-0 shrink-0"
           >
             <UserPlus className="w-4 h-4 mr-1.5" />
             Cadastrar Funcionário
@@ -170,7 +170,7 @@ export default function Dashboard() {
           <Button
             variant="outline"
             onClick={() => navigate('/admin/funcionarios')}
-            className="h-9 px-3 border-[#D4AF37]/30 bg-transparent text-amber-100 hover:bg-[#121824] hover:text-[#D4AF37] text-xs sm:text-sm font-medium"
+            className="h-9 px-3 border-[#D4AF37]/30 bg-[#0F1624] text-amber-100 hover:bg-[#151D2C] hover:text-[#D4AF37] text-xs sm:text-sm font-medium shrink-0"
           >
             <Search className="w-4 h-4 mr-1.5 text-[#D4AF37]" />
             Consultar Registros
@@ -178,8 +178,17 @@ export default function Dashboard() {
 
           <Button
             variant="outline"
+            onClick={() => navigate('/admin/espelho-ponto')}
+            className="h-9 px-3 border-[#D4AF37]/30 bg-[#0F1624] text-amber-100 hover:bg-[#151D2C] hover:text-[#D4AF37] text-xs sm:text-sm font-medium shrink-0"
+          >
+            <Clock className="w-4 h-4 mr-1.5 text-[#D4AF37]" />
+            Espelho de Ponto
+          </Button>
+
+          <Button
+            variant="outline"
             onClick={() => navigate('/admin/ferias')}
-            className="h-9 px-3 border-[#D4AF37]/30 bg-transparent text-amber-100 hover:bg-[#121824] hover:text-[#D4AF37] text-xs sm:text-sm font-medium"
+            className="h-9 px-3 border-[#D4AF37]/30 bg-[#0F1624] text-amber-100 hover:bg-[#151D2C] hover:text-[#D4AF37] text-xs sm:text-sm font-medium shrink-0"
           >
             <Calendar className="w-4 h-4 mr-1.5 text-[#D4AF37]" />
             Gestão de Férias
@@ -188,9 +197,9 @@ export default function Dashboard() {
           <Button
             variant="outline"
             onClick={() => navigate('/admin/ausencias')}
-            className="h-9 px-3 border-[#D4AF37]/30 bg-transparent text-amber-100 hover:bg-[#121824] hover:text-[#D4AF37] text-xs sm:text-sm font-medium"
+            className="h-9 px-3 border-[#D4AF37]/30 bg-[#0F1624] text-amber-100 hover:bg-[#151D2C] hover:text-[#D4AF37] text-xs sm:text-sm font-medium shrink-0"
           >
-            <Clock className="w-4 h-4 mr-1.5 text-[#D4AF37]" />
+            <AlertCircle className="w-4 h-4 mr-1.5 text-[#D4AF37]" />
             Registrar Ausência
           </Button>
         </div>

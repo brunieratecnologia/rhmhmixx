@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-28T16:23:02.868Z",
+  "generatedAt": "2026-09-28T23:01:31.524Z",
   "collections": [
     {
       "name": "users",
@@ -306,6 +306,12 @@
           "type": "json",
           "required": false,
           "system": false
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_jornadas_nome ON jornadas (nome)"]
@@ -493,7 +499,7 @@
         {
           "name": "jornada",
           "type": "relation",
-          "required": true,
+          "required": false,
           "system": false,
           "collectionRef": "jornadas"
         },

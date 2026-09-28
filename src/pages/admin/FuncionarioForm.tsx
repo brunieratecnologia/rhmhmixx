@@ -88,7 +88,7 @@ export default function FuncionarioForm() {
         const [deps, cargs, jorns] = await Promise.all([
           departamentosService.list(),
           cargosService.list(),
-          jornadasService.list(),
+          jornadasService.list(true),
         ])
         setDepartamentos(deps)
         setCargos(cargs)

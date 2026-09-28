@@ -72,6 +72,7 @@ export interface Jornada {
   atravessa_meia_noite?: boolean
   tipo_escala?: 'semanal_fixa' | 'escala_12x36' | 'escala_6x1' | 'personalizada'
   grade_semanal?: GradeSemanal | null
+  ativo?: boolean
   created: string
   updated: string
 }

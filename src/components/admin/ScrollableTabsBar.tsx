@@ -121,7 +121,7 @@ export function ScrollableTabsBar<T extends string = string>({
       {/* Container com scroll horizontal sem scrollbar feia */}
       <div
         ref={scrollContainerRef}
-        className="flex overflow-x-auto no-scrollbar scroll-smooth px-4 sm:px-6 pt-2 gap-2 sm:gap-4"
+        className="flex overflow-x-auto no-scrollbar scroll-smooth px-2 sm:px-3 lg:px-3.5 pt-1.5 gap-1 sm:gap-1.5 xl:gap-2"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {visibleTabs.map((tab) => {
@@ -133,7 +133,7 @@ export function ScrollableTabsBar<T extends string = string>({
               type="button"
               onClick={() => onTabChange(tab.id)}
               className={cn(
-                'group relative pb-3 pt-1 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-all duration-150 shrink-0 cursor-pointer focus:outline-hidden',
+                'group relative pb-2.5 pt-1 px-2 sm:px-2.5 xl:px-3 text-xs sm:text-[13px] font-semibold flex items-center gap-1.5 border-b-2 whitespace-nowrap transition-all duration-150 shrink-0 cursor-pointer focus:outline-hidden',
                 isActive
                   ? 'border-[#D4AF37] text-slate-900 font-bold'
                   : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300',
@@ -142,14 +142,14 @@ export function ScrollableTabsBar<T extends string = string>({
               {tab.icon && (
                 <span
                   className={cn(
-                    'transition-colors',
+                    'transition-colors shrink-0 [&>svg]:w-3.5 [&>svg]:h-3.5 sm:[&>svg]:w-4 sm:[&>svg]:h-4',
                     isActive ? 'text-[#D4AF37]' : 'text-slate-400 group-hover:text-slate-600',
                   )}
                 >
                   {tab.icon}
                 </span>
               )}
-              <span>{tab.label}</span>
+              <span className="tracking-tight">{tab.label}</span>
               {tab.badge}
             </button>
           )

@@ -158,6 +158,15 @@
     border-color: rgba(212, 175, 55, 0.3);
   }
 
+  /* Ocultar barra de rolagem mantendo funcionalidade */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   /* KEEP ALL THE ANIMATIONS CLASSES THAT ARE USED BELOW */
   @keyframes accordion-down {
     from {

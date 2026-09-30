@@ -401,14 +401,14 @@ export default function FuncionarioForm() {
 
       {/* Main Form Card with Tabs */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-        {/* Navigation Tabs (Blue Underline) */}
-        <div className="flex border-b border-slate-200 px-6 pt-3 gap-6">
+        {/* Navigation Tabs */}
+        <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 px-4 sm:px-6 pt-3 gap-4 sm:gap-6">
           <button
             type="button"
             onClick={() => setActiveTab('pessoais')}
-            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors duration-150 ${
+            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors duration-150 shrink-0 ${
               activeTab === 'pessoais'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
+                ? 'border-[#D4AF37] text-slate-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -418,9 +418,9 @@ export default function FuncionarioForm() {
           <button
             type="button"
             onClick={() => setActiveTab('profissionais')}
-            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors duration-150 ${
+            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors duration-150 shrink-0 ${
               activeTab === 'profissionais'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
+                ? 'border-[#D4AF37] text-slate-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >

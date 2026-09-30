@@ -392,41 +392,41 @@ export default function Configuracoes() {
 
       {/* Tabs Container */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-        {/* Navigation Tabs (Blue Underline) */}
-        <div className="flex border-b border-slate-200 px-6 pt-3 gap-6">
+        {/* Navigation Tabs */}
+        <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 px-4 sm:px-6 pt-3 gap-4 sm:gap-6">
           <button
             onClick={() => setActiveTab('empresa')}
-            className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-colors ${
+            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors shrink-0 ${
               activeTab === 'empresa'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
+                ? 'border-[#D4AF37] text-slate-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Building2 className="w-4 h-4 mr-2 text-[#D4AF37]" />
+            <Building2 className="w-4 h-4 text-[#D4AF37]" />
             Dados da Empresa
           </button>
           <button
             onClick={() => setActiveTab('jornadas')}
-            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors shrink-0 gap-2 ${
               activeTab === 'jornadas'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
+                ? 'border-[#D4AF37] text-slate-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Clock className="w-4 h-4 mr-2 text-[#D4AF37]" />
+            <Clock className="w-4 h-4 text-[#D4AF37]" />
             Jornadas de Trabalho
           </button>
           <button
             onClick={() => setActiveTab('usuarios')}
-            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors shrink-0 gap-2 ${
               activeTab === 'usuarios'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
+                ? 'border-[#D4AF37] text-slate-900 font-bold'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Users className="w-4 h-4 mr-2 text-[#D4AF37]" />
+            <Users className="w-4 h-4 text-[#D4AF37]" />
             Acessos Administrativos
-          </button>{' '}
+          </button>
         </div>
 
         {/* TAB 1: EMPRESA */}

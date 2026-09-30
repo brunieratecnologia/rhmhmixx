@@ -47,6 +47,7 @@ import { Badge } from '@/components/ui/badge'
 import { terminalService, jornadasService, bancoHorasService } from '@/services/rh'
 import type { Jornada, BancoHorasLancamento } from '@/types/rh'
 import { minutesToHoursText } from '@/lib/calculoHoras'
+import { ScrollableTabsBar, ScrollableTabItem } from '@/components/admin/ScrollableTabsBar'
 import {
   Select,
   SelectContent,
@@ -452,106 +453,60 @@ export default function FuncionarioFicha() {
 
       {/* Tabs Card */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-        {/* Navigation Tabs Bar */}
-        <div className="flex overflow-x-auto border-b border-slate-200 px-6 pt-2 gap-4 sm:gap-6 scrollbar-none">
-          <button
-            onClick={() => setActiveTab('pessoais')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'pessoais'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <User className="w-4 h-4 text-[#D4AF37]" />
-            Dados Pessoais
-          </button>
-
-          <button
-            onClick={() => setActiveTab('profissionais')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'profissionais'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Briefcase className="w-4 h-4 text-[#D4AF37]" />
-            Dados Profissionais
-          </button>
-
-          <button
-            onClick={() => setActiveTab('jornada')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'jornada'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Clock className="w-4 h-4 text-[#D4AF37]" />
-            Jornada & Escala
-          </button>
-
-          <button
-            onClick={() => setActiveTab('banco_horas')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'banco_horas'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <History className="w-4 h-4 text-[#D4AF37]" />
-            Banco de Horas
-          </button>
-
-          {isAdmin && (
-            <button
-              onClick={() => setActiveTab('contratuais')}
-              className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-                activeTab === 'contratuais'
-                  ? 'border-[#D4AF37] text-amber-900 font-bold'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <FileCheck2 className="w-4 h-4 text-[#D4AF37]" />
-              Dados Contratuais
-            </button>
-          )}
-
-          <button
-            onClick={() => setActiveTab('documentos')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'documentos'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <FolderOpen className="w-4 h-4 text-[#D4AF37]" />
-            Documentos
-          </button>
-
-          <button
-            onClick={() => setActiveTab('ferias')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'ferias'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
-            Férias e Ausências
-          </button>
-
-          <button
-            onClick={() => setActiveTab('historico')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors ${
-              activeTab === 'historico'
-                ? 'border-[#D4AF37] text-amber-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <History className="w-4 h-4 text-[#D4AF37]" />
-            Histórico
-          </button>
-        </div>
+        {/* Navigation Tabs Bar rolável horizontalmente com indicadores de fade e setas */}
+        <ScrollableTabsBar
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab as TabType)}
+          tabs={[
+            {
+              id: 'pessoais',
+              label: 'Dados Pessoais',
+              icon: <User className="w-4 h-4" />,
+            },
+            {
+              id: 'profissionais',
+              label: 'Dados Profissionais',
+              icon: <Briefcase className="w-4 h-4" />,
+            },
+            {
+              id: 'jornada',
+              label: 'Jornada & Escala',
+              icon: <Clock className="w-4 h-4" />,
+            },
+            {
+              id: 'banco_horas',
+              label: 'Banco de Horas',
+              icon: <History className="w-4 h-4" />,
+            },
+            {
+              id: 'contratuais',
+              label: 'Dados Contratuais',
+              icon: <FileCheck2 className="w-4 h-4" />,
+              hidden: !isAdmin,
+            },
+            {
+              id: 'documentos',
+              label: 'Documentos',
+              icon: <FolderOpen className="w-4 h-4" />,
+              badge:
+                documentosList.length > 0 ? (
+                  <span className="text-[10px] bg-slate-100 text-slate-700 font-semibold px-1.5 py-0.2 rounded-full">
+                    {documentosList.length}
+                  </span>
+                ) : undefined,
+            },
+            {
+              id: 'ferias',
+              label: 'Férias e Ausências',
+              icon: <CalendarDays className="w-4 h-4" />,
+            },
+            {
+              id: 'historico',
+              label: 'Histórico',
+              icon: <History className="w-4 h-4" />,
+            },
+          ]}
+        />
 
         {/* Tab Content Panes */}
         <div className="p-6">

@@ -393,39 +393,42 @@ export default function Configuracoes() {
       {/* Tabs Container */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
         {/* Navigation Tabs */}
-        <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 px-4 sm:px-6 pt-3 gap-4 sm:gap-6">
+        <div className="flex flex-wrap items-center border-b border-slate-200 px-3 sm:px-6 pt-2 gap-x-2 sm:gap-x-4 gap-y-1">
           <button
+            type="button"
             onClick={() => setActiveTab('empresa')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors shrink-0 ${
+            className={`py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all shrink-0 rounded-t-md cursor-pointer ${
               activeTab === 'empresa'
-                ? 'border-[#D4AF37] text-slate-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
             }`}
           >
             <Building2 className="w-4 h-4 text-[#D4AF37]" />
-            Dados da Empresa
+            <span className="whitespace-nowrap">Dados da Empresa</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('jornadas')}
-            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors shrink-0 gap-2 ${
+            className={`flex items-center py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 gap-2 rounded-t-md cursor-pointer ${
               activeTab === 'jornadas'
-                ? 'border-[#D4AF37] text-slate-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
             }`}
           >
             <Clock className="w-4 h-4 text-[#D4AF37]" />
-            Jornadas de Trabalho
+            <span className="whitespace-nowrap">Jornadas de Trabalho</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('usuarios')}
-            className={`flex items-center pb-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors shrink-0 gap-2 ${
+            className={`flex items-center py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 gap-2 rounded-t-md cursor-pointer ${
               activeTab === 'usuarios'
-                ? 'border-[#D4AF37] text-slate-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
             }`}
           >
             <Users className="w-4 h-4 text-[#D4AF37]" />
-            Acessos Administrativos
+            <span className="whitespace-nowrap">Acessos Administrativos</span>
           </button>
         </div>
 

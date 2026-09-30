@@ -459,7 +459,7 @@ export default function FuncionarioFicha() {
 
       {/* Tabs Card */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-        {/* Navigation Tabs Bar rolável horizontalmente com indicadores de fade e setas */}
+        {/* Navigation Tabs Bar com flex-wrap (sem estouro lateral nem necessidade de rolagem) */}
         <ScrollableTabsBar
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab as TabType)}

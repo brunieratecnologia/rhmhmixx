@@ -517,44 +517,44 @@ export default function FuncionarioForm() {
       {/* Main Form Card with Tabs */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
         {/* Navigation Tabs */}
-        <div className="flex overflow-x-auto no-scrollbar border-b border-slate-200 px-4 sm:px-6 pt-3 gap-4 sm:gap-6">
+        <div className="flex flex-wrap items-center border-b border-slate-200 px-3 sm:px-6 pt-2 gap-x-2 sm:gap-x-4 gap-y-1">
           <button
             type="button"
             onClick={() => setActiveTab('pessoais')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors duration-150 shrink-0 ${
+            className={`py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all duration-150 shrink-0 rounded-t-md cursor-pointer ${
               activeTab === 'pessoais'
-                ? 'border-[#D4AF37] text-slate-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
             }`}
           >
             <User className="w-4 h-4 text-[#D4AF37]" />
-            Dados Pessoais
+            <span className="whitespace-nowrap">Dados Pessoais</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('profissionais')}
-            className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors duration-150 shrink-0 ${
+            className={`py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all duration-150 shrink-0 rounded-t-md cursor-pointer ${
               activeTab === 'profissionais'
-                ? 'border-[#D4AF37] text-slate-900 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
             }`}
           >
             <Briefcase className="w-4 h-4 text-[#D4AF37]" />
-            Dados Profissionais
+            <span className="whitespace-nowrap">Dados Profissionais</span>
           </button>
 
           {isAdmin && (
             <button
               type="button"
               onClick={() => setActiveTab('contrato')}
-              className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors duration-150 shrink-0 ${
+              className={`py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all duration-150 shrink-0 rounded-t-md cursor-pointer ${
                 activeTab === 'contrato'
-                  ? 'border-[#D4AF37] text-slate-900 font-bold'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
               }`}
             >
               <DollarSign className="w-4 h-4 text-[#D4AF37]" />
-              Salário e Contrato
+              <span className="whitespace-nowrap">Salário e Contrato</span>
               <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-1.5 py-0.2 rounded">
                 Admin
               </span>

@@ -25,6 +25,7 @@ import {
   Info,
 } from 'lucide-react'
 import JornadaModal from '@/components/admin/JornadaModal'
+import { ScrollableTabsBar } from '@/components/admin/ScrollableTabsBar'
 import { jornadasService, type JornadaVinculosInfo } from '@/services/rh'
 import type { Jornada } from '@/types/rh'
 import { Badge } from '@/components/ui/badge'
@@ -392,45 +393,28 @@ export default function Configuracoes() {
 
       {/* Tabs Container */}
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center border-b border-slate-200 px-3 sm:px-6 pt-2 gap-x-2 sm:gap-x-4 gap-y-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('empresa')}
-            className={`py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all shrink-0 rounded-t-md cursor-pointer ${
-              activeTab === 'empresa'
-                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
-            }`}
-          >
-            <Building2 className="w-4 h-4 text-[#D4AF37]" />
-            <span className="whitespace-nowrap">Dados da Empresa</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('jornadas')}
-            className={`flex items-center py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 gap-2 rounded-t-md cursor-pointer ${
-              activeTab === 'jornadas'
-                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
-            }`}
-          >
-            <Clock className="w-4 h-4 text-[#D4AF37]" />
-            <span className="whitespace-nowrap">Jornadas de Trabalho</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('usuarios')}
-            className={`flex items-center py-2 px-2 sm:px-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all shrink-0 gap-2 rounded-t-md cursor-pointer ${
-              activeTab === 'usuarios'
-                ? 'border-[#D4AF37] text-slate-900 font-bold bg-[#D4AF37]/5'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 hover:bg-slate-50/60'
-            }`}
-          >
-            <Users className="w-4 h-4 text-[#D4AF37]" />
-            <span className="whitespace-nowrap">Acessos Administrativos</span>
-          </button>
-        </div>
+        {/* Navigation Tabs Bar compacta em linha única */}
+        <ScrollableTabsBar
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab as 'empresa' | 'jornadas' | 'usuarios')}
+          tabs={[
+            {
+              id: 'empresa',
+              label: 'Dados da Empresa',
+              icon: <Building2 className="w-4 h-4" />,
+            },
+            {
+              id: 'jornadas',
+              label: 'Jornadas de Trabalho',
+              icon: <Clock className="w-4 h-4" />,
+            },
+            {
+              id: 'usuarios',
+              label: 'Acessos Administrativos',
+              icon: <Users className="w-4 h-4" />,
+            },
+          ]}
+        />
 
         {/* TAB 1: EMPRESA */}
         {activeTab === 'empresa' && (

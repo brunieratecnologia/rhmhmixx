@@ -1528,6 +1528,28 @@ export const terminalService = {
       body: { funcionarioId, pin },
     })
   },
+
+  async aplicarPinPadraoEmMassa() {
+    return await pb.send<{
+      success: boolean
+      totalProcessados: number
+      atualizadosCount: number
+      atualizados: { id: string; nome: string; matricula: string; pinGerado: string }[]
+      jaPossuemPinCount: number
+      semDataNascimentoCount: number
+      semDataNascimento: { id: string; nome: string; matricula: string }[]
+      colisoesCount: number
+      colisoes: {
+        id: string
+        nome: string
+        matricula: string
+        pinTentado: string
+        conflitoCom: string
+      }[]
+    }>('/backend/v1/rh/pin/padrao-massa', {
+      method: 'POST',
+    })
+  },
 }
 
 export const dashboardService = {

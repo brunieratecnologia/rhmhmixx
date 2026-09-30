@@ -14,7 +14,21 @@ import {
   Plus,
   Eye,
   SlidersHorizontal,
+  KeyRound,
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { terminalService } from '@/services/rh'
+import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -36,8 +50,30 @@ export default function FuncionariosList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedSituacao, setSelectedSituacao] = useState<string>('todos')
+  const { toast } = useToast()
   const [selectedDepartamento, setSelectedDepartamento] = useState<string>('todos')
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+
+  // Modal de atribuição de PIN padrão em massa
+  const [pinMassaModalOpen, setPinMassaModalOpen] = useState(false)
+  const [executandoPinMassa, setExecutandoPinMassa] = useState(false)
+  const [resultadoPinMassa, setResultadoPinMassa] = useState<{
+    success: boolean
+    totalProcessados: number
+    atualizadosCount: number
+    atualizados: { id: string; nome: string; matricula: string; pinGerado: string }[]
+    jaPossuemPinCount: number
+    semDataNascimentoCount: number
+    semDataNascimento: { id: string; nome: string; matricula: string }[]
+    colisoesCount: number
+    colisoes: {
+      id: string
+      nome: string
+      matricula: string
+      pinTentado: string
+      conflitoCom: string
+    }[]
+  } | null>(null)
 
   const stats = useMemo(() => {
     const total = funcionarios.length
@@ -136,6 +172,46 @@ export default function FuncionariosList() {
     return funcionarios.filter((f) => f.situacao === 'ativo').length
   }, [funcionarios])
 
+  const ativosSemPin = useMemo(() => {
+    return funcionarios.filter((f) => f.situacao !== 'desligado' && !f.pin_hash).length
+  }, [funcionarios])
+
+  const handleExecutarPinPadraoMassa = async () => {
+    setExecutandoPinMassa(true)
+    try {
+      const res = await terminalService.aplicarPinPadraoEmMassa()
+      setResultadoPinMassa(res)
+      await loadData()
+      if (res.atualizadosCount > 0) {
+        toast({
+          title: 'PIN padrão aplicado com sucesso',
+          description: `${res.atualizadosCount} colaborador(es) receberam o PIN padrão (DDMMAA).`,
+          className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        })
+      } else if (res.colisoesCount > 0) {
+        toast({
+          title: 'Atenção a colisões de PIN',
+          description: 'Houve conflito de PINs iguais entre colaboradores ativos.',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Processo concluído',
+          description: 'Nenhum colaborador precisava de definição de PIN padrão.',
+        })
+      }
+    } catch (err: any) {
+      console.error('Erro ao aplicar PIN padrão em massa:', err)
+      toast({
+        title: 'Erro ao processar PINs',
+        description: err?.message || 'Falha na comunicação com o backend.',
+        variant: 'destructive',
+      })
+    } finally {
+      setExecutandoPinMassa(false)
+    }
+  }
+
   const getSituacaoPill = (sit: string) => {
     switch (sit) {
       case 'ativo':
@@ -191,13 +267,33 @@ export default function FuncionariosList() {
               Gerencie cadastros, informações contratuais e dados dos colaboradores
             </p>
           </div>
-          <Button
-            onClick={() => navigate('/admin/funcionarios/novo')}
-            className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-4 shadow-sm shrink-0 border-0 hover:brightness-110"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Novo Funcionário
-          </Button>{' '}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setResultadoPinMassa(null)
+                setPinMassaModalOpen(true)
+              }}
+              className="border-amber-300/80 bg-amber-50/70 hover:bg-amber-100/80 text-amber-950 text-xs sm:text-sm h-10 px-3 font-semibold shrink-0"
+            >
+              <KeyRound className="w-4 h-4 mr-1.5 text-[#D4AF37]" />
+              Atribuir PIN Padrão (DDMMAA)
+              {ativosSemPin > 0 && (
+                <span className="ml-1.5 bg-amber-200 text-amber-900 font-bold text-[10px] px-1.5 py-0.2 rounded-full border border-amber-300">
+                  {ativosSemPin} sem PIN
+                </span>
+              )}
+            </Button>
+
+            <Button
+              onClick={() => navigate('/admin/funcionarios/novo')}
+              className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-4 shadow-sm shrink-0 border-0 hover:brightness-110"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Novo Funcionário
+            </Button>
+          </div>
         </div>
 
         {/* Filters and Search Bar */}
@@ -490,6 +586,147 @@ export default function FuncionariosList() {
           </>
         )}
       </div>
+      {/* Modal Atribuição de PIN Padrão em Massa */}
+      <Dialog open={pinMassaModalOpen} onOpenChange={setPinMassaModalOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 text-[#D4AF37] flex items-center justify-center mb-2">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <DialogTitle>Atribuição de PIN Padrão em Massa</DialogTitle>
+            <DialogDescription>
+              Define automaticamente o PIN padrão baseado na data de nascimento (6 dígitos: DDMMAA)
+              para todos os colaboradores ativos que ainda não possuem PIN cadastrado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1.5 text-xs text-amber-950">
+              <p className="font-bold flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                Regra do PIN Padrão MH MIXX:
+              </p>
+              <p className="text-slate-700">
+                O PIN de 6 dígitos é derivado da data de nascimento (ex.: nascido em 13/10/1970 →
+                PIN <strong>131070</strong>). O terminal autentica exclusivamente pelo PIN (sem
+                necessidade de matrícula).
+              </p>
+              <p className="text-slate-700 font-semibold pt-1">
+                Colaboradores ativos atualmente sem PIN:{' '}
+                <span className="text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded font-bold">
+                  {ativosSemPin}
+                </span>
+              </p>
+            </div>
+
+            {/* Resultado do processamento */}
+            {resultadoPinMassa && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <span className="text-emerald-700 font-bold block text-lg">
+                      {resultadoPinMassa.atualizadosCount}
+                    </span>
+                    <span className="text-slate-600 text-[11px]">PINs Atribuídos</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                    <span className="text-slate-700 font-bold block text-lg">
+                      {resultadoPinMassa.jaPossuemPinCount}
+                    </span>
+                    <span className="text-slate-600 text-[11px]">Já Possuíam PIN</span>
+                  </div>
+                  <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
+                    <span className="text-red-700 font-bold block text-lg">
+                      {resultadoPinMassa.colisoesCount}
+                    </span>
+                    <span className="text-slate-600 text-[11px]">Colisões</span>
+                  </div>
+                </div>
+
+                {/* Colisões se houver */}
+                {resultadoPinMassa.colisoesCount > 0 && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl space-y-2 text-xs">
+                    <div className="flex items-center gap-1.5 text-red-800 font-bold">
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>Colisões detectadas (PIN não aplicado):</span>
+                    </div>
+                    <p className="text-slate-600 text-[11px]">
+                      Como a unicidade de PIN é obrigatória no terminal, o PIN padrão não pôde ser
+                      atribuído aos colaboradores abaixo para evitar duplicidade:
+                    </p>
+                    <ul className="divide-y divide-red-200 border-t border-red-200 pt-1 text-[11px] space-y-1">
+                      {resultadoPinMassa.colisoes.map((c, i) => (
+                        <li key={i} className="pt-1 text-red-900">
+                          <strong>{c.nome}</strong> (Matr. {c.matricula}) — Tentou PIN{' '}
+                          {c.pinTentado}, colide com {c.conflitoCom}.
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Sem data de nascimento */}
+                {resultadoPinMassa.semDataNascimentoCount > 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1 text-xs text-amber-950">
+                    <p className="font-semibold">
+                      Sem data de nascimento preenchida no cadastro (
+                      {resultadoPinMassa.semDataNascimentoCount}):
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      {resultadoPinMassa.semDataNascimento
+                        .map((s) => `${s.nome} (${s.matricula})`)
+                        .join(', ')}
+                    </p>
+                  </div>
+                )}
+
+                {/* Lista dos atualizados */}
+                {resultadoPinMassa.atualizadosCount > 0 && (
+                  <div className="max-h-44 overflow-y-auto border border-emerald-200 rounded-xl p-3 bg-emerald-50/40 space-y-1.5 text-xs">
+                    <span className="font-bold text-emerald-900 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Colaboradores atualizados:
+                    </span>
+                    <ul className="text-[11px] text-slate-700 divide-y divide-emerald-100">
+                      {resultadoPinMassa.atualizados.map((a) => (
+                        <li key={a.id} className="py-1 flex items-center justify-between">
+                          <span>
+                            <strong>{a.nome}</strong> (Matrícula: {a.matricula})
+                          </span>
+                          <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-emerald-300 text-emerald-800 font-bold">
+                            PIN: {a.pinGerado}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 border-t border-slate-100 flex items-center justify-between sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={executandoPinMassa}
+              onClick={() => setPinMassaModalOpen(false)}
+            >
+              {resultadoPinMassa ? 'Fechar' : 'Cancelar'}
+            </Button>
+            <Button
+              type="button"
+              disabled={executandoPinMassa || ativosSemPin === 0}
+              onClick={handleExecutarPinPadraoMassa}
+              className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
+            >
+              {executandoPinMassa
+                ? 'Processando PINs...'
+                : `Aplicar PIN Padrão (${ativosSemPin} sem PIN)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

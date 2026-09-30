@@ -13,7 +13,26 @@ import type { Cargo, Departamento, Jornada, Funcionario } from '@/types/rh'
 import { maskCPF, maskPhone, isValidCPF, cleanDigits } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowLeft, Save, User, Briefcase, Upload, AlertCircle, Plus, KeyRound } from 'lucide-react'
+import {
+  ArrowLeft,
+  Save,
+  User,
+  Briefcase,
+  Upload,
+  AlertCircle,
+  Plus,
+  KeyRound,
+  DollarSign,
+  FileCheck2,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react'
+import {
+  derivarPinDataNascimento,
+  calcularProximaMatricula,
+  formatBRCurrency,
+  formatBRDate,
+} from '@/lib/formatters'
 import { terminalService } from '@/services/rh'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +60,8 @@ export default function FuncionarioForm() {
   const { toast } = useToast()
   const { user } = useAuth()
 
-  const [activeTab, setActiveTab] = useState<'pessoais' | 'profissionais'>('pessoais')
+  const isAdmin = user?.role === 'admin'
+  const [activeTab, setActiveTab] = useState<'pessoais' | 'profissionais' | 'contrato'>('pessoais')
   const [loadingInitial, setLoadingInitial] = useState(isEditing)
   const [saving, setSaving] = useState(false)
 
@@ -79,16 +99,27 @@ export default function FuncionarioForm() {
   const [situacao, setSituacao] = useState<string>('ativo')
   const [dataDesligamento, setDataDesligamento] = useState('')
 
+  // Form Fields - Salário e Contrato (Apenas Admin)
+  const [salarioContratual, setSalarioContratual] = useState<number | ''>('')
+  const [salarioOriginal, setSalarioOriginal] = useState<number>(0)
+  const [motivoAlteracaoSalarial, setMotivoAlteracaoSalarial] = useState('')
+  const [dataInicioContrato, setDataInicioContrato] = useState('')
+  const [tipoContrato, setTipoContrato] = useState<string>('CLT')
+
+  // Flag se o PIN foi editado manualmente pelo usuário no formulário
+  const [pinEditadoManualmente, setPinEditadoManualmente] = useState(false)
+
   // Field Errors
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     async function loadRefsAndData() {
       try {
-        const [deps, cargs, jorns] = await Promise.all([
+        const [deps, cargs, jorns, allFuncs] = await Promise.all([
           departamentosService.list(),
           cargosService.list(),
           jornadasService.list(true),
+          funcionariosService.listAll(),
         ])
         setDepartamentos(deps)
         setCargos(cargs)
@@ -98,19 +129,30 @@ export default function FuncionarioForm() {
           const func = await funcionariosService.getById(id)
           setNome(func.nome || '')
           setCpf(maskCPF(func.cpf || ''))
-          setDataNascimento(func.data_nascimento ? func.data_nascimento.split('T')[0] : '')
+          const dtNasc = func.data_nascimento ? func.data_nascimento.split('T')[0] : ''
+          setDataNascimento(dtNasc)
           setTelefone(maskPhone(func.telefone || ''))
           setEmail(func.email || '')
           setEndereco(func.endereco || '')
           setContatoEmergencia(func.contato_emergencia || '')
           setMatricula(func.matricula || '')
-          setDataAdmissao(func.data_admissao ? func.data_admissao.split('T')[0] : '')
+          const dtAdm = func.data_admissao ? func.data_admissao.split('T')[0] : ''
+          setDataAdmissao(dtAdm)
           setCargoId(func.cargo || '')
           setDepartamentoId(func.departamento || '')
           setTipoVinculo(func.tipo_vinculo || 'CLT')
           setJornadaId(func.jornada_atual || '')
           setSituacao(func.situacao || 'ativo')
           setDataDesligamento(func.data_desligamento ? func.data_desligamento.split('T')[0] : '')
+
+          // Salário e contrato
+          const sal = func.salario_contratual !== undefined ? Number(func.salario_contratual) : 0
+          setSalarioContratual(sal > 0 ? sal : '')
+          setSalarioOriginal(sal)
+          setDataInicioContrato(
+            func.data_inicio_contrato ? func.data_inicio_contrato.split('T')[0] : dtAdm,
+          )
+          setTipoContrato(func.tipo_contrato || func.tipo_vinculo || 'CLT')
 
           if (func.fotografia) {
             setFotoPreview(pb.files.getURL(func, func.fotografia))
@@ -120,7 +162,14 @@ export default function FuncionarioForm() {
           if (cargs.length > 0) setCargoId(cargs[0].id)
           if (deps.length > 0) setDepartamentoId(deps[0].id)
           if (jorns.length > 0) setJornadaId(jorns[0].id)
-          setDataAdmissao(new Date().toISOString().split('T')[0])
+          const hojeIso = new Date().toISOString().split('T')[0]
+          setDataAdmissao(hojeIso)
+          setDataInicioContrato(hojeIso)
+
+          // 2) Matrícula sequencial automática pré-preenchida
+          const matriculas = allFuncs.map((f) => f.matricula).filter(Boolean)
+          const proxima = calcularProximaMatricula(matriculas)
+          setMatricula(proxima)
         }
       } catch (err) {
         console.error('Erro ao carregar dados do formulário:', err)
@@ -136,6 +185,18 @@ export default function FuncionarioForm() {
 
     loadRefsAndData()
   }, [id, isEditing])
+
+  // Atualiza automaticamente o PIN padrão derivado da data de nascimento (se o usuário não tiver customizado manualmente)
+  const handleDataNascimentoChange = (novaData: string) => {
+    setDataNascimento(novaData)
+    if (!isEditing && !pinEditadoManualmente && novaData) {
+      const pinSugerido = derivarPinDataNascimento(novaData)
+      if (pinSugerido) {
+        setPinInicial(pinSugerido)
+        setConfirmaPinInicial(pinSugerido)
+      }
+    }
+  }
 
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -267,6 +328,18 @@ export default function FuncionarioForm() {
         formData.append('data_desligamento', '')
       }
 
+      // Salário e contrato (apenas gravado quando o usuário for admin)
+      if (isAdmin) {
+        const salNum = salarioContratual === '' ? 0 : Number(salarioContratual)
+        formData.append('salario_contratual', String(salNum))
+        if (dataInicioContrato) {
+          formData.append('data_inicio_contrato', dataInicioContrato)
+        }
+        if (tipoContrato) {
+          formData.append('tipo_contrato', tipoContrato)
+        }
+      }
+
       if (fotoFile) {
         formData.append('fotografia', fotoFile)
       }
@@ -275,6 +348,8 @@ export default function FuncionarioForm() {
 
       if (isEditing && id) {
         await funcionariosService.update(id, formData)
+
+        // Registrar no histórico e auditoria
         await historicoService.create({
           funcionario: id,
           tipo: 'edicao',
@@ -282,6 +357,34 @@ export default function FuncionarioForm() {
           data: new Date().toISOString(),
           usuario_responsavel: user?.id,
         })
+
+        // Se o admin alterou o salário contratual, registrar no histórico salarial e auditoria
+        const salNum = salarioContratual === '' ? 0 : Number(salarioContratual)
+        if (isAdmin && salNum !== salarioOriginal) {
+          const descSalarial = `Alteração salarial de ${formatBRCurrency(salarioOriginal)} para ${formatBRCurrency(salNum)} na edição da ficha. Motivo: ${motivoAlteracaoSalarial.trim() || 'Ajuste contratual'}`
+          await historicoService.create({
+            funcionario: id,
+            tipo: 'alteracao_salarial',
+            descricao: descSalarial,
+            data: new Date().toISOString(),
+            usuario_responsavel: user?.id,
+          })
+
+          // Auditoria sensível
+          try {
+            await pb.collection('logs_auditoria').create({
+              usuario: user?.id,
+              acao: 'alteracao_salarial',
+              entidade: 'funcionarios',
+              entidade_id: id,
+              detalhes: descSalarial,
+              nivel: 'sensivel',
+              data: new Date().toISOString(),
+            })
+          } catch (auditErr) {
+            console.log('Erro ao gravar log de auditoria salarial:', auditErr)
+          }
+        }
       } else {
         // Create new employee
         const created = await funcionariosService.create(formData)
@@ -335,6 +438,18 @@ export default function FuncionarioForm() {
           data: new Date().toISOString(),
           usuario_responsavel: user?.id,
         })
+
+        // Se cadastrou com salário inicial
+        const salNum = salarioContratual === '' ? 0 : Number(salarioContratual)
+        if (isAdmin && salNum > 0) {
+          await historicoService.create({
+            funcionario: created.id,
+            tipo: 'alteracao_salarial',
+            descricao: `Salário contratual inicial definido em ${formatBRCurrency(salNum)}.`,
+            data: new Date().toISOString(),
+            usuario_responsavel: user?.id,
+          })
+        }
       }
 
       toast({
@@ -427,6 +542,24 @@ export default function FuncionarioForm() {
             <Briefcase className="w-4 h-4 text-[#D4AF37]" />
             Dados Profissionais
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('contrato')}
+              className={`pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors duration-150 shrink-0 ${
+                activeTab === 'contrato'
+                  ? 'border-[#D4AF37] text-slate-900 font-bold'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <DollarSign className="w-4 h-4 text-[#D4AF37]" />
+              Salário e Contrato
+              <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold px-1.5 py-0.2 rounded">
+                Admin
+              </span>
+            </button>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="p-6">
@@ -539,9 +672,15 @@ export default function FuncionarioForm() {
                     id="dataNascimento"
                     type="date"
                     value={dataNascimento}
-                    onChange={(e) => setDataNascimento(e.target.value)}
+                    onChange={(e) => handleDataNascimentoChange(e.target.value)}
                     className="h-10 text-xs sm:text-sm"
                   />
+                  {dataNascimento && !isEditing && (
+                    <p className="text-[11px] text-[#854d0e] flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+                      PIN padrão sugerido: {derivarPinDataNascimento(dataNascimento) || 'DDMMAA'}
+                    </p>
+                  )}
                 </div>
 
                 {/* Telefone */}
@@ -632,9 +771,16 @@ export default function FuncionarioForm() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Matrícula */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="matricula" className="text-xs font-semibold text-slate-700">
-                    Número de Matrícula <span className="text-red-500">*</span>
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="matricula" className="text-xs font-semibold text-slate-700">
+                      Número de Matrícula <span className="text-red-500">*</span>
+                    </Label>
+                    {!isEditing && (
+                      <span className="text-[10px] text-amber-900 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-medium">
+                        Sequencial sugerido
+                      </span>
+                    )}
+                  </div>
                   <Input
                     id="matricula"
                     required
@@ -768,31 +914,59 @@ export default function FuncionarioForm() {
               {/* PIN Inicial do Terminal (quando for novo funcionário) */}
               {!isEditing && (
                 <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <KeyRound className="w-4 h-4 text-[#D4AF37]" />
-                    <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      PIN do Terminal Coletivo (Opcional no cadastro)
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="w-4 h-4 text-[#D4AF37]" />
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        PIN do Terminal Coletivo (Padrão: Data de Nascimento DDMMAA)
+                      </span>
+                    </div>
+                    {dataNascimento && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const p = derivarPinDataNascimento(dataNascimento)
+                          if (p) {
+                            setPinInicial(p)
+                            setConfirmaPinInicial(p)
+                            setPinEditadoManualmente(false)
+                            toast({
+                              title: 'PIN padrão aplicado',
+                              description: `PIN preenchido como ${p} (DDMMAA)`,
+                            })
+                          }
+                        }}
+                        className="text-[11px] h-7 text-[#854d0e] hover:bg-amber-100"
+                      >
+                        <Sparkles className="w-3 h-3 mr-1 text-[#D4AF37]" />
+                        Usar data de nascimento (
+                        {derivarPinDataNascimento(dataNascimento) || 'DDMMAA'})
+                      </Button>
+                    )}
                   </div>
                   <p className="text-xs text-slate-600">
-                    Defina agora ou posteriormente o código numérico de 4 a 6 dígitos para o
-                    colaborador bater ponto no terminal.
+                    Por padrão do sistema, o PIN inicial é sugerido automaticamente com a data de
+                    nascimento do colaborador em 6 dígitos (DDMMAA). O PIN continua editável e é
+                    armazenado com hash criptográfico seguro.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                     <div className="space-y-1.5">
                       <Label htmlFor="pinInicial" className="text-xs font-semibold text-slate-700">
-                        PIN (4 a 6 dígitos numéricos)
+                        PIN (6 dígitos numéricos DDMMAA)
                       </Label>
                       <Input
                         id="pinInicial"
                         type="password"
                         inputMode="numeric"
                         maxLength={6}
-                        placeholder="Ex: 1234"
+                        placeholder="Ex: 131070"
                         value={pinInicial}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          setPinEditadoManualmente(true)
                           setPinInicial(e.target.value.replace(/\D/g, '').slice(0, 6))
-                        }
+                        }}
                         className={`h-10 text-xs sm:text-sm font-mono tracking-widest bg-white ${
                           errors.pin ? 'border-red-400 focus-visible:ring-red-400' : ''
                         }`}
@@ -817,7 +991,7 @@ export default function FuncionarioForm() {
                         type="password"
                         inputMode="numeric"
                         maxLength={6}
-                        placeholder="Ex: 1234"
+                        placeholder="Ex: 131070"
                         value={confirmaPinInicial}
                         onChange={(e) =>
                           setConfirmaPinInicial(e.target.value.replace(/\D/g, '').slice(0, 6))
@@ -919,6 +1093,166 @@ export default function FuncionarioForm() {
                 >
                   Voltar para Dados Pessoais
                 </Button>
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setActiveTab('contrato')}
+                      className="text-xs border-slate-200"
+                    >
+                      Avançar para Salário e Contrato
+                    </Button>
+                  )}
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-10 px-5 shadow-sm border-0 hover:brightness-110"
+                  >
+                    <Save className="w-4 h-4 mr-1.5" />
+                    {saving
+                      ? 'Salvando...'
+                      : isEditing
+                        ? 'Salvar Alterações'
+                        : 'Cadastrar Funcionário'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: SALÁRIO E CONTRATO (ADMIN ONLY) */}
+          {isAdmin && activeTab === 'contrato' && (
+            <div className="space-y-6">
+              <div className="p-4 bg-amber-50/60 border border-amber-200 rounded-xl flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-[#D4AF37] shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-950 space-y-1">
+                  <p className="font-bold uppercase tracking-wider">
+                    Área Restrita aos Administradores
+                  </p>
+                  <p className="text-slate-600">
+                    Os valores salariais e termos contratuais são estritamente sigilosos e nunca são
+                    exibidos para colaboradores comuns nem no Portal do Colaborador. Todas as
+                    alterações salariais são auditadas e registradas no histórico salarial do
+                    funcionário.
+                  </p>
+                </div>
+              </div>
+
+              {/* Salário, Tipo de Contrato, Início do Contrato */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Salário Contratual */}
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="salarioContratual"
+                    className="text-xs font-semibold text-slate-700"
+                  >
+                    Salário Contratual (R$)
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                      R$
+                    </span>
+                    <Input
+                      id="salarioContratual"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0,00"
+                      value={salarioContratual}
+                      onChange={(e) =>
+                        setSalarioContratual(e.target.value === '' ? '' : Number(e.target.value))
+                      }
+                      className="pl-9 h-10 text-xs sm:text-sm font-mono"
+                    />
+                  </div>
+                  {isEditing && salarioOriginal > 0 && (
+                    <p className="text-[11px] text-slate-500">
+                      Salário atual gravado: {formatBRCurrency(salarioOriginal)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Tipo de Contrato */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Tipo de Contrato</Label>
+                  <Select
+                    value={tipoContrato}
+                    onValueChange={(val) => {
+                      setTipoContrato(val)
+                      // Sincroniza opcionalmente com tipoVinculo se estiver idêntico
+                      if (val) setTipoVinculo(val)
+                    }}
+                  >
+                    <SelectTrigger className="h-10 text-xs sm:text-sm border-slate-200">
+                      <SelectValue placeholder="Selecione o contrato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CLT">CLT (Consolidação das Leis do Trabalho)</SelectItem>
+                      <SelectItem value="Estágio">Termo de Compromisso de Estágio</SelectItem>
+                      <SelectItem value="PJ">Prestação de Serviços (PJ)</SelectItem>
+                      <SelectItem value="Terceirizado">Contrato Terceirizado</SelectItem>
+                      <SelectItem value="Aprendiz">Contrato de Aprendizagem</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Data de Início do Contrato */}
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="dataInicioContrato"
+                    className="text-xs font-semibold text-slate-700"
+                  >
+                    Início da Vigência Contratual
+                  </Label>
+                  <Input
+                    id="dataInicioContrato"
+                    type="date"
+                    value={dataInicioContrato}
+                    onChange={(e) => setDataInicioContrato(e.target.value)}
+                    className="h-10 text-xs sm:text-sm"
+                  />
+                  <p className="text-[11px] text-slate-400">
+                    Geralmente idêntico à data de admissão ({formatBRDate(dataAdmissao) || '—'}).
+                  </p>
+                </div>
+              </div>
+
+              {/* Justificativa / Motivo da alteração salarial (se em edição e salário foi alterado) */}
+              {isEditing &&
+                salarioContratual !== '' &&
+                Number(salarioContratual) !== salarioOriginal && (
+                  <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2">
+                    <Label
+                      htmlFor="motivoAlteracaoSalarial"
+                      className="text-xs font-semibold text-blue-900"
+                    >
+                      Justificativa / Motivo do Reajuste Salarial (Obrigatório para Auditoria)
+                    </Label>
+                    <Input
+                      id="motivoAlteracaoSalarial"
+                      placeholder="Ex: Dissídio anual, promoção de cargo, mérito profissional..."
+                      value={motivoAlteracaoSalarial}
+                      onChange={(e) => setMotivoAlteracaoSalarial(e.target.value)}
+                      className="h-10 text-xs sm:text-sm bg-white"
+                    />
+                    <p className="text-[11px] text-blue-700">
+                      Esta informação será gravada no histórico salarial do funcionário e nos logs
+                      de auditoria.
+                    </p>
+                  </div>
+                )}
+
+              {/* Bottom Actions */}
+              <div className="pt-6 flex items-center justify-between border-t border-slate-100">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setActiveTab('profissionais')}
+                  className="text-xs border-slate-200"
+                >
+                  Voltar para Dados Profissionais
+                </Button>
                 <Button
                   type="submit"
                   disabled={saving}
@@ -928,9 +1262,9 @@ export default function FuncionarioForm() {
                   {saving
                     ? 'Salvando...'
                     : isEditing
-                      ? 'Salvar Alterações'
+                      ? 'Salvar Alterações Contratuais'
                       : 'Cadastrar Funcionário'}
-                </Button>{' '}
+                </Button>
               </div>
             </div>
           )}

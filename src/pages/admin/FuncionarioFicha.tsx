@@ -18,7 +18,13 @@ import type {
   Documento,
 } from '@/types/rh'
 import pb from '@/lib/pocketbase/client'
-import { formatBRDate, formatBRCurrency, maskCPF, maskPhone } from '@/lib/formatters'
+import {
+  formatBRDate,
+  formatBRCurrency,
+  maskCPF,
+  maskPhone,
+  derivarPinDataNascimento,
+} from '@/lib/formatters'
 import { useToast } from '@/hooks/use-toast'
 import {
   ArrowLeft,
@@ -661,8 +667,9 @@ export default function FuncionarioFicha() {
                     <Button
                       type="button"
                       onClick={() => {
-                        setNovoPin('')
-                        setConfirmaPin('')
+                        const pinPadrao = derivarPinDataNascimento(funcionario.data_nascimento)
+                        setNovoPin(pinPadrao)
+                        setConfirmaPin(pinPadrao)
                         setPinError(null)
                         setPinModalOpen(true)
                       }}
@@ -1832,7 +1839,7 @@ export default function FuncionarioFicha() {
             </div>
             <DialogTitle>PIN do Terminal Coletivo</DialogTitle>
             <DialogDescription>
-              Defina ou atualize o PIN exclusivo de 4 a 6 dígitos para{' '}
+              Defina ou atualize o PIN exclusivo de 6 dígitos para{' '}
               <strong>{funcionario.nome}</strong>. Como o terminal registra o ponto apenas pelo PIN
               (sem matrícula), este código deve ser único entre os colaboradores ativos e armazenado
               com hash criptográfico.
@@ -1847,9 +1854,37 @@ export default function FuncionarioFicha() {
               </div>
             )}
 
+            {funcionario.data_nascimento && (
+              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-lg flex items-center justify-between gap-2">
+                <div className="text-xs text-amber-950">
+                  <span className="font-semibold block">
+                    PIN Padrão: Data de Nascimento (DDMMAA)
+                  </span>
+                  <span className="text-slate-600 font-mono">
+                    {derivarPinDataNascimento(funcionario.data_nascimento) || 'Indisponível'}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const padrao = derivarPinDataNascimento(funcionario.data_nascimento)
+                    if (padrao) {
+                      setNovoPin(padrao)
+                      setConfirmaPin(padrao)
+                    }
+                  }}
+                  className="text-xs h-7 border-amber-300 text-amber-900 hover:bg-amber-100"
+                >
+                  Preencher Padrão
+                </Button>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label htmlFor="novoPinInput" className="text-xs font-semibold">
-                Novo PIN (4 a 6 dígitos numéricos) <span className="text-red-500">*</span>
+                Novo PIN (6 dígitos numéricos DDMMAA) <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="novoPinInput"
@@ -1896,7 +1931,7 @@ export default function FuncionarioFicha() {
                 disabled={salvandoPin || !novoPin || !confirmaPin}
                 className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
               >
-                {salvandoDoc ? 'Enviando...' : 'Fazer Upload'}
+                {salvandoPin ? 'Salvando...' : 'Salvar Novo PIN'}
               </Button>{' '}
             </DialogFooter>
           </form>

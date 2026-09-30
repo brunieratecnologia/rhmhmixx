@@ -99,6 +99,7 @@ export interface Funcionario {
   salario_contratual?: number
   data_inicio_contrato?: string
   tipo_contrato?: 'CLT' | 'Estágio' | 'PJ' | 'Terceirizado' | 'Aprendiz'
+  pin_hash?: string
   created: string
   updated: string
   expand?: {

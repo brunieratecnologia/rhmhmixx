@@ -204,3 +204,68 @@ export function isValidCPF(cpf: string): boolean {
 
   return true
 }
+
+/**
+ * Deriva PIN padrão de 6 dígitos a partir da data de nascimento (DDMMAA).
+ * Exemplo: 13/10/1970 ou 1970-10-13 -> "131070"
+ */
+export function derivarPinDataNascimento(dataNascimento: string | null | undefined): string {
+  if (!dataNascimento) return ''
+  const dateOnly = dataNascimento.split('T')[0].trim()
+  if (!dateOnly) return ''
+
+  // Caso esteja no formato YYYY-MM-DD
+  if (dateOnly.includes('-')) {
+    const parts = dateOnly.split('-')
+    if (parts.length >= 3) {
+      const [yyyy, mm, dd] = parts
+      const aa = yyyy.slice(-2)
+      const pin = `${dd.padStart(2, '0')}${mm.padStart(2, '0')}${aa.padStart(2, '0')}`
+      return /^\d{6}$/.test(pin) ? pin : ''
+    }
+  }
+
+  // Caso esteja no formato DD/MM/YYYY
+  if (dateOnly.includes('/')) {
+    const parts = dateOnly.split('/')
+    if (parts.length >= 3) {
+      const [dd, mm, yyyy] = parts
+      const aa = yyyy.slice(-2)
+      const pin = `${dd.padStart(2, '0')}${mm.padStart(2, '0')}${aa.padStart(2, '0')}`
+      return /^\d{6}$/.test(pin) ? pin : ''
+    }
+  }
+
+  return ''
+}
+
+/**
+ * Calcula a próxima matrícula sequencial com base nas matrículas existentes.
+ * Preserva o padding de zeros à esquerda (ex.: se a maior for "002", sugere "003").
+ */
+export function calcularProximaMatricula(matriculasExistentes: string[]): string {
+  if (!matriculasExistentes || matriculasExistentes.length === 0) {
+    return '001'
+  }
+
+  let maxNum = 0
+  let maxLen = 3
+
+  for (const m of matriculasExistentes) {
+    if (!m) continue
+    const trimmed = m.trim()
+    const match = trimmed.match(/\d+/)
+    if (match) {
+      const num = parseInt(match[0], 10)
+      if (!isNaN(num)) {
+        if (num > maxNum) {
+          maxNum = num
+          maxLen = Math.max(match[0].length, 3)
+        }
+      }
+    }
+  }
+
+  const nextNum = maxNum + 1
+  return String(nextNum).padStart(maxLen, '0')
+}

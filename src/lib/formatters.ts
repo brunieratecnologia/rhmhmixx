@@ -209,6 +209,22 @@ export function isValidCPF(cpf: string): boolean {
  * Deriva PIN padrão de 6 dígitos a partir da data de nascimento (DDMMAA).
  * Exemplo: 13/10/1970 ou 1970-10-13 -> "131070"
  */
+/**
+ * Extrai YYYY-MM-DD para preenchimento de <input type="date">.
+ * Suporta formatos retornados pelo PocketBase ("1995-03-09 00:00:00.000Z"),
+ * ISO 8601 ("1995-03-09T00:00:00.000Z") e strings já simples ("1995-03-09").
+ * Retorna string vazia se inválido ou nulo.
+ */
+export function toDateInputValue(dateStr?: string | null): string {
+  if (!dateStr) return ''
+  const trimmed = dateStr.trim()
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/)
+  if (match) {
+    return match[1]
+  }
+  return ''
+}
+
 export function derivarPinDataNascimento(dataNascimento: string | null | undefined): string {
   if (!dataNascimento) return ''
   const dateOnly = dataNascimento.split('T')[0].trim()

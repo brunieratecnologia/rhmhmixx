@@ -32,6 +32,7 @@ import {
   calcularProximaMatricula,
   formatBRCurrency,
   formatBRDate,
+  toDateInputValue,
 } from '@/lib/formatters'
 import { ScrollableTabsBar } from '@/components/admin/ScrollableTabsBar'
 import { terminalService } from '@/services/rh'
@@ -130,29 +131,27 @@ export default function FuncionarioForm() {
           const func = await funcionariosService.getById(id)
           setNome(func.nome || '')
           setCpf(maskCPF(func.cpf || ''))
-          const dtNasc = func.data_nascimento ? func.data_nascimento.split('T')[0] : ''
+          const dtNasc = toDateInputValue(func.data_nascimento)
           setDataNascimento(dtNasc)
           setTelefone(maskPhone(func.telefone || ''))
           setEmail(func.email || '')
           setEndereco(func.endereco || '')
           setContatoEmergencia(func.contato_emergencia || '')
           setMatricula(func.matricula || '')
-          const dtAdm = func.data_admissao ? func.data_admissao.split('T')[0] : ''
+          const dtAdm = toDateInputValue(func.data_admissao)
           setDataAdmissao(dtAdm)
           setCargoId(func.cargo || '')
           setDepartamentoId(func.departamento || '')
           setTipoVinculo(func.tipo_vinculo || 'CLT')
           setJornadaId(func.jornada_atual || '')
           setSituacao(func.situacao || 'ativo')
-          setDataDesligamento(func.data_desligamento ? func.data_desligamento.split('T')[0] : '')
+          setDataDesligamento(toDateInputValue(func.data_desligamento))
 
           // Salário e contrato
           const sal = func.salario_contratual !== undefined ? Number(func.salario_contratual) : 0
           setSalarioContratual(sal > 0 ? sal : '')
           setSalarioOriginal(sal)
-          setDataInicioContrato(
-            func.data_inicio_contrato ? func.data_inicio_contrato.split('T')[0] : dtAdm,
-          )
+          setDataInicioContrato(toDateInputValue(func.data_inicio_contrato) || dtAdm)
           setTipoContrato(func.tipo_contrato || func.tipo_vinculo || 'CLT')
 
           if (func.fotografia) {
@@ -311,20 +310,23 @@ export default function FuncionarioForm() {
       const formData = new FormData()
       formData.append('nome', nome.trim())
       formData.append('cpf', cleanDigits(cpf))
-      if (dataNascimento) formData.append('data_nascimento', dataNascimento)
+      const dataNascNorm = toDateInputValue(dataNascimento)
+      if (dataNascNorm) formData.append('data_nascimento', dataNascNorm)
       formData.append('telefone', telefone.trim())
       formData.append('email', email.trim().toLowerCase())
       formData.append('endereco', endereco.trim())
       formData.append('contato_emergencia', contatoEmergencia.trim())
       formData.append('matricula', matricula.trim().toUpperCase())
-      formData.append('data_admissao', dataAdmissao)
+      const dataAdmNorm = toDateInputValue(dataAdmissao)
+      if (dataAdmNorm) formData.append('data_admissao', dataAdmNorm)
       formData.append('cargo', cargoId)
       formData.append('departamento', departamentoId)
       formData.append('tipo_vinculo', tipoVinculo)
       formData.append('jornada_atual', jornadaId)
       formData.append('situacao', situacao)
-      if (situacao === 'desligado' && dataDesligamento) {
-        formData.append('data_desligamento', dataDesligamento)
+      const dataDesligNorm = toDateInputValue(dataDesligamento)
+      if (situacao === 'desligado' && dataDesligNorm) {
+        formData.append('data_desligamento', dataDesligNorm)
       } else {
         formData.append('data_desligamento', '')
       }
@@ -333,8 +335,9 @@ export default function FuncionarioForm() {
       if (isAdmin) {
         const salNum = salarioContratual === '' ? 0 : Number(salarioContratual)
         formData.append('salario_contratual', String(salNum))
-        if (dataInicioContrato) {
-          formData.append('data_inicio_contrato', dataInicioContrato)
+        const dataInicioNorm = toDateInputValue(dataInicioContrato)
+        if (dataInicioNorm) {
+          formData.append('data_inicio_contrato', dataInicioNorm)
         }
         if (tipoContrato) {
           formData.append('tipo_contrato', tipoContrato)

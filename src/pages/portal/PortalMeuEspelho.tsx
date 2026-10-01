@@ -9,6 +9,7 @@ import {
   minutesToTimeString,
   minutesToSignedString,
 } from '@/lib/calculoHoras'
+import { formatBRDate } from '@/lib/formatters'
 import { FileCheck2, Calendar, ChevronLeft, ChevronRight, Clock, Send, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -240,7 +241,7 @@ export default function PortalMeuEspelho() {
                         }`}
                       >
                         <td className="py-2.5 px-4 font-mono font-medium text-slate-200">
-                          <span>{dia.data.split('-').reverse().join('/')}</span>
+                          <span>{formatBRDate(dia.data)}</span>
                           <span className="text-[10px] text-slate-500 ml-1.5 uppercase font-sans">
                             {dia.diaSemana}
                           </span>

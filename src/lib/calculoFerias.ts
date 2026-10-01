@@ -410,8 +410,10 @@ export function validarRegrasFerias(params: {
     if (!fIni || !fFim) continue
     // Sobreposição ocorre se ini <= fFim && fim >= fIni
     if (iniStr <= fFim && fimStr >= fIni) {
+      const [y1, m1, d1] = fIni.split('-')
+      const [y2, m2, d2] = fFim.split('-')
       erros.push(
-        `Existe sobreposição com período já cadastrado (${fIni.split('-').reverse().join('/')} a ${fFim.split('-').reverse().join('/')}).`,
+        `Existe sobreposição com período já cadastrado (${d1}/${m1}/${y1} a ${d2}/${m2}/${y2}).`,
       )
     }
   }
@@ -453,8 +455,10 @@ export function validarRegrasFerias(params: {
   if (periodoAquisitivo && periodoAquisitivo.limiteConcessivo) {
     const limSafe = sanitizarDataISO(periodoAquisitivo.limiteConcessivo)
     if (limSafe && fimStr > limSafe) {
+      const [yf, mf, df] = fimStr.split('-')
+      const [yl, ml, dl] = limSafe.split('-')
       avisos.push(
-        `Atenção: O término destas férias (${fimStr.split('-').reverse().join('/')}) ultrapassa o limite concessivo legal (${limSafe.split('-').reverse().join('/')}).`,
+        `Atenção: O término destas férias (${df}/${mf}/${yf}) ultrapassa o limite concessivo legal (${dl}/${ml}/${yl}).`,
       )
     }
   }

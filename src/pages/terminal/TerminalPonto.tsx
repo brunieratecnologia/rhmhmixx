@@ -15,6 +15,8 @@ import {
   ArrowRight,
   KeyRound,
   ShieldCheck,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -23,6 +25,7 @@ export default function TerminalPonto() {
   const [terminalInfo, setTerminalInfo] = useState<TerminalInfo | null>(null)
   const [isOnline, setIsOnline] = useState<boolean>(true)
   const [checkingConnection, setCheckingConnection] = useState<boolean>(false)
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
 
   // Clock offset in ms between server time (UTC) and client clock (Date.now())
   const serverOffsetRef = useRef<number>(0)
@@ -130,6 +133,72 @@ export default function TerminalPonto() {
       if (countdownTimerRef.current) clearInterval(countdownTimerRef.current)
     }
   }, [confirmation, resetForm])
+
+  // 4.1. Monitorar estado e suporte da Fullscreen API
+  useEffect(() => {
+    const checkFullscreenState = () => {
+      const doc = document as any
+      const isFs = Boolean(
+        doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement,
+      )
+      setIsFullscreen(isFs)
+    }
+
+    checkFullscreenState()
+
+    const events = [
+      'fullscreenchange',
+      'webkitfullscreenchange',
+      'mozfullscreenchange',
+      'MSFullscreenChange',
+    ]
+
+    events.forEach((evt) => document.addEventListener(evt, checkFullscreenState))
+    return () => {
+      events.forEach((evt) => document.removeEventListener(evt, checkFullscreenState))
+    }
+  }, [])
+
+  const toggleFullscreen = useCallback(async () => {
+    const doc = document as any
+    const docEl = document.documentElement as any
+
+    const isFs = Boolean(
+      doc.fullscreenElement ||
+      doc.webkitFullscreenElement ||
+      doc.mozFullScreenElement ||
+      doc.msFullscreenElement,
+    )
+
+    try {
+      if (!isFs) {
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen()
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen()
+        } else if (docEl.mozRequestFullScreen) {
+          await docEl.mozRequestFullScreen()
+        } else if (docEl.msRequestFullscreen) {
+          await docEl.msRequestFullscreen()
+        }
+      } else {
+        if (doc.exitFullscreen) {
+          await doc.exitFullscreen()
+        } else if (doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen()
+        } else if (doc.mozCancelFullScreen) {
+          await doc.mozCancelFullScreen()
+        } else if (doc.msExitFullscreen) {
+          await doc.msExitFullscreen()
+        }
+      }
+    } catch (err) {
+      console.warn('Falha ao alternar tela cheia:', err)
+    }
+  }, [])
 
   // 5. Interceptação global de teclado durante a tela de confirmação:
   // Se o próximo funcionário na fila começar a digitar seu PIN no teclado físico/numérico,
@@ -337,25 +406,48 @@ export default function TerminalPonto() {
             </div>
           </div>
 
-          {/* Large Digital Clock com Fuso de São Paulo e Hora Oficial do Servidor */}
-          <div className="flex flex-col items-end">
-            <div className="flex items-center gap-1.5 font-mono text-2xl sm:text-4xl font-extrabold text-[#D4AF37] tracking-wider drop-shadow-xs">
-              <span>{hours}</span>
-              <span className="animate-pulse text-[#E5C07B]">:</span>
-              <span>{minutes}</span>
-              <span className="animate-pulse text-[#E5C07B]">:</span>
-              <span className="text-lg sm:text-2xl text-slate-400">{seconds}</span>
+          {/* Large Digital Clock com Fuso de São Paulo, Hora Oficial do Servidor e Ação Rápida */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex flex-col items-end">
+              <div className="flex items-center gap-1.5 font-mono text-2xl sm:text-4xl font-extrabold text-[#D4AF37] tracking-wider drop-shadow-xs">
+                <span>{hours}</span>
+                <span className="animate-pulse text-[#E5C07B]">:</span>
+                <span>{minutes}</span>
+                <span className="animate-pulse text-[#E5C07B]">:</span>
+                <span className="text-lg sm:text-2xl text-slate-400">{seconds}</span>
+              </div>
+              <div className="text-[11px] sm:text-xs text-slate-400 font-medium capitalize mt-0.5">
+                {shortDateBR} • <span className="capitalize">{dateFormatted}</span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-[#D4AF37]/90 font-medium mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] inline-block animate-pulse" />
+                <span>
+                  Horário oficial (servidor) •{' '}
+                  {targetTimeZone === 'America/Sao_Paulo' ? 'São Paulo (UTC-3)' : targetTimeZone}
+                </span>
+              </div>
             </div>
-            <div className="text-[11px] sm:text-xs text-slate-400 font-medium capitalize mt-0.5">
-              {shortDateBR} • <span className="capitalize">{dateFormatted}</span>
-            </div>
-            <div className="flex items-center gap-1 text-[10px] text-[#D4AF37]/90 font-medium mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] inline-block animate-pulse" />
-              <span>
-                Horário oficial (servidor) •{' '}
-                {targetTimeZone === 'America/Sao_Paulo' ? 'São Paulo (UTC-3)' : targetTimeZone}
-              </span>
-            </div>
+
+            {/* Botão Tela Cheia no cabeçalho */}
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Sair de Tela Cheia' : 'Entrar em Tela Cheia (F11)'}
+              aria-label={isFullscreen ? 'Sair de Tela Cheia' : 'Entrar em Tela Cheia'}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-[#121824] hover:bg-[#1A2233] text-amber-200 hover:text-amber-100 border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-4 h-4 text-[#D4AF37]" />
+                  <span className="text-xs font-semibold hidden md:inline">Sair Tela Cheia</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-4 h-4 text-[#D4AF37]" />
+                  <span className="text-xs font-semibold hidden md:inline">Tela Cheia</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -646,8 +738,8 @@ export default function TerminalPonto() {
             </p>
           </div>
 
-          {/* Server Connection Status Indicator */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Server Connection Status Indicator & Fullscreen Button */}
+          <div className="flex items-center gap-2.5 shrink-0">
             {isOnline ? (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <Wifi className="w-3.5 h-3.5 text-emerald-600" />
@@ -659,6 +751,27 @@ export default function TerminalPonto() {
                 <span>Desconectado</span>
               </span>
             )}
+
+            {/* Botão Tela Cheia discreto */}
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Sair de Tela Cheia' : 'Entrar em Tela Cheia (F11)'}
+              aria-label={isFullscreen ? 'Sair de Tela Cheia' : 'Entrar em Tela Cheia'}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-semibold bg-[#121824] hover:bg-[#1A2233] text-amber-200 hover:text-amber-100 border border-[#D4AF37]/30 hover:border-[#D4AF37]/60 transition-all shadow-xs active:scale-95 cursor-pointer"
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span className="hidden sm:inline">Sair Tela Cheia</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span className="hidden sm:inline">Tela Cheia</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </footer>

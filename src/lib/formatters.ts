@@ -3,23 +3,45 @@
  */
 export function formatBRDate(dateStr?: string | null, timeZone = 'America/Sao_Paulo'): string {
   if (!dateStr) return '-'
+  const trimmed = dateStr.trim()
+  if (!trimmed) return '-'
+
   try {
-    // If it's pure YYYY-MM-DD without time or timezone, format directly without shift
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      const parts = dateStr.split('-')
-      return `${parts[2]}/${parts[1]}/${parts[0]}`
+    // 1. Data civil: se contiver formato YYYY-MM-DD (com ou sem meia-noite 00:00:00.000Z/T00:00:00Z)
+    // Extrai ano, mês e dia diretamente para evitar que o fuso local (UTC-3) desloque para o dia anterior
+    const ymdMatch = trimmed.match(
+      /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/,
+    )
+    if (ymdMatch) {
+      const [, y, m, d, hh, mm, ss] = ymdMatch
+      // Se não tiver hora ou for meia-noite exata (ex.: 00:00:00.000Z gravada pelo PocketBase para campos date),
+      // trata como data civil pura (sem hora) para não voltar 1 dia
+      const isMidnightOrDateOnly =
+        hh === undefined ||
+        (hh === '00' && (mm === '00' || mm === undefined) && (ss === '00' || ss === undefined))
+
+      if (isMidnightOrDateOnly) {
+        return `${d}/${m}/${y}`
+      }
     }
-    // If it's an ISO timestamp (e.g. UTC timestamp_utc with T or Z), format in America/Sao_Paulo
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return dateStr
+
+    // 2. Se já estiver no padrão brasileiro DD/MM/YYYY
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+      return trimmed
+    }
+
+    // 3. Se for timestamp com hora efetiva (ex.: batidas de ponto, logs, created/updated), converte com fuso oficial
+    const parsedDate = new Date(trimmed)
+    if (isNaN(parsedDate.getTime())) return trimmed
+
     return new Intl.DateTimeFormat('pt-BR', {
       timeZone,
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-    }).format(d)
+    }).format(parsedDate)
   } catch {
-    return dateStr || '-'
+    return trimmed || '-'
   }
 }
 

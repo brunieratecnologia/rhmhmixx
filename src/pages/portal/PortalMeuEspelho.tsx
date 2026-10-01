@@ -315,7 +315,20 @@ export default function PortalMeuEspelho() {
                         </td>
 
                         <td className="py-2.5 px-4 font-mono text-slate-400">
-                          {dia.previstoFormatado}
+                          {dia.ehDiaFolga ? (
+                            <span className="text-slate-500 italic text-xs">Folga</span>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-200 text-xs">
+                                {dia.previstoFormatado}
+                              </span>
+                              {dia.cargaPrevistaFormatada && (
+                                <span className="text-[10px] text-slate-400 font-sans tracking-tight">
+                                  {dia.cargaPrevistaFormatada}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         <td className="py-2.5 px-4 font-mono font-semibold text-slate-200">

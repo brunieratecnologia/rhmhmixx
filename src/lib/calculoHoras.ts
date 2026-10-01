@@ -28,7 +28,9 @@ export interface DiaEspelhoCalculado {
   diaNumero: number // 1 a 31
   jornadaPrevista: Jornada | null
   previstoMinutos: number
-  previstoFormatado: string // Ex: "08:00" ou "Folga"
+  previstoFormatado: string // Ex: "08:00 - 18:00" ou "Folga"
+  horarioPrevistoFormatado?: string // Ex: "08:00 - 18:00" ou "Folga"
+  cargaPrevistaFormatada?: string // Ex: "carga 9h" ou "carga 8h 48m"
   ehDiaFolga: boolean
   ehFeriado: boolean
   feriadoDescricao?: string
@@ -840,6 +842,23 @@ export function construirEspelhoMensal(params: {
       diaConfig?.atravessa_meia_noite || jornadaVigente?.atravessa_meia_noite,
     )
 
+    let horarioPrevistoFormatado = 'Folga'
+    let cargaPrevistaFormatada = ''
+
+    if (!ehDiaFolga) {
+      if (horaEntradaPrevista && horaSaidaPrevista) {
+        horarioPrevistoFormatado = `${horaEntradaPrevista.slice(0, 5)} - ${horaSaidaPrevista.slice(0, 5)}`
+      } else if (horaEntradaPrevista) {
+        horarioPrevistoFormatado = `A partir das ${horaEntradaPrevista.slice(0, 5)}`
+      } else {
+        horarioPrevistoFormatado = minutesToTimeString(previstoMin)
+      }
+
+      if (previstoMin > 0) {
+        cargaPrevistaFormatada = `carga ${minutesToHoursText(previstoMin)}`
+      }
+    }
+
     let horasBancoCreditoMinutos = 0
     let horasBancoDebitoMinutos = 0
     let atrasoMinutos = 0
@@ -961,7 +980,9 @@ export function construirEspelhoMensal(params: {
       diaNumero: dia,
       jornadaPrevista: jornadaVigente,
       previstoMinutos: previstoMin,
-      previstoFormatado: ehDiaFolga ? 'Folga' : minutesToTimeString(previstoMin),
+      previstoFormatado: ehDiaFolga ? 'Folga' : horarioPrevistoFormatado,
+      horarioPrevistoFormatado,
+      cargaPrevistaFormatada,
       ehDiaFolga,
       ehFeriado: false,
       marcacoesOriginais: regsDoDia,

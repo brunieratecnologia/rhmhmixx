@@ -563,18 +563,25 @@ export function executarTestesIntervaloAutomatico(): {
       feriasMes: [],
     })
 
-    // 2026-09-07 (Seg): 540 min (9h)
-    // 2026-09-11 (Sex): 480 min (8h)
+    // 2026-09-07 (Seg): 540 min (9h), horário 08:00 - 18:00
+    // 2026-09-10 (Qui): 540 min (9h), horário 08:00 - 18:00
+    // 2026-09-11 (Sex): 480 min (8h), horário 08:00 - 17:00
     // 2026-09-12 (Sáb): Folga
     const diaSegReal = espelhoSegSex.dias.find((d) => d.data === '2026-09-07')
+    const diaQuiReal = espelhoSegSex.dias.find((d) => d.data === '2026-09-10')
     const diaSexReal = espelhoSegSex.dias.find((d) => d.data === '2026-09-11')
     const diaSabReal = espelhoSegSex.dias.find((d) => d.data === '2026-09-12')
 
     const passouSegSexReal =
       diaSegReal?.previstoMinutos === 540 &&
+      diaSegReal?.previstoFormatado === '08:00 - 18:00' &&
+      diaQuiReal?.previstoMinutos === 540 &&
+      diaQuiReal?.previstoFormatado === '08:00 - 18:00' &&
       diaSexReal?.previstoMinutos === 480 &&
+      diaSexReal?.previstoFormatado === '08:00 - 17:00' &&
       diaSabReal?.ehDiaFolga === true &&
-      diaSabReal?.previstoMinutos === 0
+      diaSabReal?.previstoMinutos === 0 &&
+      diaSabReal?.previstoFormatado === 'Folga'
 
     // 2. Jornada "SABADO": Seg 10:00-18:00 (1h30 almoço = 6h30 = 390 min), Ter-Sab 09:00-18:00 (1h30 almoço = 7h30 = 450 min), Dom Folga
     const jornadaSabadoReal: Jornada = {
@@ -683,7 +690,7 @@ export function executarTestesIntervaloAutomatico(): {
     resultados.push({
       nome: 'Teste (g2): Jornadas reais da empresa MH MIXX ("Segunda a Sexta" 44h e "SABADO")',
       passou: Boolean(passouSegSexReal && passouSabadoReal),
-      detalhe: `SegSex (Seg ${diaSegReal?.previstoMinutos}m, Sex ${diaSexReal?.previstoMinutos}m); SABADO (Seg ${diaSegSabado?.previstoMinutos}m, Ter ${diaTerSabado?.previstoMinutos}m, Sáb ${diaSabSabado?.previstoMinutos}m, Dom Folga)`,
+      detalhe: `SegSex (Qui ${diaQuiReal?.previstoFormatado} / ${diaQuiReal?.previstoMinutos}m, Sex ${diaSexReal?.previstoFormatado} / ${diaSexReal?.previstoMinutos}m, Sáb ${diaSabReal?.previstoFormatado}); SABADO (Seg ${diaSegSabado?.previstoMinutos}m, Ter ${diaTerSabado?.previstoMinutos}m, Sáb ${diaSabSabado?.previstoMinutos}m, Dom Folga)`,
     })
   }
 

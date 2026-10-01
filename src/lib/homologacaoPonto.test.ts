@@ -5,6 +5,7 @@ import {
   minutesToTimeString,
   minutesToSignedString,
   calcularHorasRealizadas,
+  construirEspelhoMensal,
 } from './calculoHoras'
 import type { Jornada, RegistroHorario } from '@/types/rh'
 
@@ -63,5 +64,69 @@ describe('Homologação de Cálculo de Horas e Intervalos', () => {
 
     const resultado = calcularHorasRealizadas([regEntrada, regSaida], [], jornadaNoturna)
     expect(resultado.minutosTrabalhados).toBeGreaterThan(0)
+  })
+
+  it('deve exibir horário previsto "08:00 - 18:00" em dia de quinta da jornada Segunda a Sexta e "Folga" em dia de folga', () => {
+    const jornadaSegSex: Jornada = {
+      id: 'j-seg-sex',
+      nome: 'Segunda a Sexta',
+      hora_entrada: '08:00',
+      hora_inicio_intervalo: '12:00',
+      hora_retorno_intervalo: '13:00',
+      hora_saida: '18:00',
+      duracao_jornada_min: 528,
+      dias_trabalho: ['seg', 'ter', 'qua', 'qui', 'sex'],
+      dias_folga: ['sab', 'dom'],
+      grade_semanal: {
+        seg: { ativo: true, hora_entrada: '08:00', hora_saida: '18:00', duracao_min: 540 },
+        ter: { ativo: true, hora_entrada: '08:00', hora_saida: '18:00', duracao_min: 540 },
+        qua: { ativo: true, hora_entrada: '08:00', hora_saida: '18:00', duracao_min: 540 },
+        qui: { ativo: true, hora_entrada: '08:00', hora_saida: '18:00', duracao_min: 540 },
+        sex: { ativo: true, hora_entrada: '08:00', hora_saida: '17:00', duracao_min: 480 },
+        sab: { ativo: false, hora_entrada: '', hora_saida: '', duracao_min: 0 },
+        dom: { ativo: false, hora_entrada: '', hora_saida: '', duracao_min: 0 },
+      },
+      created: '',
+      updated: '',
+    }
+
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 10,
+      jornadaAtual: jornadaSegSex,
+      historicoJornadas: [],
+      registrosMes: [],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    // 01/10/2026 é Quinta-feira
+    const dia01Qui = espelho.dias.find((d: any) => d.data === '2026-10-01')
+    expect(dia01Qui).toBeDefined()
+    expect(dia01Qui?.diaSemana).toBe('qui')
+    expect(dia01Qui?.previstoFormatado).toBe('08:00 - 18:00')
+    expect(dia01Qui?.horarioPrevistoFormatado).toBe('08:00 - 18:00')
+    expect(dia01Qui?.cargaPrevistaFormatada).toBe('carga 9h')
+    expect(dia01Qui?.previstoMinutos).toBe(540)
+    expect(dia01Qui?.ehDiaFolga).toBe(false)
+
+    // 02/10/2026 é Sexta-feira (saída 17:00, carga 8h)
+    const dia02Sex = espelho.dias.find((d: any) => d.data === '2026-10-02')
+    expect(dia02Sex?.previstoFormatado).toBe('08:00 - 17:00')
+    expect(dia02Sex?.cargaPrevistaFormatada).toBe('carga 8h')
+    expect(dia02Sex?.previstoMinutos).toBe(480)
+
+    // 03/10/2026 é Sábado (Folga)
+    const dia03Sab = espelho.dias.find((d: any) => d.data === '2026-10-03')
+    expect(dia03Sab?.previstoFormatado).toBe('Folga')
+    expect(dia03Sab?.ehDiaFolga).toBe(true)
+    expect(dia03Sab?.previstoMinutos).toBe(0)
+
+    // 04/10/2026 é Domingo (Folga)
+    const dia04Dom = espelho.dias.find((d: any) => d.data === '2026-10-04')
+    expect(dia04Dom?.previstoFormatado).toBe('Folga')
+    expect(dia04Dom?.ehDiaFolga).toBe(true)
+    expect(dia04Dom?.previstoMinutos).toBe(0)
   })
 })

@@ -813,11 +813,18 @@ export default function EspelhoPonto() {
                       {/* Jornada Prevista */}
                       <td className="py-2.5 px-3 font-mono">
                         {dia.ehDiaFolga ? (
-                          <span className="text-slate-400 italic">Folga</span>
+                          <span className="text-slate-400 italic text-xs">Folga</span>
                         ) : (
-                          <span className="font-medium text-slate-700">
-                            {dia.previstoFormatado}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-slate-800 text-xs">
+                              {dia.previstoFormatado}
+                            </span>
+                            {dia.cargaPrevistaFormatada && (
+                              <span className="text-[10px] text-slate-500 font-sans tracking-tight">
+                                {dia.cargaPrevistaFormatada}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
 

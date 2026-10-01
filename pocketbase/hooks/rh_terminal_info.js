@@ -19,6 +19,30 @@ routerAdd('GET', '/backend/v1/rh/terminal/info', (e) => {
     console.log('Erro ao carregar empresa para terminal:', err)
   }
 
+  // Lista dos funcionários ativos e seus pin_hashes para validação segura em modo offline
+  const funcionariosOffline = []
+  try {
+    const colFuncs = $app.findCollectionByNameOrId('funcionarios')
+    const funcs = $app.findRecordsByFilter(
+      colFuncs.id,
+      "situacao = 'ativo' && pin_hash != ''",
+      'nome',
+      100,
+      0,
+    )
+    for (let i = 0; i < funcs.length; i++) {
+      const f = funcs[i]
+      funcionariosOffline.push({
+        id: f.id,
+        nome: f.getString('nome'),
+        matricula: f.getString('matricula'),
+        pin_hash: f.getString('pin_hash'),
+      })
+    }
+  } catch (err) {
+    console.log('Erro ao carregar funcionários para cache offline:', err)
+  }
+
   const serverTime = new Date()
   const serverTimeMs = serverTime.getTime()
 
@@ -54,5 +78,6 @@ routerAdd('GET', '/backend/v1/rh/terminal/info', (e) => {
       logotipo: logotipo,
       fuso_horario: fusoHorario,
     },
+    funcionarios_offline: funcionariosOffline,
   })
 })

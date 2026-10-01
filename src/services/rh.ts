@@ -1476,9 +1476,9 @@ export const usersService = {
 export interface TerminalInfo {
   status: string
   server_time_utc: string
-  server_time_ms?: number
-  sp_time_formatted?: string
-  sp_date_formatted?: string
+  server_time_ms: number
+  sp_time_formatted: string
+  sp_date_formatted: string
   empresa: {
     id: string
     nome_fantasia: string
@@ -1486,12 +1486,18 @@ export interface TerminalInfo {
     logotipo: string
     fuso_horario: string
   }
+  funcionarios_offline?: {
+    id: string
+    nome: string
+    matricula: string
+    pin_hash: string
+  }[]
 }
-
 export interface RegistroPontoResult {
   success: boolean
   idempotent?: boolean
   deduplicated?: boolean
+  offline_sync?: boolean
   identificador?: string
   funcionario_nome?: string
   data_formatada?: string
@@ -1515,6 +1521,9 @@ export const terminalService = {
     matricula: string
     pin: string
     id_requisicao: string
+    timestamp_utc?: string
+    offline?: boolean
+    offline_sync?: boolean
   }): Promise<RegistroPontoResult> {
     return await pb.send<RegistroPontoResult>('/backend/v1/rh/ponto/registrar', {
       method: 'POST',

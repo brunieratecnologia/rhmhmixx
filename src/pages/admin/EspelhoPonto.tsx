@@ -832,6 +832,7 @@ export default function EspelhoPonto() {
                                 const ehAjuste = m.origem === 'tratamento_fechamento'
                                 const ehAuto = m.origem === 'intervalo_automatico'
                                 const ehAnulado = Boolean(m.anulado)
+                                const ehOffline = Boolean(m.offline_sync)
                                 return (
                                   <span
                                     key={idx}
@@ -843,7 +844,9 @@ export default function EspelhoPonto() {
                                               ? 'Intervalo Automático derivado da jornada'
                                               : ehAjuste
                                                 ? 'Ajuste Fechamento Folha'
-                                                : 'Terminal Coletivo Imutável'
+                                                : ehOffline
+                                                  ? 'Registrado Offline no Terminal e Sincronizado'
+                                                  : 'Terminal Coletivo Imutável'
                                           })`
                                     }
                                     className={`px-2 py-0.5 rounded text-xs font-semibold border flex items-center gap-1 ${
@@ -853,7 +856,9 @@ export default function EspelhoPonto() {
                                           ? 'bg-purple-50 text-purple-900 border-purple-300 shadow-xs'
                                           : ehAjuste
                                             ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                            : 'bg-slate-100 text-slate-800 border-slate-200'
+                                            : ehOffline
+                                              ? 'bg-amber-50/80 text-amber-950 border-amber-300/80 shadow-xs'
+                                              : 'bg-slate-100 text-slate-800 border-slate-200'
                                     }`}
                                   >
                                     {m.horario}
@@ -871,6 +876,14 @@ export default function EspelhoPonto() {
                                         title="Incluído pelo gestor no fechamento"
                                       >
                                         AJ
+                                      </span>
+                                    )}
+                                    {ehOffline && !ehAnulado && (
+                                      <span
+                                        className="text-[9px] bg-amber-200 text-amber-950 px-1 rounded font-bold uppercase tracking-wider"
+                                        title="Registrado offline e sincronizado automaticamente"
+                                      >
+                                        Offline
                                       </span>
                                     )}
                                     {ehAnulado && (

@@ -18,6 +18,7 @@ export interface MarcacaoInterpreta {
   automatico?: boolean
   anulado?: boolean
   motivoAnulacao?: string
+  offline_sync?: boolean
 }
 
 export interface DiaEspelhoCalculado {
@@ -399,6 +400,7 @@ export function calcularHorasRealizadas(
         tipo: 'avulsa',
         origem: 'terminal',
         registroOriginal: reg,
+        offline_sync: Boolean(reg.offline_sync),
         anulado: true,
         motivoAnulacao:
           tratAnulacao?.justificativa ||
@@ -412,6 +414,7 @@ export function calcularHorasRealizadas(
         tipo: 'avulsa',
         origem: 'terminal',
         registroOriginal: reg,
+        offline_sync: Boolean(reg.offline_sync),
       })
       lastKeptTs = ts
     }

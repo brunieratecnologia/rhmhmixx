@@ -257,6 +257,7 @@ export default function PortalMeuEspelho() {
                                   const ehAuto = m.origem === 'intervalo_automatico'
                                   const ehAjuste = m.origem === 'tratamento_fechamento'
                                   const ehAnulado = Boolean(m.anulado)
+                                  const ehOffline = Boolean(m.offline_sync)
                                   return (
                                     <span
                                       key={idx}
@@ -267,7 +268,9 @@ export default function PortalMeuEspelho() {
                                             ? 'bg-[#7C3AED]/20 text-purple-300 border-[#7C3AED]/40'
                                             : ehAjuste
                                               ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
-                                              : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
+                                              : ehOffline
+                                                ? 'bg-amber-950/30 text-amber-200 border-amber-500/40'
+                                                : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
                                       }`}
                                       title={
                                         ehAnulado
@@ -276,13 +279,20 @@ export default function PortalMeuEspelho() {
                                             ? 'Intervalo automático da jornada'
                                             : ehAjuste
                                               ? 'Ajuste de fechamento'
-                                              : 'Batida registrada'
+                                              : ehOffline
+                                                ? 'Batida registrada em modo offline e sincronizada'
+                                                : 'Batida registrada'
                                       }
                                     >
                                       {m.horario}
                                       {ehAuto && (
                                         <span className="text-[9px] bg-[#7C3AED]/40 text-purple-200 px-1 rounded uppercase tracking-wider">
                                           Auto
+                                        </span>
+                                      )}
+                                      {ehOffline && !ehAnulado && (
+                                        <span className="text-[9px] bg-amber-500/30 text-amber-300 px-1 rounded font-bold uppercase tracking-wider">
+                                          Offline
                                         </span>
                                       )}
                                       {ehAnulado && (

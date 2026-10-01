@@ -2,6 +2,8 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
   const body = e.requestInfo().body || {}
   const pin = (body.pin || '').toString().trim()
   const idRequisicao = (body.id_requisicao || '').toString().trim()
+  const timestampInformadoUtc = (body.timestamp_utc || '').toString().trim()
+  const isOfflineSync = Boolean(body.offline || body.offline_sync)
 
   // Terminal agora autentica EXCLUSIVAMENTE pelo PIN do funcionário
   if (!pin) {
@@ -27,39 +29,41 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
   const LOCKOUT_MINUTES = 10
   const now = new Date()
 
-  // 1. Verificar bloqueio temporário ativo para este PIN hash
+  // 1. Verificar bloqueio temporário ativo para este PIN hash (apenas para requisições em tempo real)
   let attemptRecord = null
-  try {
-    const colTentativas = $app.findCollectionByNameOrId('tentativas_pin')
-    const recs = $app.findRecordsByFilter(
-      colTentativas.id,
-      "pin_hash = '" + computedHash + "'",
-      '-created',
-      1,
-      0,
-    )
-    if (recs && recs.length > 0) {
-      attemptRecord = recs[0]
-    }
-  } catch (_) {}
+  if (!isOfflineSync) {
+    try {
+      const colTentativas = $app.findCollectionByNameOrId('tentativas_pin')
+      const recs = $app.findRecordsByFilter(
+        colTentativas.id,
+        "pin_hash = '" + computedHash + "'",
+        '-created',
+        1,
+        0,
+      )
+      if (recs && recs.length > 0) {
+        attemptRecord = recs[0]
+      }
+    } catch (_) {}
 
-  if (attemptRecord) {
-    const bloqueadoAte = attemptRecord.getString('bloqueado_ate')
-    if (bloqueadoAte) {
-      const lockDate = new Date(bloqueadoAte)
-      if (now < lockDate) {
-        const remainingMinutes = Math.max(
-          1,
-          Math.ceil((lockDate.getTime() - now.getTime()) / 60000),
-        )
-        return e.json(429, {
-          success: false,
-          locked: true,
-          message:
-            'Acesso temporariamente bloqueado por excesso de tentativas incorretas. Tente novamente em ' +
-            remainingMinutes +
-            ' minuto(s).',
-        })
+    if (attemptRecord) {
+      const bloqueadoAte = attemptRecord.getString('bloqueado_ate')
+      if (bloqueadoAte) {
+        const lockDate = new Date(bloqueadoAte)
+        if (now < lockDate) {
+          const remainingMinutes = Math.max(
+            1,
+            Math.ceil((lockDate.getTime() - now.getTime()) / 60000),
+          )
+          return e.json(429, {
+            success: false,
+            locked: true,
+            message:
+              'Acesso temporariamente bloqueado por excesso de tentativas incorretas. Tente novamente em ' +
+              remainingMinutes +
+              ' minuto(s).',
+          })
+        }
       }
     }
   }
@@ -82,22 +86,24 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
 
   if (!func) {
     // PIN inexistente: registrar tentativa com falha sem jamais revelar se o PIN existe ou a quem pertence
-    try {
-      const col = $app.findCollectionByNameOrId('tentativas_pin')
-      if (!attemptRecord) {
-        attemptRecord = new Record(col)
-        attemptRecord.set('pin_hash', computedHash)
-        attemptRecord.set('tentativas', 1)
-      } else {
-        const currentAttempts = (attemptRecord.getInt('tentativas') || 0) + 1
-        attemptRecord.set('tentativas', currentAttempts)
-        if (currentAttempts >= MAX_ATTEMPTS) {
-          const lockUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60000)
-          attemptRecord.set('bloqueado_ate', lockUntil.toISOString())
+    if (!isOfflineSync) {
+      try {
+        const col = $app.findCollectionByNameOrId('tentativas_pin')
+        if (!attemptRecord) {
+          attemptRecord = new Record(col)
+          attemptRecord.set('pin_hash', computedHash)
+          attemptRecord.set('tentativas', 1)
+        } else {
+          const currentAttempts = (attemptRecord.getInt('tentativas') || 0) + 1
+          attemptRecord.set('tentativas', currentAttempts)
+          if (currentAttempts >= MAX_ATTEMPTS) {
+            const lockUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60000)
+            attemptRecord.set('bloqueado_ate', lockUntil.toISOString())
+          }
         }
-      }
-      $app.save(attemptRecord)
-    } catch (_) {}
+        $app.save(attemptRecord)
+      } catch (_) {}
+    }
 
     return e.json(401, {
       success: false,
@@ -178,58 +184,71 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
           timestamp_utc: existingUtcStr,
           server_timestamp_ms: tsExisting.getTime(),
           fuso_horario: 'America/Sao_Paulo',
+          offline_sync: existing.getBool('offline_sync'),
           mensagem: 'Marcação confirmada com sucesso (registro previamente recebido).',
         })
       }
     } catch (_) {}
   }
 
-  // 4.1 Deduplicação de batidas consecutivas em janela muito curta (mesmo funcionário)
-  // Regra do usuário: "quando o funcionario bater 2 vezes o ponto no intervalo pequeno, registrar apenas 1. nao registrar duas vezes."
-  // Se houver uma batida recente do mesmo funcionário nos últimos 90 segundos (1,5 min),
-  // consolida na mesma marcação retornando o registro recente como deduplicado (sem gravar duplicata no banco).
+  // Determinar timestamp da batida:
+  // Se for sincronização offline com timestamp informado válido, usa o timestamp registrado no momento real da batida.
+  // Caso contrário, usa o horário oficial atual do servidor.
+  let officialServerTime = new Date()
+  if (isOfflineSync && timestampInformadoUtc) {
+    const parsedTs = new Date(timestampInformadoUtc)
+    if (!isNaN(parsedTs.getTime())) {
+      officialServerTime = parsedTs
+    }
+  }
+
+  // 4.1 Deduplicação de batidas consecutivas em janela de 90 segundos (mesmo funcionário)
+  // Regra: "quando o funcionário bater 2 vezes no intervalo pequeno, registrar apenas 1. não registrar duas vezes."
+  // Para batidas offline/sincronizadas, compara o timestamp da batida com batidas já existentes no banco
   const DEDUP_WINDOW_MS = 90 * 1000 // 90 segundos
   try {
     const colRegistros = $app.findCollectionByNameOrId('registros_horario')
     const recsRecentes = $app.findRecordsByFilter(
       colRegistros.id,
       "funcionario = '" + func.id + "'",
-      '-created',
-      1,
+      '-timestamp_utc,-created',
+      5,
       0,
     )
 
     if (recsRecentes && recsRecentes.length > 0) {
-      const ultRec = recsRecentes[0]
-      const ultUtcStr = ultRec.getString('timestamp_utc') || ultRec.getString('created')
-      if (ultUtcStr) {
-        const tsUlt = new Date(ultUtcStr).getTime()
-        const tsNow = now.getTime()
-        const diffMs = tsNow - tsUlt
+      const targetTimeMs = officialServerTime.getTime()
+      for (let i = 0; i < recsRecentes.length; i++) {
+        const ultRec = recsRecentes[i]
+        const ultUtcStr = ultRec.getString('timestamp_utc') || ultRec.getString('created')
+        if (ultUtcStr) {
+          const tsUlt = new Date(ultUtcStr).getTime()
+          const diffMs = Math.abs(targetTimeMs - tsUlt)
 
-        if (diffMs >= 0 && diffMs < DEDUP_WINDOW_MS) {
-          const spParts = formatSaoPauloDateTime(new Date(ultUtcStr))
-          const horaSimples = spParts.timeFormatted.slice(0, 5) // HH:MM
-          return e.json(200, {
-            success: true,
-            idempotent: true,
-            deduplicated: true,
-            identificador: ultRec.id,
-            funcionario_nome: func.getString('nome'),
-            data_formatada: spParts.dateFormatted,
-            horario_formatado: spParts.timeFormatted,
-            timestamp_utc: ultUtcStr,
-            server_timestamp_ms: tsUlt,
-            fuso_horario: 'America/Sao_Paulo',
-            mensagem: 'Sua batida às ' + horaSimples + ' já valeu — não precisa bater de novo.',
-          })
+          if (diffMs < DEDUP_WINDOW_MS) {
+            const spParts = formatSaoPauloDateTime(new Date(ultUtcStr))
+            const horaSimples = spParts.timeFormatted.slice(0, 5) // HH:MM
+            return e.json(200, {
+              success: true,
+              idempotent: true,
+              deduplicated: true,
+              identificador: ultRec.id,
+              funcionario_nome: func.getString('nome'),
+              data_formatada: spParts.dateFormatted,
+              horario_formatado: spParts.timeFormatted,
+              timestamp_utc: ultUtcStr,
+              server_timestamp_ms: tsUlt,
+              fuso_horario: 'America/Sao_Paulo',
+              offline_sync: ultRec.getBool('offline_sync'),
+              mensagem: 'Sua batida às ' + horaSimples + ' já valeu — não precisa bater de novo.',
+            })
+          }
         }
       }
     }
   } catch (_) {}
 
-  // 5. Horário oficial do servidor em UTC
-  const officialServerTime = new Date()
+  // 5. Horário final formatado em UTC
   const officialUtcIso = officialServerTime.toISOString()
   const dateUtc = officialUtcIso.split('T')[0]
   const timeUtc = officialUtcIso.split('T')[1].slice(0, 8)
@@ -242,6 +261,9 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
   newReg.set('hora_utc', timeUtc)
   newReg.set('timestamp_utc', officialUtcIso)
   newReg.set('origem', 'terminal')
+  if (isOfflineSync) {
+    newReg.set('offline_sync', true)
+  }
   if (idRequisicao) {
     newReg.set('id_requisicao', idRequisicao)
   }
@@ -260,6 +282,9 @@ routerAdd('POST', '/backend/v1/rh/ponto/registrar', (e) => {
     timestamp_utc: officialUtcIso,
     server_timestamp_ms: officialServerTime.getTime(),
     fuso_horario: 'America/Sao_Paulo',
-    mensagem: 'Ponto registrado com sucesso!',
+    offline_sync: isOfflineSync,
+    mensagem: isOfflineSync
+      ? 'Marcação offline sincronizada com sucesso!'
+      : 'Ponto registrado com sucesso!',
   })
 })

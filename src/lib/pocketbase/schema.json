@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-01T01:46:44.509Z",
+  "generatedAt": "2026-10-01T02:08:17.687Z",
   "collections": [
     {
       "name": "users",
@@ -594,6 +594,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "offline_sync",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

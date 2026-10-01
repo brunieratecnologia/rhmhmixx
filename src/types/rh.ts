@@ -131,6 +131,7 @@ export interface RegistroHorario {
   timestamp_utc: string
   origem: 'terminal' | 'admin' | 'portal'
   id_requisicao?: string
+  offline_sync?: boolean
   created: string
   updated: string
   expand?: {

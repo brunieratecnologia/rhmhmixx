@@ -22,7 +22,7 @@
 
   :root {
     /* Tema Base Escuro MH MIXX — Preto / Grafite com Acentos Dourados e Roxo Açaí */
-    --background: 222 47% 7%; /* #090D14 */
+    --background: 148.1 37.2% 16.9%; /* #090D14 */
     --foreground: 45 30% 96%; /* #FAF8F2 */
 
     --card: 222 40% 10%; /* #0F1624 */
@@ -52,7 +52,7 @@
     --input: 222 25% 20%;
     --ring: 43 74% 50%; /* Dourado */
 
-    --radius: 0.5rem;
+    --radius: 0.9rem;
 
     --sidebar-background: 222 47% 6%; /* #070B11 */
     --sidebar-foreground: 45 20% 90%;

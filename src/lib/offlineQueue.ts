@@ -13,8 +13,9 @@ export interface FuncionarioCacheOffline {
 export interface BatidaOfflineFila {
   id_requisicao: string
   pin: string
-  funcionario_id: string
-  funcionario_nome: string
+  funcionario_id?: string
+  funcionario_nome?: string
+  modo_contingencia?: boolean
   timestamp_utc: string
   server_timestamp_ms: number
   criado_em_ms: number
@@ -245,6 +246,7 @@ export function obterTamanhoFilaOffline(): number {
 export interface ValidacaoOfflineResult {
   valido: boolean
   funcionario?: FuncionarioCacheOffline
+  modoContingencia?: boolean
   mensagemErro?: string
   motivoBloqueio?: boolean
   deduplicado?: boolean
@@ -254,7 +256,10 @@ export interface ValidacaoOfflineResult {
 const DEDUP_WINDOW_MS = 90 * 1000 // 90 segundos
 
 /**
- * Valida o PIN localmente contra o cache de funcionários ativos e aplica deduplicação local
+ * Valida o PIN localmente contra o cache de funcionários ativos e aplica deduplicação local.
+ * Se o cache de funcionários estiver vazio (ex.: terminal recarregado sem internet antes do sync inicial),
+ * entra no MODO DE CONTINGÊNCIA: acolhe o PIN formatado (4-6 dígitos) na fila com flag de contingência,
+ * garantindo que nenhum funcionário fique sem bater o ponto.
  */
 export async function validarPinOffline(
   pin: string,
@@ -262,11 +267,29 @@ export async function validarPinOffline(
 ): Promise<ValidacaoOfflineResult> {
   const cache = carregarCacheFuncionarios()
 
+  // Se o terminal não tiver cache carregado, aciona modo de contingência
   if (!cache || cache.length === 0) {
+    // Deduplicação local de contingência pelo próprio PIN
+    const fila = carregarFilaOffline()
+    const batidasPin = fila.filter((b) => b.pin === pin)
+    if (batidasPin.length > 0) {
+      batidasPin.sort((a, b) => b.server_timestamp_ms - a.server_timestamp_ms)
+      const ultBatida = batidasPin[0]
+      const diff = Math.abs(nowServerMs - ultBatida.server_timestamp_ms)
+      if (diff < DEDUP_WINDOW_MS) {
+        return {
+          valido: true,
+          modoContingencia: true,
+          deduplicado: true,
+          batidaAnterior: ultBatida,
+        }
+      }
+    }
+
     return {
-      valido: false,
-      mensagemErro:
-        'O terminal ainda não possui lista de funcionários sincronizada. Conecte à internet uma vez para habilitar o modo offline.',
+      valido: true,
+      modoContingencia: true,
+      deduplicado: false,
     }
   }
 
@@ -282,7 +305,7 @@ export async function validarPinOffline(
 
   // Verificar se há batida recente do mesmo funcionário na fila offline (< 90s)
   const fila = carregarFilaOffline()
-  const batidasFunc = fila.filter((b) => b.funcionario_id === funcionario.id)
+  const batidasFunc = fila.filter((b) => b.funcionario_id === funcionario.id || b.pin === pin)
 
   if (batidasFunc.length > 0) {
     // Pega a mais recente

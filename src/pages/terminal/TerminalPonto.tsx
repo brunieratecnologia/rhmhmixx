@@ -98,7 +98,7 @@ export default function TerminalPonto() {
       const totalEnviadas = res.sucessos + res.duplicadasDescartadas
       if (totalEnviadas > 0) {
         const plural = totalEnviadas > 1 ? 'batidas enviadas' : 'batida enviada'
-        const aviso = `Conexão restabelecida — ${totalEnviadas} ${plural}`
+        const aviso = `Conexão restabelecida — ${totalEnviadas} ${plural} ao servidor com sucesso!`
         setSyncNotice(aviso)
         if (syncNoticeTimerRef.current) clearTimeout(syncNoticeTimerRef.current)
         syncNoticeTimerRef.current = setTimeout(() => {
@@ -112,13 +112,15 @@ export default function TerminalPonto() {
     }
   }, [atualizarContadorFila])
 
+  // Na montagem inicial do terminal, se houver batidas pendentes e o navegador estiver online, dispara o sincronizador imediatamente
+  useEffect(() => {
+    if (obterTamanhoFilaOffline() > 0 && navigator.onLine) {
+      dispararSincronizacao()
+    }
+  }, [dispararSincronizacao])
+
   // 2. Fetch Terminal Info & sync server time offset & check connection
   const checkStatus = useCallback(async () => {
-    if (!navigator.onLine) {
-      setIsOnline(false)
-      return
-    }
-
     try {
       setCheckingConnection(true)
       const clientReqTime = Date.now()
@@ -140,7 +142,7 @@ export default function TerminalPonto() {
         setCurrentTime(new Date(Date.now() + serverOffsetRef.current))
       }
 
-      // Persistir em cache local
+      // Persistir em cache local imediatamente
       salvarCacheTerminalInfo(info)
       if (info.funcionarios_offline && info.funcionarios_offline.length > 0) {
         salvarCacheFuncionarios(info.funcionarios_offline)
@@ -160,11 +162,12 @@ export default function TerminalPonto() {
     }
   }, [dispararSincronizacao])
 
+  // Carga inicial e revalidação periódica de 15 segundos
   useEffect(() => {
     checkStatus()
     const interval = setInterval(() => {
       checkStatus()
-    }, 30000)
+    }, 15000)
     return () => clearInterval(interval)
   }, [checkStatus])
 
@@ -350,7 +353,7 @@ export default function TerminalPonto() {
   const registrarBatidaOfflineLocal = async (cleanPin: string, nowMs: number) => {
     const validacao = await validarPinOffline(cleanPin, nowMs)
 
-    if (!validacao.valido || !validacao.funcionario) {
+    if (!validacao.valido) {
       setErrorMessage(validacao.mensagemErro || 'PIN inválido ou não cadastrado.')
       setPin('')
       pinInputRef.current?.focus()
@@ -358,6 +361,9 @@ export default function TerminalPonto() {
     }
 
     const func = validacao.funcionario
+    const isContingencia = Boolean(validacao.modoContingencia)
+    const nomeExibicao = func ? func.nome : `Colaborador (PIN ••••${cleanPin.slice(-2)})`
+
     const dateNowObj = new Date(nowMs)
     const targetTimeZone = terminalInfo?.empresa?.fuso_horario || 'America/Sao_Paulo'
     const {
@@ -378,7 +384,7 @@ export default function TerminalPonto() {
         offline_recorded: true,
         offline_sync: true,
         identificador: validacao.batidaAnterior?.id_requisicao || 'OFFLINE-DEDUP',
-        funcionario_nome: func.nome,
+        funcionario_nome: nomeExibicao,
         data_formatada: shortDateBR,
         horario_formatado: horaFormatada,
         timestamp_utc: validacao.batidaAnterior?.timestamp_utc || dateNowObj.toISOString(),
@@ -395,8 +401,9 @@ export default function TerminalPonto() {
     const novaBatida: BatidaOfflineFila = {
       id_requisicao: idRequisicao,
       pin: cleanPin,
-      funcionario_id: func.id,
-      funcionario_nome: func.nome,
+      funcionario_id: func?.id,
+      funcionario_nome: func?.nome,
+      modo_contingencia: isContingencia,
       timestamp_utc: dateNowObj.toISOString(),
       server_timestamp_ms: nowMs,
       criado_em_ms: Date.now(),
@@ -413,13 +420,15 @@ export default function TerminalPonto() {
       offline_recorded: true,
       offline_sync: true,
       identificador: idRequisicao,
-      funcionario_nome: func.nome,
+      funcionario_nome: nomeExibicao,
       data_formatada: shortDateBR,
       horario_formatado: horaFormatada,
       timestamp_utc: novaBatida.timestamp_utc,
       server_timestamp_ms: nowMs,
       fuso_horario: targetTimeZone,
-      mensagem: 'Ponto registrado offline com sucesso!',
+      mensagem: isContingencia
+        ? 'Ponto registrado em modo de contingência! Salvo com segurança no terminal.'
+        : 'Ponto registrado offline com sucesso!',
     })
     setPin('')
   }
@@ -871,7 +880,6 @@ export default function TerminalPonto() {
                       )
                     })}
                   </div>
-
                   <input
                     ref={pinInputRef}
                     type="password"
@@ -958,13 +966,16 @@ export default function TerminalPonto() {
       {/* 3. Footer / Base */}
       <footer className="bg-[#070B11] border-t border-[#D4AF37]/20 px-4 sm:px-8 py-3 text-xs text-slate-400">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
-          {/* Orientation message */}
-          <div className="flex items-center gap-2">
+          {/* Orientation message e versão do terminal */}
+          <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
             <span className="w-2 h-2 rounded-full bg-[#D4AF37]" />
             <p className="text-[11px] sm:text-xs text-slate-400 font-medium">
               Aproxime-se do terminal, digite seu PIN individual e pressione{' '}
               <strong className="text-amber-200">Confirmar Ponto</strong>.
             </p>
+            <span className="text-[10px] text-slate-500 font-mono bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800">
+              v0.0.29 • Modo Offline Ativo
+            </span>
           </div>
 
           {/* Server Connection Status Indicator & Fullscreen Button */}

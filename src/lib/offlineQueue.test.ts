@@ -55,10 +55,31 @@ describe('Modo Offline do Terminal de Ponto MH MIXX', () => {
     expect(carregados[1].matricula).toBe('003')
   })
 
-  it('retorna erro amigável se tentar validar offline antes da primeira sincronização (sem cache)', async () => {
+  it('habilita modo de contingência se validar offline antes da primeira sincronização (sem cache prévio)', async () => {
     const res = await validarPinOffline('1234', Date.now())
-    expect(res.valido).toBe(false)
-    expect(res.mensagemErro).toContain('conectar à internet uma vez')
+    // No novo comportamento à prova de falhas: nunca perde a batida! Entra em contingência
+    expect(res.valido).toBe(true)
+    expect(res.modoContingencia).toBe(true)
+    expect(res.deduplicado).toBe(false)
+  })
+
+  it('no modo de contingência sem cache prévio, aplica deduplicação de 90s por PIN', async () => {
+    const t0 = Date.now()
+    enfileirarBatidaOffline({
+      id_requisicao: 'req_contingencia_1',
+      pin: '9876',
+      modo_contingencia: true,
+      timestamp_utc: new Date(t0).toISOString(),
+      server_timestamp_ms: t0,
+      criado_em_ms: t0,
+      tentativas: 0,
+    })
+
+    // Segunda batida em 30s com mesmo PIN
+    const res = await validarPinOffline('9876', t0 + 30000)
+    expect(res.valido).toBe(true)
+    expect(res.deduplicado).toBe(true)
+    expect(res.batidaAnterior?.id_requisicao).toBe('req_contingencia_1')
   })
 
   it('valida PIN localmente com sucesso quando existe no cache', async () => {
@@ -137,6 +158,28 @@ describe('Modo Offline do Terminal de Ponto MH MIXX', () => {
     const filaRestante = carregarFilaOffline()
     expect(filaRestante).toHaveLength(1)
     expect(filaRestante[0].id_requisicao).toBe('req_2')
+  })
+
+  it('fila offline sobrevive a recarga/nova leitura do localStorage e mantém integridade', () => {
+    const batida: BatidaOfflineFila = {
+      id_requisicao: 'req_recarga_teste',
+      pin: '1234',
+      funcionario_id: 'func_recarga',
+      funcionario_nome: 'Recarga Teste',
+      timestamp_utc: '2026-10-02T21:00:00.000Z',
+      server_timestamp_ms: 1790974800000,
+      criado_em_ms: 1790974800000,
+      tentativas: 0,
+    }
+
+    enfileirarBatidaOffline(batida)
+
+    // Simula recarga (leitura pura a partir do localStorage)
+    const filaLida = carregarFilaOffline()
+    expect(filaLida).toHaveLength(1)
+    expect(filaLida[0].id_requisicao).toBe('req_recarga_teste')
+    expect(filaLida[0].pin).toBe('1234')
+    expect(filaLida[0].funcionario_nome).toBe('Recarga Teste')
   })
 
   it('aplica deduplicação de 90s offline para batidas consecutivas do mesmo funcionário', async () => {

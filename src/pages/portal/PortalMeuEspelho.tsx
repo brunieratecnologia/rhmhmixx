@@ -264,30 +264,46 @@ export default function PortalMeuEspelho() {
                                       className={`px-1.5 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-1 ${
                                         ehAnulado
                                           ? 'bg-rose-950/30 text-rose-400/80 border-rose-500/30 line-through opacity-70'
-                                          : ehAuto
-                                            ? 'bg-[#7C3AED]/20 text-purple-300 border-[#7C3AED]/40'
-                                            : ehAjuste
-                                              ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
-                                              : ehOffline
-                                                ? 'bg-amber-950/30 text-amber-200 border-amber-500/40'
-                                                : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
+                                          : m.corrigida
+                                            ? 'bg-amber-500/20 text-amber-200 border-amber-400/40 shadow-xs'
+                                            : ehAuto
+                                              ? 'bg-[#7C3AED]/20 text-purple-300 border-[#7C3AED]/40'
+                                              : ehAjuste
+                                                ? 'bg-amber-950/40 text-amber-300 border-amber-500/30'
+                                                : ehOffline
+                                                  ? 'bg-amber-950/30 text-amber-200 border-amber-500/40'
+                                                  : 'bg-[#151D2C] text-amber-100 border-[#D4AF37]/20'
                                       }`}
                                       title={
                                         ehAnulado
                                           ? `Marcação Anulada (${m.motivoAnulacao || 'Desconsiderada no fechamento'})`
-                                          : ehAuto
-                                            ? 'Intervalo automático da jornada'
-                                            : ehAjuste
-                                              ? 'Ajuste de fechamento'
-                                              : ehOffline
-                                                ? 'Batida registrada em modo offline e sincronizada'
-                                                : 'Batida registrada'
+                                          : m.corrigida
+                                            ? `Marcação Corrigida: ${m.horarioOriginal ? `${m.horarioOriginal} → ` : ''}${m.horario}${m.motivoCorrecao ? ` (${m.motivoCorrecao})` : ''}`
+                                            : ehAuto
+                                              ? 'Intervalo automático da jornada'
+                                              : ehAjuste
+                                                ? 'Ajuste de fechamento'
+                                                : ehOffline
+                                                  ? 'Batida registrada em modo offline e sincronizada'
+                                                  : 'Batida registrada'
                                       }
                                     >
                                       {m.horario}
                                       {ehAuto && (
                                         <span className="text-[9px] bg-[#7C3AED]/40 text-purple-200 px-1 rounded uppercase tracking-wider">
                                           Auto
+                                        </span>
+                                      )}
+                                      {m.corrigida && !ehAnulado && (
+                                        <span
+                                          className="text-[9px] bg-amber-400/30 text-amber-200 px-1 rounded font-bold uppercase tracking-wider"
+                                          title={
+                                            m.horarioOriginal
+                                              ? `Horário corrigido de ${m.horarioOriginal} para ${m.horario}`
+                                              : 'Marcação com horário corrigido'
+                                          }
+                                        >
+                                          Corrigida
                                         </span>
                                       )}
                                       {ehOffline && !ehAnulado && (

@@ -157,6 +157,8 @@ export interface TratamentoPonto {
     | 'abono_horas'
     | 'anulacao_marcacao_duplicada'
     | 'anulacao_marcacao_indevida'
+    | 'correcao_horario_batida'
+    | 'anulacao_por_correcao'
   created: string
   updated: string
   expand?: {

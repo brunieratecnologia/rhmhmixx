@@ -943,6 +943,111 @@ export function executarTestesIntervaloAutomatico(): {
     })
   }
 
+  // TESTE 11: Correção de horário de batida do terminal (exemplo da Rosineida que chegou 07:45 mas bateu 08:30 por problema no computador)
+  // Original do terminal: 08:30 (entrada com atraso aparente) e 17:00 (saída)
+  // Jornada padrão: 08:00 às 17:00 com almoço 12:00 às 13:00 (8h líquidas)
+  // Com a correção: batida de 08:30 anulada via tratamento + nova batida de 07:45 incluída via tratamento vinculado
+  // Resultado líquido: entrada 07:45, almoço auto 12:00–13:00, saída 17:00 -> 8h15 trabalhadas (495 min), sem atraso!
+  {
+    const regTerminalEntrada: RegistroHorario = {
+      id: 'reg_rosi_ent',
+      funcionario: 'func_rosi',
+      data_utc: '2026-09-08',
+      hora_utc: '08:30:00',
+      timestamp_utc: '2026-09-08T11:30:00.000Z', // 08:30 SP
+      origem: 'terminal',
+      created: '',
+      updated: '',
+    }
+    const regTerminalSaida: RegistroHorario = {
+      id: 'reg_rosi_sai',
+      funcionario: 'func_rosi',
+      data_utc: '2026-09-08',
+      hora_utc: '17:00:00',
+      timestamp_utc: '2026-09-08T20:00:00.000Z', // 17:00 SP
+      origem: 'terminal',
+      created: '',
+      updated: '',
+    }
+
+    // Tratamentos complementares vinculados da correção:
+    // 1. Anulação do original de 08:30
+    // 2. Inclusão da batida corrigida às 07:45 vinculada ao registro
+    const tratamentosCorrecao: TratamentoPonto[] = [
+      {
+        id: 'trat_anula_0830',
+        funcionario: 'func_rosi',
+        registro: 'reg_rosi_ent',
+        tipo: 'anulacao',
+        origem_ajuste: 'anulacao_por_correcao',
+        data_registro: '2026-09-08',
+        hora_registro: '08:30',
+        justificativa: 'Problemas no computador na chegada às 07:45',
+        informacao_corrigida: 'Marcação original anulada por motivo de correção para 07:45',
+        data_tratamento: '2026-09-08T12:00:00Z',
+        created: '',
+        updated: '',
+      },
+      {
+        id: 'trat_corrige_0745',
+        funcionario: 'func_rosi',
+        registro: 'reg_rosi_ent',
+        tipo: 'correcao',
+        tipo_marcacao: 'entrada',
+        origem_ajuste: 'correcao_horario_batida',
+        data_registro: '2026-09-08',
+        hora_registro: '07:45',
+        justificativa: 'Problemas no computador na chegada às 07:45',
+        informacao_corrigida: 'Horário corrigido de 08:30 para 07:45 (entrada)',
+        data_tratamento: '2026-09-08T12:00:00Z',
+        created: '',
+        updated: '',
+      },
+    ]
+
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao, // 08:00 às 17:00 (almoço 12:00-13:00)
+      historicoJornadas: [],
+      registrosMes: [regTerminalEntrada, regTerminalSaida],
+      tratamentosMes: tratamentosCorrecao,
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const dia8 = espelho.dias.find((d) => d.data === '2026-09-08')
+    const batidaAnulada = dia8?.todasMarcacoes.find((m) => m.id === 'reg_rosi_ent' && m.anulado)
+    const batidaCorrigida = dia8?.todasMarcacoes.find(
+      (m) => m.id === 'trat_corrige_0745' && !m.anulado,
+    )
+
+    // Intervalo auto: 12:00 a 13:00 (60 min)
+    // Manhã: 07:45 às 12:00 = 255 min
+    // Tarde: 13:00 às 17:00 = 240 min
+    // Total trabalhado esperado = 495 min (8h15)
+    // Previsto = 480 min (8h00)
+    // Diferença = +15 min
+    // Atraso = 0 min
+    const passouFluxoCorrecao =
+      Boolean(dia8) &&
+      Boolean(batidaAnulada) &&
+      batidaAnulada?.horario === '08:30' &&
+      Boolean(batidaCorrigida) &&
+      batidaCorrigida?.horario === '07:45' &&
+      batidaCorrigida?.corrigida === true &&
+      batidaCorrigida?.horarioOriginal === '08:30' &&
+      dia8?.realizadoMinutos === 495 &&
+      dia8?.diferencaMinutos === 15 &&
+      dia8?.atrasoMinutos === 0
+
+    resultados.push({
+      nome: 'Teste (k): Correção de horário de batida do terminal anula original, inclui corrigido e calcula com o novo horário',
+      passou: passouFluxoCorrecao,
+      detalhe: `Trabalhado: ${dia8?.realizadoMinutos}m (esperado 495m), Dif: ${dia8?.diferencaMinutos}m, Atraso: ${dia8?.atrasoMinutos}m, Corrigida: ${batidaCorrigida?.corrigida}, Horário Orig: ${batidaCorrigida?.horarioOriginal}`,
+    })
+  }
+
   const todosPassaram = resultados.every((r) => r.passou)
   return { todosPassaram, resultados }
 }

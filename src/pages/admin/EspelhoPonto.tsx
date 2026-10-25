@@ -13,6 +13,7 @@ import {
   DiaEspelhoCalculado,
   ResumoEspelhoMensal,
   minutesToHoursText,
+  getSPTimeFromUtc,
 } from '@/lib/calculoHoras'
 import { executarTestesIntervaloAutomatico } from '@/lib/calculoHoras.test'
 import { formatBRDate } from '@/lib/formatters'
@@ -103,11 +104,12 @@ export default function EspelhoPonto() {
   const [obsFechamento, setObsFechamento] = useState('')
   const [processandoFechamento, setProcessandoFechamento] = useState(false)
 
-  // 2. Inclusão / Ajuste de Ponto Faltante ou Anulação no Fechamento
+  // 2. Inclusão / Ajuste de Ponto Faltante, Anulação ou Correção de Horário
   const [ajustePontoModalOpen, setAjustePontoModalOpen] = useState(false)
   const [ajusteDia, setAjusteDia] = useState<DiaEspelhoCalculado | null>(null)
-  const [ajusteModo, setAjusteModo] = useState<'incluir' | 'anular'>('incluir')
+  const [ajusteModo, setAjusteModo] = useState<'incluir' | 'anular' | 'corrigir'>('incluir')
   const [registroParaAnular, setRegistroParaAnular] = useState<string>('')
+  const [registroParaCorrigir, setRegistroParaCorrigir] = useState<string>('')
   const [ajusteHora, setAjusteHora] = useState('08:00')
   const [ajusteTipoMarcacao, setAjusteTipoMarcacao] = useState<
     'entrada' | 'inicio_intervalo' | 'retorno_intervalo' | 'saida' | 'outro'
@@ -339,7 +341,7 @@ export default function EspelhoPonto() {
     }
   }
 
-  // Salvar Ajuste / Inclusão de Ponto Faltante ou Anulação de Marcação
+  // Salvar Ajuste / Inclusão de Ponto Faltante, Anulação ou Correção de Marcação
   const handleSalvarAjustePonto = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!ajusteDia || !selectedFuncId || !ajusteMotivo.trim()) return
@@ -353,9 +355,37 @@ export default function EspelhoPonto() {
       return
     }
 
+    if (ajusteModo === 'corrigir' && !registroParaCorrigir) {
+      toast({
+        title: 'Selecione a marcação original para corrigir',
+        description: 'É necessário indicar qual batida do terminal teve o horário incorreto.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSalvandoAjuste(true)
     try {
-      if (ajusteModo === 'anular') {
+      if (ajusteModo === 'corrigir') {
+        const res = await fechamentoFolhaService.ajustarPonto({
+          funcionario: selectedFuncId,
+          data_registro: ajusteDia.data,
+          hora_registro: ajusteHora,
+          tipo: 'correcao',
+          tipo_marcacao: ajusteTipoMarcacao,
+          justificativa: ajusteMotivo.trim(),
+          registro: registroParaCorrigir,
+          acao_tipo: 'corrigir',
+        })
+
+        toast({
+          title: 'Horário de batida corrigido.',
+          description:
+            res.message ||
+            'A marcação foi corrigida com sucesso. O horário corrigido passa a constar nos cálculos do espelho e o registro original permanece preservado no histórico.',
+          className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        })
+      } else if (ajusteModo === 'anular') {
         // Encontrar horário do registro selecionado para salvar no tratamento
         const regAlvo = ajusteDia.marcacoesOriginais.find((r) => r.id === registroParaAnular)
         const horaAlvo = regAlvo
@@ -402,6 +432,7 @@ export default function EspelhoPonto() {
       setAjustePontoModalOpen(false)
       setAjusteMotivo('')
       setRegistroParaAnular('')
+      setRegistroParaCorrigir('')
       carregarEspelho()
     } catch (err: any) {
       toast({
@@ -852,26 +883,30 @@ export default function EspelhoPonto() {
                                     title={
                                       ehAnulado
                                         ? `Marcação Anulada: ${m.motivoAnulacao || 'Desconsiderada por registro complementar'}`
-                                        : `${m.tipo.replace('_', ' ')} (${
-                                            ehAuto
-                                              ? 'Intervalo Automático derivado da jornada'
-                                              : ehAjuste
-                                                ? 'Ajuste Fechamento Folha'
-                                                : ehOffline
-                                                  ? 'Registrado Offline no Terminal e Sincronizado'
-                                                  : 'Terminal Coletivo Imutável'
-                                          })`
+                                        : m.corrigida
+                                          ? `Marcação Corrigida: ${m.horarioOriginal ? `${m.horarioOriginal} → ` : ''}${m.horario}${m.motivoCorrecao ? ` (Motivo: ${m.motivoCorrecao})` : ''}`
+                                          : `${m.tipo.replace('_', ' ')} (${
+                                              ehAuto
+                                                ? 'Intervalo Automático derivado da jornada'
+                                                : ehAjuste
+                                                  ? 'Ajuste Fechamento Folha'
+                                                  : ehOffline
+                                                    ? 'Registrado Offline no Terminal e Sincronizado'
+                                                    : 'Terminal Coletivo Imutável'
+                                            })`
                                     }
                                     className={`px-2 py-0.5 rounded text-xs font-semibold border flex items-center gap-1 ${
                                       ehAnulado
                                         ? 'bg-red-50 text-red-700/80 border-red-200 line-through opacity-75'
-                                        : ehAuto
-                                          ? 'bg-purple-50 text-purple-900 border-purple-300 shadow-xs'
-                                          : ehAjuste
-                                            ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                            : ehOffline
-                                              ? 'bg-amber-50/80 text-amber-950 border-amber-300/80 shadow-xs'
-                                              : 'bg-slate-100 text-slate-800 border-slate-200'
+                                        : m.corrigida
+                                          ? 'bg-amber-100 text-amber-950 border-amber-400 shadow-xs'
+                                          : ehAuto
+                                            ? 'bg-purple-50 text-purple-900 border-purple-300 shadow-xs'
+                                            : ehAjuste
+                                              ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                              : ehOffline
+                                                ? 'bg-amber-50/80 text-amber-950 border-amber-300/80 shadow-xs'
+                                                : 'bg-slate-100 text-slate-800 border-slate-200'
                                     }`}
                                   >
                                     {m.horario}
@@ -883,7 +918,19 @@ export default function EspelhoPonto() {
                                         Auto
                                       </span>
                                     )}
-                                    {ehAjuste && !ehAnulado && (
+                                    {m.corrigida && !ehAnulado && (
+                                      <span
+                                        className="text-[9px] bg-amber-300 text-amber-950 px-1 rounded font-bold uppercase tracking-wider"
+                                        title={
+                                          m.horarioOriginal
+                                            ? `Horário corrigido de ${m.horarioOriginal} para ${m.horario}${m.motivoCorrecao ? ` (${m.motivoCorrecao})` : ''}`
+                                            : `Marcação corrigida pelo gestor${m.motivoCorrecao ? `: ${m.motivoCorrecao}` : ''}`
+                                        }
+                                      >
+                                        CORRIGIDA
+                                      </span>
+                                    )}
+                                    {ehAjuste && !ehAnulado && !m.corrigida && (
                                       <span
                                         className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded font-bold"
                                         title="Incluído pelo gestor no fechamento"
@@ -1044,6 +1091,7 @@ export default function EspelhoPonto() {
                                 setAjusteTipoMarcacao('entrada')
                                 setAjusteMotivo('')
                                 setRegistroParaAnular('')
+                                setRegistroParaCorrigir('')
                                 setAjustePontoModalOpen(true)
                               }}
                               className="h-7 px-2 text-[11px] border-amber-300 text-amber-900 bg-amber-50/80 hover:bg-amber-100 font-semibold"
@@ -1182,7 +1230,7 @@ export default function EspelhoPonto() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Ajuste de Ponto (Inclusão ou Anulação) no Fechamento */}
+      {/* Modal Ajuste de Ponto (Inclusão, Anulação ou Correção) no Fechamento */}
       <Dialog open={ajustePontoModalOpen} onOpenChange={setAjustePontoModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1193,30 +1241,60 @@ export default function EspelhoPonto() {
             <DialogDescription>
               Colaborador: <strong>{funcionarioAtual?.nome}</strong> — Data:{' '}
               <strong>{ajusteDia ? formatBRDate(ajusteDia.data) : ''}</strong>. Os registros
-              originais do terminal permanecem 100% imutáveis. Inclusões ou anulações são feitas via
-              registros complementares auditados (AJ).
+              originais do terminal permanecem 100% imutáveis. Inclusões, anulações e correções são
+              feitas via registros complementares auditados (AJ).
             </DialogDescription>
           </DialogHeader>
 
-          {/* Alternador de Ação: Incluir Batida Faltante vs Anular Marcação Errada */}
-          <div className="flex border border-slate-200 rounded-lg p-1 bg-slate-50 gap-1 text-xs">
+          {/* Alternador de Ação: Corrigir Horário vs Incluir Batida vs Anular Marcação */}
+          <div className="grid grid-cols-3 border border-slate-200 rounded-lg p-1 bg-slate-50 gap-1 text-xs">
             <button
               type="button"
-              onClick={() => setAjusteModo('incluir')}
-              className={`flex-1 py-1.5 px-3 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-                ajusteModo === 'incluir'
+              onClick={() => {
+                setAjusteModo('corrigir')
+                if (ajusteDia && ajusteDia.marcacoesOriginais.length > 0) {
+                  const jaAnuladas = new Set(
+                    ajusteDia.todasMarcacoes.filter((m) => m.anulado).map((m) => m.id),
+                  )
+                  const primeiraValida = ajusteDia.marcacoesOriginais.find(
+                    (r) => !jaAnuladas.has(r.id),
+                  )
+                  if (primeiraValida) {
+                    setRegistroParaCorrigir(primeiraValida.id)
+                    const h = primeiraValida.timestamp_utc
+                      ? getSPTimeFromUtc(primeiraValida.timestamp_utc)
+                      : primeiraValida.hora_utc.slice(0, 5)
+                    setAjusteHora(h)
+                  }
+                }
+              }}
+              className={`py-1.5 px-2 rounded-md font-semibold transition-colors flex items-center justify-center gap-1 text-center ${
+                ajusteModo === 'corrigir'
                   ? 'bg-amber-600 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <PlusCircle className="w-3.5 h-3.5" />
-              Incluir Batida Esquecida
+              <Clock className="w-3.5 h-3.5 shrink-0" />
+              <span>Corrigir Horário</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setAjusteModo('incluir')}
+              className={`py-1.5 px-2 rounded-md font-semibold transition-colors flex items-center justify-center gap-1 text-center ${
+                ajusteModo === 'incluir'
+                  ? 'bg-[#2563EB] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>Incluir Batida</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
                 setAjusteModo('anular')
-                // Se houver marcações originais, pré-seleciona a primeira que não estiver já anulada
                 if (ajusteDia && ajusteDia.marcacoesOriginais.length > 0) {
                   const jaAnuladas = new Set(
                     ajusteDia.todasMarcacoes.filter((m) => m.anulado).map((m) => m.id),
@@ -1229,19 +1307,131 @@ export default function EspelhoPonto() {
                   }
                 }
               }}
-              className={`flex-1 py-1.5 px-3 rounded-md font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+              className={`py-1.5 px-2 rounded-md font-semibold transition-colors flex items-center justify-center gap-1 text-center ${
                 ajusteModo === 'anular'
                   ? 'bg-rose-700 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Ban className="w-3.5 h-3.5" />
-              Anular Marcação Errada
+              <Ban className="w-3.5 h-3.5 shrink-0" />
+              <span>Anular Errada</span>
             </button>
           </div>
 
           <form onSubmit={handleSalvarAjustePonto} className="space-y-4 pt-1">
-            {ajusteModo === 'incluir' ? (
+            {ajusteModo === 'corrigir' ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">
+                    Marcação original do terminal a corrigir <span className="text-red-500">*</span>
+                  </Label>
+                  {ajusteDia && ajusteDia.marcacoesOriginais.length > 0 ? (
+                    <Select
+                      value={registroParaCorrigir}
+                      onValueChange={(val) => {
+                        setRegistroParaCorrigir(val)
+                        const reg = ajusteDia.marcacoesOriginais.find((r) => r.id === val)
+                        if (reg) {
+                          const h = reg.timestamp_utc
+                            ? getSPTimeFromUtc(reg.timestamp_utc)
+                            : reg.hora_utc.slice(0, 5)
+                          setAjusteHora(h)
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="text-xs">
+                        <SelectValue placeholder="Selecione o registro..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ajusteDia.marcacoesOriginais.map((reg) => {
+                          const horaFormatada = reg.timestamp_utc
+                            ? new Intl.DateTimeFormat('pt-BR', {
+                                timeZone: 'America/Sao_Paulo',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false,
+                              }).format(new Date(reg.timestamp_utc))
+                            : reg.hora_utc
+                          const jaAnulado = ajusteDia.todasMarcacoes.some(
+                            (m) => m.id === reg.id && m.anulado,
+                          )
+                          return (
+                            <SelectItem
+                              key={reg.id}
+                              value={reg.id}
+                              disabled={jaAnulado}
+                              className="font-mono text-xs"
+                            >
+                              Batida original às {horaFormatada}{' '}
+                              {jaAnulado ? '(Já Anulada)' : '(Terminal)'}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic p-2 bg-slate-50 rounded border">
+                      Não há marcações do terminal registradas nesta data para corrigir. Use
+                      "Incluir Batida" caso o colaborador não tenha batido.
+                    </p>
+                  )}
+                  <p className="text-[11px] text-slate-500">
+                    O registro original do terminal permanece intacto no banco de dados e visível no
+                    espelho como anulado. Um novo registro complementar é gerado com o horário
+                    correto.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Tipo da Marcação</Label>
+                    <Select
+                      value={ajusteTipoMarcacao}
+                      onValueChange={(val: any) => setAjusteTipoMarcacao(val)}
+                    >
+                      <SelectTrigger className="text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entrada">Entrada</SelectItem>
+                        <SelectItem value="inicio_intervalo">Início Intervalo</SelectItem>
+                        <SelectItem value="retorno_intervalo">Retorno Intervalo</SelectItem>
+                        <SelectItem value="saida">Saída</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ajusteHoraInput" className="text-xs font-semibold">
+                      Horário Correto (24h) <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="ajusteHoraInput"
+                      type="time"
+                      required
+                      value={ajusteHora}
+                      onChange={(e) => setAjusteHora(e.target.value)}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="ajusteMotivoInput" className="text-xs font-semibold">
+                    Motivo Obrigatório da Correção <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="ajusteMotivoInput"
+                    required
+                    placeholder="Ex: Problemas de lentidão no computador ao iniciar o turno"
+                    value={ajusteMotivo}
+                    onChange={(e) => setAjusteMotivo(e.target.value)}
+                  />
+                </div>
+              </>
+            ) : ajusteModo === 'incluir' ? (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -1372,19 +1562,24 @@ export default function EspelhoPonto() {
                 disabled={
                   salvandoAjuste ||
                   !ajusteMotivo.trim() ||
+                  (ajusteModo === 'corrigir' && !registroParaCorrigir) ||
                   (ajusteModo === 'anular' && !registroParaAnular)
                 }
                 className={
-                  ajusteModo === 'anular'
-                    ? 'bg-rose-700 hover:bg-rose-800 text-white'
-                    : 'bg-amber-600 hover:bg-amber-700 text-white'
+                  ajusteModo === 'corrigir'
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : ajusteModo === 'anular'
+                      ? 'bg-rose-700 hover:bg-rose-800 text-white'
+                      : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white'
                 }
               >
                 {salvandoAjuste
                   ? 'Processando...'
-                  : ajusteModo === 'anular'
-                    ? 'Confirmar Anulação'
-                    : 'Salvar Marcação Complementar'}
+                  : ajusteModo === 'corrigir'
+                    ? 'Confirmar Correção de Horário'
+                    : ajusteModo === 'anular'
+                      ? 'Confirmar Anulação'
+                      : 'Salvar Marcação Complementar'}
               </Button>
             </DialogFooter>
           </form>

@@ -19,6 +19,9 @@ export interface MarcacaoInterpreta {
   anulado?: boolean
   motivoAnulacao?: string
   offline_sync?: boolean
+  corrigida?: boolean
+  horarioOriginal?: string
+  motivoCorrecao?: string
 }
 
 export interface DiaEspelhoCalculado {
@@ -425,12 +428,39 @@ export function calcularHorasRealizadas(
   // 2. Marcações adicionadas em tratamentos de fechamento (que não sejam anulações)
   for (const trat of tratamentosDoDia) {
     if (trat.tipo !== 'anulacao' && trat.hora_registro) {
+      // Se tiver registro original vinculado ou origem_ajuste = correcao_horario_batida,
+      // busca o horário original no registro ou na informação corrigida
+      let ehCorrecao = trat.origem_ajuste === 'correcao_horario_batida'
+      let horaOriginal: string | undefined = undefined
+
+      if (trat.registro) {
+        const regVinculado = marcacoesOriginais.find((r) => r.id === trat.registro)
+        if (regVinculado) {
+          ehCorrecao = true
+          horaOriginal = regVinculado.timestamp_utc
+            ? getSPTimeFromUtc(regVinculado.timestamp_utc)
+            : regVinculado.hora_utc.slice(0, 5)
+        }
+      }
+
+      // Se ainda não encontrou horaOriginal mas informacao_corrigida menciona "Horário corrigido de HH:MM para HH:MM"
+      if (!horaOriginal && trat.informacao_corrigida) {
+        const match = trat.informacao_corrigida.match(/de\s+(\d{2}:\d{2})\s+para/i)
+        if (match && match[1]) {
+          horaOriginal = match[1]
+          ehCorrecao = true
+        }
+      }
+
       listaFisica.push({
         id: trat.id,
         horario: trat.hora_registro.slice(0, 5),
         tipo: (trat.tipo_marcacao as any) || 'avulsa',
         origem: 'tratamento_fechamento',
         tratamento: trat,
+        corrigida: ehCorrecao,
+        horarioOriginal: horaOriginal,
+        motivoCorrecao: trat.justificativa,
       })
     }
   }

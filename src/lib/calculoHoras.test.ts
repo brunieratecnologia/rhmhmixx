@@ -1048,6 +1048,155 @@ export function executarTestesIntervaloAutomatico(): {
     })
   }
 
+  // TESTE 8: Feriado sem nenhuma batida executada (ex: 12/10 Nossa Senhora Aparecida)
+  // Requisito: Não gera falta, previsto vira "Feriado — <nome>", minutos previstos = 0, sem ocorrência de falta/alerta
+  {
+    const feriadoAparecida = {
+      id: 'fer-1210',
+      data: '2026-10-12',
+      nome: 'Nossa Senhora Aparecida',
+      tipo: 'nacional' as const,
+      recorrente: true,
+      ativo: true,
+      created: '',
+      updated: '',
+    }
+
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 10,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [], // Ninguém bateu ponto no mês/dia
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+      feriados: [feriadoAparecida],
+    })
+
+    const dia12 = espelho.dias.find((d) => d.data === '2026-10-12')
+    const passouFeriadoSemBatida =
+      Boolean(dia12) &&
+      dia12?.ehFeriado === true &&
+      dia12?.previstoMinutos === 0 &&
+      dia12?.previstoFormatado === 'Feriado — Nossa Senhora Aparecida' &&
+      dia12?.realizadoMinutos === 0 &&
+      dia12?.diferencaMinutos === 0 &&
+      dia12?.horasBancoDebitoMinutos === 0 &&
+      dia12?.ocorrencias.length === 0
+
+    resultados.push({
+      nome: 'Teste (l): Feriado sem batida não gera falta, zera previsto e exibe "Feriado — <nome>"',
+      passou: passouFeriadoSemBatida,
+      detalhe: `ehFeriado: ${dia12?.ehFeriado}, previsto: ${dia12?.previstoFormatado}, diferenca: ${dia12?.diferencaMinutos}m, debitoBH: ${dia12?.horasBancoDebitoMinutos}m, ocorrencias: ${dia12?.ocorrencias.length}`,
+    })
+  }
+
+  // TESTE 9: Feriado com batida de ponto executada (trabalho em dia de feriado)
+  // Requisito: Todas as horas trabalhadas do dia são creditadas integralmente como Banco de Horas
+  {
+    const feriadoTrabalho = {
+      id: 'fer-0105',
+      data: '2026-05-01',
+      nome: 'Dia do Trabalho',
+      tipo: 'nacional' as const,
+      recorrente: true,
+      ativo: true,
+      created: '',
+      updated: '',
+    }
+
+    const regsFeriado: RegistroHorario[] = [
+      {
+        id: 'rf1',
+        funcionario: 'f1',
+        data_utc: '2026-05-01',
+        hora_utc: '08:00:00',
+        timestamp_utc: '2026-05-01T11:00:00.000Z',
+        origem: 'terminal',
+        created: '',
+        updated: '',
+      },
+      {
+        id: 'rf2',
+        funcionario: 'f1',
+        data_utc: '2026-05-01',
+        hora_utc: '14:00:00',
+        timestamp_utc: '2026-05-01T17:00:00.000Z',
+        origem: 'terminal',
+        created: '',
+        updated: '',
+      },
+    ]
+
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 5,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: regsFeriado, // Bateu 08:00 às 14:00 (6h = 360 min)
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+      feriados: [feriadoTrabalho],
+    })
+
+    const dia1 = espelho.dias.find((d) => d.data === '2026-05-01')
+    const passouFeriadoComBatida =
+      Boolean(dia1) &&
+      dia1?.ehFeriado === true &&
+      dia1?.realizadoMinutos === 360 &&
+      dia1?.horasBancoCreditoMinutos === 360 && // Crédito integral em banco de horas
+      dia1?.diferencaMinutos === 360 &&
+      dia1?.ocorrencias.some((o) => o.tipo === 'folga_trabalhada')
+
+    resultados.push({
+      nome: 'Teste (m): Feriado trabalhado credita 100% das horas no Banco de Horas',
+      passou: Boolean(passouFeriadoComBatida),
+      detalhe: `ehFeriado: ${dia1?.ehFeriado}, realizado: ${dia1?.realizadoMinutos}m, creditoBH: ${dia1?.horasBancoCreditoMinutos}m`,
+    })
+  }
+
+  // TESTE 10: Feriado recorrente aplicado em múltiplos anos (ex: 2026 e 2027)
+  // Requisito: Um feriado cadastrado como recorrente em 2026-10-12 é reconhecido no espelho de 2027
+  {
+    const feriadoRecorrente = {
+      id: 'fer-recorrente-1',
+      data: '2026-10-12',
+      nome: 'Nossa Senhora Aparecida',
+      tipo: 'nacional' as const,
+      recorrente: true,
+      ativo: true,
+      created: '',
+      updated: '',
+    }
+
+    const espelho2027 = construirEspelhoMensal({
+      ano: 2027,
+      mes: 10,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+      feriados: [feriadoRecorrente],
+    })
+
+    const dia12Out2027 = espelho2027.dias.find((d) => d.data === '2027-10-12')
+    const passouRecorrenciaMultiplosAnos =
+      Boolean(dia12Out2027) &&
+      dia12Out2027?.ehFeriado === true &&
+      dia12Out2027?.previstoMinutos === 0 &&
+      dia12Out2027?.previstoFormatado === 'Feriado — Nossa Senhora Aparecida'
+
+    resultados.push({
+      nome: 'Teste (n): Feriado recorrente se propaga corretamente para outros anos (ex: 2027)',
+      passou: Boolean(passouRecorrenciaMultiplosAnos),
+      detalhe: `2027-10-12 ehFeriado: ${dia12Out2027?.ehFeriado}, previsto: ${dia12Out2027?.previstoFormatado}`,
+    })
+  }
+
   const todosPassaram = resultados.every((r) => r.passou)
   return { todosPassaram, resultados }
 }

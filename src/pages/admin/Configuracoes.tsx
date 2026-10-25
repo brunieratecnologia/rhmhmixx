@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { empresaService, usersService } from '@/services/rh'
-import type { Empresa, User } from '@/types/rh'
-import { maskCNPJ, maskPhone } from '@/lib/formatters'
+import {
+  empresaService,
+  usersService,
+  jornadasService,
+  feriadosService,
+  type JornadaVinculosInfo,
+} from '@/services/rh'
+import type { Empresa, User, Jornada, Feriado, TipoFeriado } from '@/types/rh'
+import { maskCNPJ, maskPhone, formatBRDate } from '@/lib/formatters'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -23,11 +29,14 @@ import {
   Clock,
   Plus,
   Info,
+  Calendar,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
 } from 'lucide-react'
 import JornadaModal from '@/components/admin/JornadaModal'
 import { ScrollableTabsBar } from '@/components/admin/ScrollableTabsBar'
-import { jornadasService, type JornadaVinculosInfo } from '@/services/rh'
-import type { Jornada } from '@/types/rh'
 import { Badge } from '@/components/ui/badge'
 import { minutesToHoursText } from '@/lib/calculoHoras'
 import { Button } from '@/components/ui/button'
@@ -53,7 +62,9 @@ export default function Configuracoes() {
   const { user: currentUser } = useAuth()
   const { toast } = useToast()
 
-  const [activeTab, setActiveTab] = useState<'empresa' | 'usuarios' | 'jornadas'>('empresa')
+  const [activeTab, setActiveTab] = useState<'empresa' | 'usuarios' | 'jornadas' | 'feriados'>(
+    'empresa',
+  )
   const [jornadasList, setJornadasList] = useState<Jornada[]>([])
   const [jornadaModalOpen, setJornadaModalOpen] = useState(false)
   const [editingJornada, setEditingJornada] = useState<Jornada | null>(null)
@@ -100,6 +111,23 @@ export default function Configuracoes() {
   const [deleteUserModal, setDeleteUserModal] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [deletingUser, setDeletingUser] = useState(false)
+
+  // Feriados State
+  const [anoFeriados, setAnoFeriados] = useState<number>(new Date().getFullYear())
+  const [feriadosList, setFeriadosList] = useState<Feriado[]>([])
+  const [loadingFeriados, setLoadingFeriados] = useState(false)
+  const [feriadoModalOpen, setFeriadoModalOpen] = useState(false)
+  const [editingFeriado, setEditingFeriado] = useState<Feriado | null>(null)
+  const [feriadoDataInput, setFeriadoDataInput] = useState('') // DD/MM/AAAA ou YYYY-MM-DD
+  const [feriadoNome, setFeriadoNome] = useState('')
+  const [feriadoTipo, setFeriadoTipo] = useState<TipoFeriado>('nacional')
+  const [feriadoRecorrente, setFeriadoRecorrente] = useState(true)
+  const [feriadoAtivo, setFeriadoAtivo] = useState(true)
+  const [savingFeriado, setSavingFeriado] = useState(false)
+  const [deleteFeriadoModal, setDeleteFeriadoModal] = useState(false)
+  const [feriadoToDelete, setFeriadoToDelete] = useState<Feriado | null>(null)
+  const [deletingFeriado, setDeletingFeriado] = useState(false)
+  const [carregandoNacionais, setCarregandoNacionais] = useState(false)
 
   const loadEmpresa = async () => {
     try {
@@ -208,7 +236,134 @@ export default function Configuracoes() {
     loadEmpresa()
     loadUsers()
     loadJornadas()
+    loadFeriados(anoFeriados)
   }, [])
+
+  const loadFeriados = async (ano: number) => {
+    setLoadingFeriados(true)
+    try {
+      const list = await feriadosService.listByAno(ano, false)
+      setFeriadosList(list)
+    } catch (err) {
+      console.error('Erro ao carregar feriados:', err)
+    } finally {
+      setLoadingFeriados(false)
+    }
+  }
+
+  const handleMudarAnoFeriados = (novoAno: number) => {
+    setAnoFeriados(novoAno)
+    loadFeriados(novoAno)
+  }
+
+  const handleOpenNewFeriado = () => {
+    setEditingFeriado(null)
+    setFeriadoDataInput(`${anoFeriados}-01-01`)
+    setFeriadoNome('')
+    setFeriadoTipo('nacional')
+    setFeriadoRecorrente(true)
+    setFeriadoAtivo(true)
+    setFeriadoModalOpen(true)
+  }
+
+  const handleOpenEditFeriado = (f: Feriado) => {
+    setEditingFeriado(f)
+    const rawData = f.data ? f.data.slice(0, 10) : ''
+    setFeriadoDataInput(rawData)
+    setFeriadoNome(f.nome)
+    setFeriadoTipo(f.tipo || 'nacional')
+    setFeriadoRecorrente(Boolean(f.recorrente))
+    setFeriadoAtivo(f.ativo !== false)
+    setFeriadoModalOpen(true)
+  }
+
+  const handleSaveFeriado = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!feriadoNome.trim() || !feriadoDataInput) return
+
+    setSavingFeriado(true)
+    try {
+      if (editingFeriado) {
+        await feriadosService.update(editingFeriado.id, {
+          data: feriadoDataInput,
+          nome: feriadoNome.trim(),
+          tipo: feriadoTipo,
+          recorrente: feriadoRecorrente,
+          ativo: feriadoAtivo,
+        })
+        toast({
+          title: 'Feriado atualizado.',
+          className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        })
+      } else {
+        await feriadosService.create({
+          data: feriadoDataInput,
+          nome: feriadoNome.trim(),
+          tipo: feriadoTipo,
+          recorrente: feriadoRecorrente,
+          ativo: feriadoAtivo,
+        })
+        toast({
+          title: 'Feriado cadastrado.',
+          className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        })
+      }
+      setFeriadoModalOpen(false)
+      loadFeriados(anoFeriados)
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar feriado',
+        description: err?.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingFeriado(false)
+    }
+  }
+
+  const handleDeleteFeriado = async () => {
+    if (!feriadoToDelete) return
+    setDeletingFeriado(true)
+    try {
+      await feriadosService.delete(feriadoToDelete.id)
+      toast({
+        title: 'Feriado excluído com sucesso.',
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      })
+      setDeleteFeriadoModal(false)
+      setFeriadoToDelete(null)
+      loadFeriados(anoFeriados)
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao excluir feriado',
+        description: err?.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setDeletingFeriado(false)
+    }
+  }
+
+  const handleCarregarNacionaisDoAno = async () => {
+    setCarregandoNacionais(true)
+    try {
+      const res = await feriadosService.popularFeriadosNacionaisAno(anoFeriados)
+      toast({
+        title: 'Feriados nacionais verificados',
+        description: `${res.inseridos} novo(s) feriado(s) cadastrado(s), ${res.existentes} já existente(s) ou recorrente(s).`,
+        className: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      })
+      loadFeriados(anoFeriados)
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao carregar feriados nacionais',
+        description: err?.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setCarregandoNacionais(false)
+    }
+  }
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -396,7 +551,9 @@ export default function Configuracoes() {
         {/* Navigation Tabs Bar compacta em linha única */}
         <ScrollableTabsBar
           activeTab={activeTab}
-          onTabChange={(tab) => setActiveTab(tab as 'empresa' | 'jornadas' | 'usuarios')}
+          onTabChange={(tab) =>
+            setActiveTab(tab as 'empresa' | 'jornadas' | 'feriados' | 'usuarios')
+          }
           tabs={[
             {
               id: 'empresa',
@@ -407,6 +564,11 @@ export default function Configuracoes() {
               id: 'jornadas',
               label: 'Jornadas de Trabalho',
               icon: <Clock className="w-4 h-4" />,
+            },
+            {
+              id: 'feriados',
+              label: 'Feriados',
+              icon: <Calendar className="w-4 h-4" />,
             },
             {
               id: 'usuarios',
@@ -838,7 +1000,209 @@ export default function Configuracoes() {
           </div>
         )}
 
-        {/* TAB 2: USUÁRIOS ADMINISTRATIVOS */}
+        {/* TAB 3: FERIADOS */}
+        {activeTab === 'feriados' && (
+          <div className="p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#D4AF37]" />
+                  Cadastro de Feriados
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Feriados nacionais, estaduais e municipais que dispensam o registro de ponto e
+                  isentam ocorrência de falta
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Navegador de Ano */}
+                <div className="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleMudarAnoFeriados(anoFeriados - 1)}
+                    className="h-7 w-7 p-0 text-slate-600 hover:text-slate-900"
+                    title="Ano Anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="font-bold text-xs px-3 text-slate-800">Ano {anoFeriados}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleMudarAnoFeriados(anoFeriados + 1)}
+                    className="h-7 w-7 p-0 text-slate-600 hover:text-slate-900"
+                    title="Próximo Ano"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Botão Carregar Feriados Nacionais */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCarregarNacionaisDoAno}
+                  disabled={carregandoNacionais}
+                  className="border-[#D4AF37]/50 text-amber-900 bg-amber-50/50 hover:bg-amber-100 text-xs h-9"
+                  title="Garante que todos os feriados nacionais fixos estejam cadastrados"
+                >
+                  <Sparkles className="w-3.5 h-3.5 mr-1.5 text-[#D4AF37]" />
+                  {carregandoNacionais
+                    ? 'Carregando...'
+                    : `Carregar feriados nacionais de ${anoFeriados}`}
+                </Button>
+
+                {/* Botão Novo Feriado */}
+                <Button
+                  type="button"
+                  onClick={handleOpenNewFeriado}
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs sm:text-sm h-9 px-3.5 shadow-sm border-0 hover:brightness-110"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1.5" />
+                  Novo Feriado
+                </Button>
+              </div>
+            </div>
+
+            {/* Caixa Informativa sobre Feriados Móveis */}
+            <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl flex items-start gap-3 text-xs text-amber-950">
+              <Info className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-amber-900">
+                  Importante: Regra de Feriados Móveis vs. Recorrentes
+                </p>
+                <p className="text-amber-800">
+                  Feriados com data fixa (ex: 01/01 Confraternização, 21/04 Tiradentes, 01/05 Dia do
+                  Trabalho, 07/09 Independência, 12/10 Aparecida, 02/11 Finados, 15/11 República,
+                  20/11 Consciência Negra, 25/12 Natal) ficam cadastrados como{' '}
+                  <strong>recorrentes</strong> e valem para qualquer ano.
+                </p>
+                <p className="text-amber-800 font-semibold">
+                  Feriados móveis (Carnaval, Sexta-feira Santa, Corpus Christi) variam a cada ano e
+                  devem ser cadastrados a cada ano manualmente pelo gestor (sem a opção recorrente).
+                </p>
+              </div>
+            </div>
+
+            {/* Tabela de Feriados */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              {loadingFeriados ? (
+                <div className="py-12 text-center text-xs text-slate-500">
+                  <div className="w-6 h-6 border-2 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  Carregando feriados de {anoFeriados}...
+                </div>
+              ) : feriadosList.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-500 space-y-3">
+                  <Calendar className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p>Nenhum feriado cadastrado para o ano {anoFeriados}.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCarregarNacionaisDoAno}
+                    className="border-amber-300 text-amber-900 text-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5 text-[#D4AF37]" />
+                    Carregar Feriados Nacionais do Ano
+                  </Button>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-semibold text-xs">
+                      <th className="py-3 px-4">Data</th>
+                      <th className="py-3 px-4">Nome do Feriado</th>
+                      <th className="py-3 px-4">Tipo</th>
+                      <th className="py-3 px-4">Recorrência</th>
+                      <th className="py-3 px-4">Situação</th>
+                      <th className="py-3 px-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {feriadosList.map((f) => {
+                      const dataStr = f.data ? f.data.slice(0, 10) : ''
+                      return (
+                        <tr key={f.id} className="hover:bg-slate-50/80">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                            {formatBRDate(dataStr)}
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-slate-900">{f.nome}</td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase ${
+                                f.tipo === 'nacional'
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : f.tipo === 'estadual'
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                    : f.tipo === 'municipal'
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              }`}
+                            >
+                              {f.tipo}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {f.recorrente ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                <Sparkles className="w-3 h-3 text-emerald-600" />
+                                Todo ano (fixo)
+                              </span>
+                            ) : (
+                              <span className="text-slate-500 text-xs">Específico deste ano</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            {f.ativo !== false ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Ativo
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                Inativo
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenEditFeriado(f)}
+                                title="Editar Feriado"
+                                className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:text-[#D4AF37]"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </Button>
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setFeriadoToDelete(f)
+                                  setDeleteFeriadoModal(true)
+                                }}
+                                title="Excluir Feriado"
+                                className="h-8 w-8 p-0 border-slate-200 text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: USUÁRIOS ADMINISTRATIVOS */}
         {activeTab === 'usuarios' && (
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
@@ -1281,6 +1645,149 @@ export default function Configuracoes() {
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {deletingUser ? 'Excluindo...' : 'Confirmar Exclusão'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Criar / Editar Feriado */}
+      <Dialog open={feriadoModalOpen} onOpenChange={setFeriadoModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center mb-1">
+              <Calendar className="w-5 h-5 text-[#D4AF37]" />
+            </div>
+            <DialogTitle>{editingFeriado ? 'Editar Feriado' : 'Novo Feriado'}</DialogTitle>
+            <DialogDescription>
+              Feriados dispensam o colaborador da obrigação de ponto. Caso haja trabalho registrado,
+              as horas são integralmente creditadas como Banco de Horas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveFeriado} className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="feriadoNomeInput" className="text-xs font-semibold">
+                Nome do Feriado <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="feriadoNomeInput"
+                required
+                placeholder="Ex: Nossa Senhora Aparecida"
+                value={feriadoNome}
+                onChange={(e) => setFeriadoNome(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="feriadoDataInput" className="text-xs font-semibold">
+                  Data (AAAA-MM-DD) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="feriadoDataInput"
+                  type="date"
+                  required
+                  value={feriadoDataInput}
+                  onChange={(e) => setFeriadoDataInput(e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Tipo de Feriado</Label>
+                <Select value={feriadoTipo} onValueChange={(val: any) => setFeriadoTipo(val)}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="nacional">Nacional</SelectItem>
+                    <SelectItem value="estadual">Estadual</SelectItem>
+                    <SelectItem value="municipal">Municipal</SelectItem>
+                    <SelectItem value="empresa">Empresa / Facultativo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Opções de Recorrência e Ativo */}
+            <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={feriadoRecorrente}
+                  onChange={(e) => setFeriadoRecorrente(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-300 text-[#D4AF37] focus:ring-[#D4AF37]"
+                />
+                <div>
+                  <span className="font-semibold text-slate-800 block">
+                    Feriado Recorrente (Repete todo ano na mesma data)
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Marque para datas fixas (01/01, 21/04, 01/05, 07/09, 12/10, 02/11, 15/11, 20/11,
+                    25/12). <strong>Deixe desmarcado para feriados móveis</strong> (Carnaval,
+                    Sexta-feira Santa, Corpus Christi).
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-2.5 cursor-pointer pt-1 border-t border-slate-200">
+                <input
+                  type="checkbox"
+                  checked={feriadoAtivo}
+                  onChange={(e) => setFeriadoAtivo(e.target.checked)}
+                  className="rounded border-slate-300 text-[#D4AF37] focus:ring-[#D4AF37]"
+                />
+                <span className="font-semibold text-slate-800">Feriado Ativo no Sistema</span>
+              </label>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={savingFeriado}
+                onClick={() => setFeriadoModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingFeriado || !feriadoNome.trim() || !feriadoDataInput}
+                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold border-0 hover:brightness-110"
+              >
+                {savingFeriado ? 'Salvando...' : 'Salvar Feriado'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Excluir Feriado */}
+      <Dialog open={deleteFeriadoModal} onOpenChange={setDeleteFeriadoModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir Feriado</DialogTitle>
+            <DialogDescription>
+              Tem certeza de que deseja remover o feriado <strong>{feriadoToDelete?.nome}</strong> (
+              {feriadoToDelete?.data ? formatBRDate(feriadoToDelete.data.slice(0, 10)) : ''})?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deletingFeriado}
+              onClick={() => setDeleteFeriadoModal(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={deletingFeriado}
+              onClick={handleDeleteFeriado}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deletingFeriado ? 'Excluindo...' : 'Confirmar Exclusão'}
             </Button>
           </DialogFooter>
         </DialogContent>

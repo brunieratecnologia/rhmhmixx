@@ -372,3 +372,16 @@ export interface LogAuditoria {
   created: string
   updated: string
 }
+
+export type TipoFeriado = 'nacional' | 'estadual' | 'municipal' | 'empresa'
+
+export interface Feriado {
+  id: string
+  data: string // YYYY-MM-DD ou ISO
+  nome: string
+  tipo: TipoFeriado
+  recorrente: boolean
+  ativo: boolean
+  created: string
+  updated: string
+}

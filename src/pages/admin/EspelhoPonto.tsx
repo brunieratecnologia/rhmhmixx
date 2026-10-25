@@ -6,8 +6,9 @@ import {
   fechamentoFolhaService,
   atestadosService,
   espelhoPontoService,
+  feriadosService,
 } from '@/services/rh'
-import type { Funcionario, FechamentoFolha } from '@/types/rh'
+import type { Funcionario, FechamentoFolha, Feriado } from '@/types/rh'
 import {
   construirEspelhoMensal,
   DiaEspelhoCalculado,
@@ -124,6 +125,7 @@ export default function EspelhoPonto() {
   const [atestadoMotivo, setAtestadoMotivo] = useState('')
   const [atestadoArquivo, setAtestadoArquivo] = useState<File | null>(null)
   const [salvandoAtestado, setSalvandoAtestado] = useState(false)
+  const [feriadosDoAno, setFeriadosDoAno] = useState<Feriado[]>([])
 
   // Execução de validação dos testes de regressão do cálculo de ponto e intervalo automático
   useEffect(() => {
@@ -161,9 +163,13 @@ export default function EspelhoPonto() {
     if (!selectedFuncId) return
     setLoading(true)
     try {
-      const dados = await espelhoPontoService.getDadosEspelho(selectedFuncId, ano, mes)
+      const [dados, feriadosList] = await Promise.all([
+        espelhoPontoService.getDadosEspelho(selectedFuncId, ano, mes),
+        feriadosService.listByAno(ano, true).catch(() => [] as Feriado[]),
+      ])
       setFuncionarioAtual(dados.funcionario)
       setFechamento(dados.fechamento)
+      setFeriadosDoAno(feriadosList)
 
       const calculado = construirEspelhoMensal({
         ano,
@@ -174,6 +180,7 @@ export default function EspelhoPonto() {
         tratamentosMes: dados.tratamentos,
         ausenciasMes: dados.ausencias,
         feriasMes: dados.ferias,
+        feriados: feriadosList,
       })
 
       setDiasEspelho(calculado.dias)
@@ -826,30 +833,54 @@ export default function EspelhoPonto() {
                     <tr
                       key={dia.data}
                       className={`hover:bg-slate-50/90 transition-colors ${
-                        dia.ehDiaFolga ? 'bg-slate-50/40 text-slate-500' : ''
+                        dia.ehFeriado
+                          ? 'bg-amber-50/30'
+                          : dia.ehDiaFolga
+                            ? 'bg-slate-50/40 text-slate-500'
+                            : ''
                       } ${temIncompleto ? 'bg-amber-50/20' : ''}`}
                     >
                       {/* Data e Dia da Semana */}
                       <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono font-bold text-slate-800">
                             {formatBRDate(dia.data).slice(0, 5)}
                           </span>
                           <span
                             className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
-                              isFimDeSemana
-                                ? 'bg-slate-200 text-slate-700'
-                                : 'bg-blue-50 text-[#2563EB]'
+                              dia.ehFeriado
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold'
+                                : isFimDeSemana
+                                  ? 'bg-slate-200 text-slate-700'
+                                  : 'bg-blue-50 text-[#2563EB]'
                             }`}
                           >
                             {dia.diaSemana}
                           </span>
+                          {dia.ehFeriado && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/15 text-[#996515] border border-[#D4AF37]/40 shadow-xs"
+                              title={dia.feriadoDescricao || 'Feriado'}
+                            >
+                              Feriado
+                            </span>
+                          )}
                         </div>
                       </td>
 
                       {/* Jornada Prevista */}
                       <td className="py-2.5 px-3 font-mono">
-                        {dia.ehDiaFolga ? (
+                        {dia.ehFeriado ? (
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-amber-900 text-xs flex items-center gap-1">
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
+                              {dia.previstoFormatado}
+                            </span>
+                            <span className="text-[10px] text-amber-700 font-sans tracking-tight">
+                              Sem obrigatoriedade de jornada
+                            </span>
+                          </div>
+                        ) : dia.ehDiaFolga ? (
                           <span className="text-slate-400 italic text-xs">Folga</span>
                         ) : (
                           <div className="flex flex-col">
@@ -1245,6 +1276,25 @@ export default function EspelhoPonto() {
               feitas via registros complementares auditados (AJ).
             </DialogDescription>
           </DialogHeader>
+
+          {/* Aviso informativo se o dia for feriado */}
+          {ajusteDia?.ehFeriado && (
+            <div className="p-3 bg-amber-50/90 border border-[#D4AF37]/40 rounded-lg flex items-start gap-2.5 text-xs text-amber-950">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#D4AF37] text-white font-bold shrink-0 text-[10px]">
+                ★
+              </span>
+              <div>
+                <p className="font-bold text-amber-900">
+                  Este dia é feriado ({ajusteDia.feriadoDescricao || 'Feriado'})
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  Não há jornada prevista para este dia. Caso uma marcação de ponto seja incluída ou
+                  corrigida, todas as horas trabalhadas serão creditadas integralmente no Banco de
+                  Horas.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Alternador de Ação: Corrigir Horário vs Incluir Batida vs Anular Marcação */}
           <div className="grid grid-cols-3 border border-slate-200 rounded-lg p-1 bg-slate-50 gap-1 text-xs">

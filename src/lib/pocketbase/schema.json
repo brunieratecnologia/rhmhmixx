@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T14:07:11.779Z",
+  "generatedAt": "2026-10-25T14:17:35.680Z",
   "collections": [
     {
       "name": "users",
@@ -1688,6 +1688,65 @@
         "CREATE INDEX idx_holerites_ver_hol ON holerites_versoes (holerite)",
         "CREATE INDEX idx_holerites_ver_func ON holerites_versoes (funcionario)"
       ]
+    },
+    {
+      "name": "feriados",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != \"\"",
+        "view": "@request.auth.id != \"\"",
+        "create": "@request.auth.role = \"admin\" || @request.auth.role = \"rh\"",
+        "update": "@request.auth.role = \"admin\" || @request.auth.role = \"rh\"",
+        "delete": "@request.auth.role = \"admin\" || @request.auth.role = \"rh\""
+      },
+      "fields": [
+        {
+          "name": "data",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["nacional", "estadual", "municipal", "empresa"]
+        },
+        {
+          "name": "recorrente",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ativo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_feriados_data ON feriados (data)"]
     }
   ]
 }

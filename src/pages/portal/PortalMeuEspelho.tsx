@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useOutletContext, Link } from 'react-router-dom'
 import type { PortalContextType } from '@/pages/portal/PortalTypes'
-import { espelhoPontoService, bancoHorasService } from '@/services/rh'
+import { espelhoPontoService, bancoHorasService, feriadosService } from '@/services/rh'
+import type { Feriado } from '@/types/rh'
 import {
   construirEspelhoMensal,
   DiaEspelhoCalculado,
@@ -47,9 +48,10 @@ export default function PortalMeuEspelho() {
     async function loadEspelho() {
       setLoading(true)
       try {
-        const [dados, bh] = await Promise.all([
+        const [dados, bh, feriadosList] = await Promise.all([
           espelhoPontoService.getDadosEspelho(funcionario.id, ano, mes),
           bancoHorasService.getSaldoFuncionario(funcionario.id),
+          feriadosService.listByAno(ano, true).catch(() => [] as Feriado[]),
         ])
 
         if (isMounted) {
@@ -62,6 +64,7 @@ export default function PortalMeuEspelho() {
             tratamentosMes: dados.tratamentos,
             ausenciasMes: dados.ausencias,
             feriasMes: dados.ferias,
+            feriados: feriadosList,
           })
           setDiasCalculados(resultado.dias)
           setResumo(resultado.resumo)
@@ -237,14 +240,21 @@ export default function PortalMeuEspelho() {
                       <tr
                         key={dia.data}
                         className={`hover:bg-[#121824] transition-colors ${
-                          isFimDeSemana ? 'bg-[#0A0E17]/40' : ''
+                          dia.ehFeriado ? 'bg-[#D4AF37]/5' : isFimDeSemana ? 'bg-[#0A0E17]/40' : ''
                         }`}
                       >
                         <td className="py-2.5 px-4 font-mono font-medium text-slate-200">
-                          <span>{formatBRDate(dia.data)}</span>
-                          <span className="text-[10px] text-slate-500 ml-1.5 uppercase font-sans">
-                            {dia.diaSemana}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{formatBRDate(dia.data)}</span>
+                            <span className="text-[10px] text-slate-500 uppercase font-sans">
+                              {dia.diaSemana}
+                            </span>
+                            {dia.ehFeriado && (
+                              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#D4AF37]/20 text-amber-300 border border-[#D4AF37]/40">
+                                Feriado
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-2.5 px-4 font-mono">
@@ -331,7 +341,16 @@ export default function PortalMeuEspelho() {
                         </td>
 
                         <td className="py-2.5 px-4 font-mono text-slate-400">
-                          {dia.ehDiaFolga ? (
+                          {dia.ehFeriado ? (
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-amber-300 text-xs">
+                                {dia.previstoFormatado}
+                              </span>
+                              <span className="text-[10px] text-amber-400/70 font-sans tracking-tight">
+                                Sem obrigatoriedade
+                              </span>
+                            </div>
+                          ) : dia.ehDiaFolga ? (
                             <span className="text-slate-500 italic text-xs">Folga</span>
                           ) : (
                             <div className="flex flex-col">
@@ -380,13 +399,19 @@ export default function PortalMeuEspelho() {
                                       ? 'border-emerald-500/30 text-emerald-300 bg-emerald-950/30'
                                       : oc.tipo === 'ausencia'
                                         ? 'border-rose-500/30 text-rose-300 bg-rose-950/30'
-                                        : 'border-[#7C3AED]/30 text-purple-300 bg-[#7C3AED]/10'
+                                        : oc.tipo === 'folga_trabalhada'
+                                          ? 'border-amber-500/40 text-amber-300 bg-amber-950/40'
+                                          : 'border-[#7C3AED]/30 text-purple-300 bg-[#7C3AED]/10'
                                   }`}
                                 >
                                   {oc.descricao}
                                 </Badge>
                               ))}
                             </div>
+                          ) : dia.ehFeriado ? (
+                            <span className="text-amber-400/90 text-[11px] font-medium">
+                              Feriado Nacional / Local
+                            </span>
                           ) : isFimDeSemana ? (
                             <span className="text-slate-500 text-[11px]">DSR / Folga</span>
                           ) : (

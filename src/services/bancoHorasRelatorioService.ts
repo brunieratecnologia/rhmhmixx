@@ -8,14 +8,16 @@ import {
 } from '@/lib/calculoHoras'
 import type {
   Funcionario,
-  BancoHorasLancamento,
+  HistoricoJornada,
   RegistroHorario,
   TratamentoPonto,
   Ausencia,
   Ferias,
-  HistoricoJornada,
   Jornada,
+  BancoHorasLancamento,
+  Feriado,
 } from '@/types/rh'
+import { feriadosService } from './rh'
 import pb from '@/lib/pocketbase/client'
 
 export interface ExtratoItemBancoHoras {
@@ -138,6 +140,14 @@ export async function carregarDadosRelatorioBancoHoras(
       expand: 'usuario_responsavel',
     })
 
+  // 8. Feriados aplicáveis (recorrentes + ano específico)
+  let feriadosAplicaveis: Feriado[] = []
+  try {
+    feriadosAplicaveis = await feriadosService.listByAno(ano, true)
+  } catch (err) {
+    console.warn('Erro ao carregar feriados para o relatório de banco de horas:', err)
+  }
+
   // Agrupar coleções por ID de funcionário para performance O(N)
   const registrosPorFunc = new Map<string, RegistroHorario[]>()
   for (const reg of todosRegistros) {
@@ -208,6 +218,7 @@ export async function carregarDadosRelatorioBancoHoras(
       tratamentosMes: tratMes,
       ausenciasMes: ausMes,
       feriasMes: ferMes,
+      feriados: feriadosAplicaveis,
     })
 
     const extratoItens = construirExtratoFuncionario({

@@ -6,6 +6,7 @@ import type {
   Ferias,
   DiaSemanaSigla,
   HorarioDiaSemana,
+  Feriado,
 } from '@/types/rh'
 
 export interface MarcacaoInterpreta {
@@ -62,6 +63,7 @@ export interface DiaEspelhoCalculado {
       | 'ausencia'
       | 'atestado'
       | 'ferias'
+      | 'feriado'
       | 'atraso'
       | 'extra'
       | 'folga_trabalhada'
@@ -83,12 +85,13 @@ export interface ResumoEspelhoMensal {
   totalDiasNoMes: number
   totalDiasTrabalhados: number
   totalDiasFolga: number
+  totalDiasFeriado?: number
   previstoTotalMinutos: number
   realizadoTotalMinutos: number
   saldoTotalMinutos: number // realizado - previsto
   horasExtrasMinutos: number // soma das diferenças positivas dos dias de trabalho
   horasFaltasMinutos: number // soma das diferenças negativas dos dias de trabalho
-  totalBancoCreditoMinutos: number // Total de crédito para Banco de Horas (após saída prevista + folgas trabalhadas)
+  totalBancoCreditoMinutos: number // Total de crédito para Banco de Horas (após saída prevista + folgas/feriados trabalhados)
   totalBancoDebitoMinutos: number // Total de débito para Banco de Horas (atrasos > 10m + faltas)
   totalOcorrencias: number
   totalMarcacoesIncompletas: number
@@ -696,6 +699,7 @@ export function construirEspelhoMensal(params: {
   tratamentosMes: TratamentoPonto[]
   ausenciasMes: Ausencia[]
   feriasMes: Ferias[]
+  feriados?: Feriado[]
 }): {
   dias: DiaEspelhoCalculado[]
   resumo: ResumoEspelhoMensal
@@ -709,6 +713,7 @@ export function construirEspelhoMensal(params: {
     tratamentosMes,
     ausenciasMes,
     feriasMes,
+    feriados = [],
   } = params
 
   // Determina número de dias no mês
@@ -739,6 +744,7 @@ export function construirEspelhoMensal(params: {
 
   let totalDiasTrabalhados = 0
   let totalDiasFolga = 0
+  let totalDiasFeriado = 0
   let previstoTotalMinutos = 0
   let realizadoTotalMinutos = 0
   let horasExtrasMinutos = 0
@@ -757,6 +763,23 @@ export function construirEspelhoMensal(params: {
     const diaSigla = getDiaSemanaSigla(dataStr)
     const diaSemanaLabel = getDiaSemanaLabel(diaSigla)
 
+    // Detectar Feriado neste dia (recorrente todo ano ou data específica deste ano)
+    const feriadoMatch = feriados.find((f) => {
+      if (f.ativo === false) return false
+      const fData = f.data ? f.data.slice(0, 10) : ''
+      if (f.recorrente) {
+        // Compara dia e mês (ex: "-10-12")
+        return fData.slice(4) === dataStr.slice(4)
+      }
+      return fData === dataStr
+    })
+    const ehFeriado = Boolean(feriadoMatch)
+    const feriadoDescricao = feriadoMatch ? feriadoMatch.nome : undefined
+
+    if (ehFeriado) {
+      totalDiasFeriado++
+    }
+
     // Resolve qual jornada estava vigente nesta data específica
     let jornadaVigente: Jornada | null = jornadaAtual
     if (historicoJornadas && historicoJornadas.length > 0) {
@@ -771,8 +794,10 @@ export function construirEspelhoMensal(params: {
       }
     }
 
-    const previstoMin = calcularPrevistoJornada(jornadaVigente, diaSigla)
-    const ehDiaFolga = previstoMin === 0
+    // Se é feriado, previstoMin é ZERO (não exige trabalho da jornada)
+    const jornadaPrevistaMin = calcularPrevistoJornada(jornadaVigente, diaSigla)
+    const previstoMin = ehFeriado ? 0 : jornadaPrevistaMin
+    const ehDiaFolga = !ehFeriado && previstoMin === 0
 
     if (ehDiaFolga) {
       totalDiasFolga++
@@ -790,7 +815,7 @@ export function construirEspelhoMensal(params: {
       intervaloAutomaticoAplicado,
       intervaloInfo,
     } = calcularHorasRealizadas(regsDoDia, tratamentosDoDia, jornadaVigente, {
-      ehDiaFolga,
+      ehDiaFolga: ehDiaFolga || ehFeriado,
       diaSigla,
     })
 
@@ -804,7 +829,7 @@ export function construirEspelhoMensal(params: {
 
     if (diferencaMinutos > 0) {
       horasExtrasMinutos += diferencaMinutos
-    } else if (diferencaMinutos < 0 && !ehDiaFolga) {
+    } else if (diferencaMinutos < 0 && !ehDiaFolga && !ehFeriado) {
       horasFaltasMinutos += Math.abs(diferencaMinutos)
     }
 
@@ -815,16 +840,19 @@ export function construirEspelhoMensal(params: {
       return dataStr >= ini && dataStr <= fim
     })
 
-    // Detectar Ausências neste dia
-    const ausenciaMatch = ausenciasMes.find((a) => {
-      const ini = a.data_inicio ? a.data_inicio.slice(0, 10) : ''
-      const fim = a.data_fim ? a.data_fim.slice(0, 10) : ini
-      return dataStr >= ini && dataStr <= fim
-    })
+    // Detectar Ausências neste dia (em feriado ausência/atestado não é exigido)
+    const ausenciaMatch = !ehFeriado
+      ? ausenciasMes.find((a) => {
+          const ini = a.data_inicio ? a.data_inicio.slice(0, 10) : ''
+          const fim = a.data_fim ? a.data_fim.slice(0, 10) : ini
+          return dataStr >= ini && dataStr <= fim
+        })
+      : undefined
 
     const ocorrencias: DiaEspelhoCalculado['ocorrencias'] = []
 
-    if (isIncompleto) {
+    // Feriado: se não houve batida, NÃO gera ocorrência de marcação incompleta nem falta
+    if (isIncompleto && (!ehFeriado || minutosTrabalhados > 0)) {
       totalMarcacoesIncompletas++
       totalOcorrencias++
       ocorrencias.push({
@@ -872,10 +900,12 @@ export function construirEspelhoMensal(params: {
       diaConfig?.atravessa_meia_noite || jornadaVigente?.atravessa_meia_noite,
     )
 
-    let horarioPrevistoFormatado = 'Folga'
+    let horarioPrevistoFormatado = ehFeriado
+      ? `Feriado — ${feriadoDescricao || 'Feriado'}`
+      : 'Folga'
     let cargaPrevistaFormatada = ''
 
-    if (!ehDiaFolga) {
+    if (!ehDiaFolga && !ehFeriado) {
       if (horaEntradaPrevista && horaSaidaPrevista) {
         horarioPrevistoFormatado = `${horaEntradaPrevista.slice(0, 5)} - ${horaSaidaPrevista.slice(0, 5)}`
       } else if (horaEntradaPrevista) {
@@ -898,7 +928,7 @@ export function construirEspelhoMensal(params: {
 
     // 1. Tolerância de 10 minutos na entrada (Regra 3)
     // Se o funcionário tem horário de entrada previsto e realizou marcações válidas:
-    if (!ehDiaFolga && horaEntradaPrevista && marcacoesValidas.length > 0) {
+    if (!ehDiaFolga && !ehFeriado && horaEntradaPrevista && marcacoesValidas.length > 0) {
       const primeiraMarcacao = marcacoesValidas[0]
       const minEntradaReal = timeStringToMinutes(primeiraMarcacao.horario)
       const minEntradaPrev = timeStringToMinutes(horaEntradaPrevista)
@@ -926,13 +956,15 @@ export function construirEspelhoMensal(params: {
     }
 
     // 2. Crédito de Banco de Horas pós-saída prevista (Regra 2)
-    // "todas as batidas apos as 18h registrar como banco de horas."
-    // Tempo trabalhado após o horário de saída previsto da jornada do dia vai para crédito no Banco de Horas.
+    // Em feriados com trabalho: se houver minutos trabalhados válidos (>0), TODAS as horas trabalhadas
+    // são creditadas no banco de horas (mesma mecânica de dia de folga / DSR).
     // Em dias de folga com trabalho: se houver minutos trabalhados válidos (>0), vira crédito de banco de horas.
 
-    if (ehDiaFolga && minutosTrabalhados > 0) {
+    if (ehFeriado && minutosTrabalhados > 0) {
       horasBancoCreditoMinutos = minutosTrabalhados
-    } else if (!ehDiaFolga && horaSaidaPrevista && marcacoesValidas.length >= 2) {
+    } else if (ehDiaFolga && minutosTrabalhados > 0) {
+      horasBancoCreditoMinutos = minutosTrabalhados
+    } else if (!ehDiaFolga && !ehFeriado && horaSaidaPrevista && marcacoesValidas.length >= 2) {
       // Localiza a última batida válida (saída) realizada
       const ultimaMarcacao = marcacoesValidas[marcacoesValidas.length - 1]
       let minSaidaReal = timeStringToMinutes(ultimaMarcacao.horario)
@@ -979,6 +1011,7 @@ export function construirEspelhoMensal(params: {
 
     if (
       !ehDiaFolga &&
+      !ehFeriado &&
       marcacoesValidas.length === 0 &&
       !feriasMatch &&
       !ausenciaMatch &&
@@ -994,7 +1027,14 @@ export function construirEspelhoMensal(params: {
       totalBancoDebitoMinutos += previstoMin
     }
 
-    if (ehDiaFolga && minutosTrabalhados > 0) {
+    if (ehFeriado && minutosTrabalhados > 0) {
+      totalOcorrencias++
+      ocorrencias.push({
+        tipo: 'folga_trabalhada',
+        descricao: `Trabalho em dia de feriado — ${feriadoDescricao || 'Feriado'} (${minutesToHoursText(minutosTrabalhados)}) - crédito integral de banco de horas`,
+        severidade: 'atencao',
+      })
+    } else if (ehDiaFolga && minutosTrabalhados > 0) {
       totalOcorrencias++
       ocorrencias.push({
         tipo: 'folga_trabalhada',
@@ -1010,11 +1050,16 @@ export function construirEspelhoMensal(params: {
       diaNumero: dia,
       jornadaPrevista: jornadaVigente,
       previstoMinutos: previstoMin,
-      previstoFormatado: ehDiaFolga ? 'Folga' : horarioPrevistoFormatado,
+      previstoFormatado: ehDiaFolga
+        ? 'Folga'
+        : ehFeriado
+          ? `Feriado — ${feriadoDescricao || 'Feriado'}`
+          : horarioPrevistoFormatado,
       horarioPrevistoFormatado,
       cargaPrevistaFormatada,
       ehDiaFolga,
-      ehFeriado: false,
+      ehFeriado,
+      feriadoDescricao,
       marcacoesOriginais: regsDoDia,
       tratamentosDoDia,
       todasMarcacoes,
@@ -1045,6 +1090,7 @@ export function construirEspelhoMensal(params: {
     totalDiasNoMes: ultimoDia,
     totalDiasTrabalhados,
     totalDiasFolga,
+    totalDiasFeriado,
     previstoTotalMinutos,
     realizadoTotalMinutos,
     saldoTotalMinutos: realizadoTotalMinutos - previstoTotalMinutos,

@@ -15,6 +15,7 @@ import type {
   HistoricoFuncionario,
   HistoricoJornada,
   User,
+  Feriado,
 } from '@/types/rh'
 
 export const funcionariosService = {
@@ -1806,5 +1807,118 @@ export const dashboardService = {
     eventos.sort((a, b) => a.data.localeCompare(b.data))
 
     return eventos
+  },
+}
+
+export const FERIADOS_NACIONAIS_PADRAO: { diaMes: string; nome: string; tipo: Feriado['tipo'] }[] =
+  [
+    { diaMes: '01-01', nome: 'Confraternização Universal', tipo: 'nacional' },
+    { diaMes: '04-21', nome: 'Tiradentes', tipo: 'nacional' },
+    { diaMes: '05-01', nome: 'Dia do Trabalho', tipo: 'nacional' },
+    { diaMes: '09-07', nome: 'Independência do Brasil', tipo: 'nacional' },
+    { diaMes: '10-12', nome: 'Nossa Senhora Aparecida', tipo: 'nacional' },
+    { diaMes: '11-02', nome: 'Finados', tipo: 'nacional' },
+    { diaMes: '11-15', nome: 'Proclamação da República', tipo: 'nacional' },
+    { diaMes: '11-20', nome: 'Dia Nacional de Zumbi e da Consciência Negra', tipo: 'nacional' },
+    { diaMes: '12-25', nome: 'Natal', tipo: 'nacional' },
+  ]
+
+export const feriadosService = {
+  async listAll(ativoOnly = false) {
+    const filter = ativoOnly ? 'ativo = true' : ''
+    return await pb.collection('feriados').getFullList<Feriado>({
+      filter,
+      sort: 'data',
+    })
+  },
+
+  async listByAno(ano: number, ativoOnly = false) {
+    // Retorna todos os feriados para processamento no cliente:
+    // (feriados específicos do ano selecionado + feriados recorrentes)
+    const todos = await this.listAll(ativoOnly)
+    return todos.filter((f) => {
+      if (f.recorrente) return true
+      const fData = f.data ? f.data.slice(0, 10) : ''
+      return fData.startsWith(`${ano}-`)
+    })
+  },
+
+  async create(data: {
+    data: string // YYYY-MM-DD
+    nome: string
+    tipo: Feriado['tipo']
+    recorrente: boolean
+    ativo?: boolean
+  }) {
+    const dataISO = data.data.length === 10 ? `${data.data} 00:00:00.000Z` : data.data
+    return await pb.collection('feriados').create<Feriado>({
+      data: dataISO,
+      nome: data.nome.trim(),
+      tipo: data.tipo,
+      recorrente: Boolean(data.recorrente),
+      ativo: data.ativo !== false,
+    })
+  },
+
+  async update(
+    id: string,
+    data: Partial<{
+      data: string
+      nome: string
+      tipo: Feriado['tipo']
+      recorrente: boolean
+      ativo: boolean
+    }>,
+  ) {
+    const payload: Record<string, any> = { ...data }
+    if (payload.data && payload.data.length === 10) {
+      payload.data = `${payload.data} 00:00:00.000Z`
+    }
+    if (payload.nome) {
+      payload.nome = payload.nome.trim()
+    }
+    return await pb.collection('feriados').update<Feriado>(id, payload)
+  },
+
+  async delete(id: string) {
+    return await pb.collection('feriados').delete(id)
+  },
+
+  /**
+   * Helper para carregar os feriados nacionais fixos no ano selecionado.
+   * Cadastra os feriados fixos como recorrentes para o ano selecionado caso ainda não existam.
+   */
+  async popularFeriadosNacionaisAno(
+    ano: number,
+  ): Promise<{ inseridos: number; existentes: number }> {
+    const todos = await this.listAll(false)
+    let inseridos = 0
+    let existentes = 0
+
+    for (const fPadrao of FERIADOS_NACIONAIS_PADRAO) {
+      const dataStr = `${ano}-${fPadrao.diaMes}`
+      // Checa se já existe registro com a data exata OU recorrente com mesmo mês/dia
+      const jaExiste = todos.some((f) => {
+        const d = f.data ? f.data.slice(0, 10) : ''
+        if (d === dataStr) return true
+        if (f.recorrente && d.slice(5) === fPadrao.diaMes) return true
+        return false
+      })
+
+      if (jaExiste) {
+        existentes++
+      } else {
+        await this.create({
+          data: dataStr,
+          nome: fPadrao.nome,
+          tipo: fPadrao.tipo,
+          recorrente: true,
+          ativo: true,
+        })
+        inseridos++
+      }
+    }
+
+    return { inseridos, existentes }
   },
 }

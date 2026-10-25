@@ -441,6 +441,33 @@ export const bancoHorasService = {
       totalDebito,
     }
   },
+
+  /**
+   * Obtém os dados consolidados do Banco de Horas para todos os funcionários ativos
+   * (e opcionalmente de um período/competência).
+   * Reutiliza o mesmo motor do espelho de ponto + lançamentos manuais registrados.
+   */
+  async getRelatorioConsolidado(competencia?: { ano: number; mes: number }) {
+    // 1. Carrega todos os funcionários (com cargo, departamento, jornada_atual)
+    const funcs = await pb.collection('funcionarios').getFullList<Funcionario>({
+      filter: 'situacao != "desligado"',
+      sort: 'nome',
+      expand: 'cargo,departamento,jornada_atual',
+    })
+
+    // 2. Carrega todos os lançamentos manuais/registrados de banco_horas
+    const lancamentosManuais = await pb
+      .collection('banco_horas')
+      .getFullList<import('@/types/rh').BancoHorasLancamento>({
+        sort: '-data_referencia,-created',
+        expand: 'usuario_responsavel,funcionario',
+      })
+
+    return {
+      funcionarios: funcs,
+      lancamentosManuais,
+    }
+  },
 }
 
 export const feriasService = {

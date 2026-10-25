@@ -622,27 +622,33 @@ export default function EspelhoPonto() {
       </div>
 
       {/* Banner de Aviso de Regra do Usuário */}
-      {!isFechamentoAberto && (
-        <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-3 print:hidden">
-          <ShieldCheck className="w-5 h-5 text-[#2563EB] shrink-0 mt-0.5" />
+      {isFechamentoFechado ? (
+        <div className="p-3.5 bg-slate-100 border border-slate-300 rounded-xl text-xs text-slate-800 flex items-start gap-3 print:hidden">
+          <Lock className="w-5 h-5 text-slate-600 shrink-0 mt-0.5" />
           <p>
-            <strong>Regra de Integridade do Ponto:</strong> Os registros originais do terminal são
-            estritamente imutáveis. A edição ou inclusão de marcações faltantes esquecidas pelo
-            colaborador é permitida pelo gestor <strong>apenas no fechamento do mês</strong> através
-            do botão <em>"Abrir Fechamento do Mês"</em>. Fora do fechamento, a inclusão permanece
-            bloqueada.
+            <strong>Competência Encerrada:</strong> A folha deste mês foi finalizada e está travada
+            para edições. Caso seja necessário realizar algum ajuste complementar, utilize o botão{' '}
+            <em>"Reabrir Fechamento (Admin)"</em> no topo.
           </p>
         </div>
-      )}
-
-      {isFechamentoAberto && (
+      ) : isFechamentoAberto ? (
         <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 flex items-start gap-3 print:hidden">
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <p>
-            <strong>Período de Fechamento Aberto:</strong> Você pode incluir marcações faltantes e
-            justificar ocorrências diretamente na tabela abaixo clicando em{' '}
-            <em>"+ Ajustar / Incluir"</em> no dia correspondente. Toda alteração gerará registro
-            complementar auditado mantendo o original intacto. Ao finalizar, encerre o fechamento.
+            <strong>Período de Fechamento Aberto:</strong> Você pode incluir marcações faltantes ou
+            anular batidas incorretas diretamente no botão <em>"Ajustar"</em> de cada dia. As
+            alterações geram registros complementares auditados (AJ) mantendo os originais intactos.
+            Ao concluir a conferência, clique em <em>"Encerrar Fechamento da Folha"</em>.
+          </p>
+        </div>
+      ) : (
+        <div className="p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-start gap-3 print:hidden">
+          <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <p>
+            <strong>Ajustes Liberados a Qualquer Momento:</strong> O gestor pode registrar marcações
+            esquecidas ou anular batidas incorretas imediatamente no botão <em>"Ajustar"</em> de
+            cada dia. Os registros originais do terminal permanecem 100% imutáveis e cada inclusão é
+            auditada via registro complementar (AJ).
           </p>
         </div>
       )}
@@ -1026,8 +1032,8 @@ export default function EspelhoPonto() {
                             Atestado
                           </Button>
 
-                          {/* Ajustar / Incluir Ponto (Habilitado durante fechamento do mês) */}
-                          {isFechamentoAberto ? (
+                          {/* Ajustar / Incluir Ponto (Permitido a qualquer momento, exceto competência com folha fechada ou período futuro) */}
+                          {!isFechamentoFechado && !isPeriodoFuturo ? (
                             <Button
                               variant="outline"
                               size="sm"
@@ -1040,9 +1046,9 @@ export default function EspelhoPonto() {
                                 setRegistroParaAnular('')
                                 setAjustePontoModalOpen(true)
                               }}
-                              className="h-7 px-2 text-[11px] border-amber-300 text-amber-800 bg-amber-50/70 hover:bg-amber-100 font-semibold"
+                              className="h-7 px-2 text-[11px] border-amber-300 text-amber-900 bg-amber-50/80 hover:bg-amber-100 font-semibold"
                             >
-                              <PlusCircle className="w-3 h-3 mr-1 text-amber-600" />
+                              <PlusCircle className="w-3 h-3 mr-1 text-[#D4AF37]" />
                               Ajustar
                             </Button>
                           ) : (
@@ -1065,29 +1071,14 @@ export default function EspelhoPonto() {
                                   side="top"
                                   className="max-w-xs text-xs space-y-2 p-3 bg-slate-900 text-white border-slate-800 shadow-xl"
                                 >
-                                  <p>
-                                    O botão <strong>Ajustar</strong> fica ativo apenas durante o
-                                    período de <strong>Fechamento da Folha</strong> deste mês.
-                                  </p>
-                                  {!isPeriodoFuturo && !isFechamentoFechado && (
-                                    <button
-                                      type="button"
-                                      onClick={handleAbrirFechamentoRapido}
-                                      className="text-amber-300 hover:underline font-semibold block text-[11px] text-left pt-1 border-t border-slate-700"
-                                    >
-                                      → Abrir Fechamento do Mês agora
-                                    </button>
-                                  )}
-                                  {isFechamentoFechado && (
-                                    <p className="text-amber-200 text-[11px]">
-                                      A folha deste mês está encerrada. Administradores podem
-                                      reabrir no topo da página.
+                                  {isFechamentoFechado ? (
+                                    <p>
+                                      A folha desta competência foi <strong>encerrada</strong>.
+                                      Reabra o fechamento no topo da página para permitir novos
+                                      ajustes.
                                     </p>
-                                  )}
-                                  {isPeriodoFuturo && (
-                                    <p className="text-amber-200 text-[11px]">
-                                      Meses futuros não podem ser abertos para fechamento.
-                                    </p>
+                                  ) : (
+                                    <p>Não é possível realizar ajustes em competências futuras.</p>
                                   )}
                                 </TooltipContent>
                               </Tooltip>
@@ -1198,12 +1189,12 @@ export default function EspelhoPonto() {
             <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-1">
               <Clock className="w-5 h-5" />
             </div>
-            <DialogTitle>Ajustar Marcações de Ponto (Fechamento)</DialogTitle>
+            <DialogTitle>Ajustar Marcações de Ponto</DialogTitle>
             <DialogDescription>
               Colaborador: <strong>{funcionarioAtual?.nome}</strong> — Data:{' '}
               <strong>{ajusteDia ? formatBRDate(ajusteDia.data) : ''}</strong>. Os registros
-              originais permanecem imutáveis. Correções são feitas via registros complementares
-              auditados (AJ).
+              originais do terminal permanecem 100% imutáveis. Inclusões ou anulações são feitas via
+              registros complementares auditados (AJ).
             </DialogDescription>
           </DialogHeader>
 

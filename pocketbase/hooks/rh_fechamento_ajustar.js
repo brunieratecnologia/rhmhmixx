@@ -78,9 +78,10 @@ routerAdd(
       })
     }
 
-    // 3. ENFORCE USER CONSTRAINT: Edição/inclusão de pontos pelo gestor permitida APENAS no fechamento do mês
-    // Check if there is an active fechamentos_folha record with status = 'aberto_fechamento'
-    let fechamentoAberto = null
+    // 3. Validação da competência:
+    // O admin pode incluir/anular marcações esquecidas a qualquer momento no mês corrente e em meses anteriores.
+    // Apenas se a folha da competência tiver sido encerrada ('fechado'), exige-se reabertura prévia do fechamento.
+    let fechamentoRegistro = null
     try {
       const records = $app.findRecordsByFilter(
         'fechamentos_folha',
@@ -90,31 +91,19 @@ routerAdd(
         0,
       )
       if (records && records.length > 0) {
-        fechamentoAberto = records[0]
+        fechamentoRegistro = records[0]
       }
     } catch (_) {}
 
-    if (!fechamentoAberto || fechamentoAberto.getString('status') !== 'aberto_fechamento') {
-      const statusAtual = fechamentoAberto ? fechamentoAberto.getString('status') : 'nao_iniciado'
-      if (statusAtual === 'fechado') {
-        return e.json(403, {
-          success: false,
-          message:
-            'A folha de ponto desta competência (' +
-            mes +
-            '/' +
-            ano +
-            ') já foi encerrada e está bloqueada para edições.',
-        })
-      }
+    if (fechamentoRegistro && fechamentoRegistro.getString('status') === 'fechado') {
       return e.json(403, {
         success: false,
         message:
-          'Ajustes e inclusões de pontos só são permitidos durante o período de Fechamento da Folha do mês. Inicie o fechamento mensal da competência ' +
+          'A folha de ponto desta competência (' +
           mes +
           '/' +
           ano +
-          ' antes de incluir pontos faltantes.',
+          ') já foi encerrada e está bloqueada para edições. Reabra o fechamento para efetuar novos ajustes.',
       })
     }
 

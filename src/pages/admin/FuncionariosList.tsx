@@ -46,6 +46,9 @@ export default function FuncionariosList() {
   const [departamentos, setDepartamentos] = useState<Departamento[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Active Tab: 'ativos' (quadro ativo / em férias / afastados) vs 'desligados' (Funcionários Anteriores)
+  const [activeTab, setActiveTab] = useState<'ativos' | 'desligados'>('ativos')
+
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -80,8 +83,9 @@ export default function FuncionariosList() {
     const ativos = funcionarios.filter((f) => f.situacao === 'ativo').length
     const afastados = funcionarios.filter((f) => f.situacao === 'afastado').length
     const ferias = funcionarios.filter((f) => f.situacao === 'em_ferias').length
+    const quadroAtivo = funcionarios.filter((f) => f.situacao !== 'desligado').length
     const desligados = funcionarios.filter((f) => f.situacao === 'desligado').length
-    return { total, ativos, afastados, ferias, desligados }
+    return { total, ativos, afastados, ferias, quadroAtivo, desligados }
   }, [funcionarios])
 
   // Pagination
@@ -134,6 +138,18 @@ export default function FuncionariosList() {
   // Filtered employees
   const filteredFuncionarios = useMemo(() => {
     return funcionarios.filter((f) => {
+      // Regra 1: Na aba principal ('ativos'), funcionários desligados NÃO aparecem (vão para 'desligados')
+      if (activeTab === 'ativos') {
+        if (f.situacao === 'desligado') {
+          return false
+        }
+      } else {
+        // Aba 'desligados' (Funcionários Anteriores) mostra APENAS os desligados
+        if (f.situacao !== 'desligado') {
+          return false
+        }
+      }
+
       // Search filter (name, matricula, cpf, cargo, situacao)
       if (debouncedSearch) {
         const query = debouncedSearch.toLowerCase().trim()
@@ -147,9 +163,11 @@ export default function FuncionariosList() {
         }
       }
 
-      // Situacao filter
-      if (selectedSituacao !== 'todos' && f.situacao !== selectedSituacao) {
-        return false
+      // Situacao filter (apenas aplicável na aba de ativos quando não for 'todos')
+      if (activeTab === 'ativos') {
+        if (selectedSituacao !== 'todos' && f.situacao !== selectedSituacao) {
+          return false
+        }
       }
 
       // Departamento filter
@@ -159,7 +177,7 @@ export default function FuncionariosList() {
 
       return true
     })
-  }, [funcionarios, debouncedSearch, selectedSituacao, selectedDepartamento])
+  }, [funcionarios, activeTab, debouncedSearch, selectedSituacao, selectedDepartamento])
 
   // Paginated items
   const totalPages = Math.ceil(filteredFuncionarios.length / perPage) || 1
@@ -260,8 +278,13 @@ export default function FuncionariosList() {
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">Funcionários</h2>
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
-                {stats.ativos} ativos
-              </span>{' '}
+                {stats.quadroAtivo} no quadro ativo
+              </span>
+              {stats.desligados > 0 && (
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+                  {stats.desligados} desligado{stats.desligados > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-1">
               Gerencie cadastros, informações contratuais e dados dos colaboradores
@@ -296,14 +319,73 @@ export default function FuncionariosList() {
           </div>
         </div>
 
+        {/* Navigation Tabs: Quadro Ativo vs Funcionários Anteriores (Desligados) */}
+        <div className="mt-5 border-b border-slate-200">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('ativos')
+                setPage(1)
+              }}
+              className={`px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                activeTab === 'ativos'
+                  ? 'border-[#D4AF37] text-slate-900 bg-amber-50/40'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <Users className="w-4 h-4 text-[#D4AF37]" />
+              Funcionários Ativos
+              <span
+                className={`ml-1 text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                  activeTab === 'ativos'
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {stats.quadroAtivo}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('desligados')
+                setPage(1)
+              }}
+              className={`px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                activeTab === 'desligados'
+                  ? 'border-[#D4AF37] text-slate-900 bg-amber-50/40'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              }`}
+            >
+              <Users className="w-4 h-4 text-slate-400" />
+              Funcionários Anteriores (Desligados)
+              <span
+                className={`ml-1 text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                  activeTab === 'desligados'
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {stats.desligados}
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Filters and Search Bar */}
-        <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        <div className="pt-4 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
           {/* Search Input */}
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
               type="text"
-              placeholder="Buscar por nome, matrícula, CPF ou cargo..."
+              placeholder={
+                activeTab === 'ativos'
+                  ? 'Buscar funcionário ativo por nome, matrícula, CPF ou cargo...'
+                  : 'Buscar funcionário anterior por nome, matrícula, CPF...'
+              }
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-10 border-slate-200 text-xs sm:text-sm"
@@ -322,7 +404,8 @@ export default function FuncionariosList() {
                 <SlidersHorizontal className="w-3.5 h-3.5 mr-2 text-slate-500" />
                 Filtros
               </span>
-              {(selectedSituacao !== 'todos' || selectedDepartamento !== 'todos') && (
+              {((activeTab === 'ativos' && selectedSituacao !== 'todos') ||
+                selectedDepartamento !== 'todos') && (
                 <span className="w-2 h-2 rounded-full bg-[#D4AF37]" />
               )}
             </Button>
@@ -334,27 +417,28 @@ export default function FuncionariosList() {
               mobileFiltersOpen ? 'flex' : 'hidden md:flex'
             }`}
           >
-            {/* Situacao */}
-            <div className="w-full sm:w-44">
-              <Select
-                value={selectedSituacao}
-                onValueChange={(val) => {
-                  setSelectedSituacao(val)
-                  setPage(1)
-                }}
-              >
-                <SelectTrigger className="h-10 text-xs border-slate-200">
-                  <SelectValue placeholder="Situação" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todas as situações</SelectItem>
-                  <SelectItem value="ativo">Ativo</SelectItem>
-                  <SelectItem value="afastado">Afastado</SelectItem>
-                  <SelectItem value="em_ferias">Em Férias</SelectItem>
-                  <SelectItem value="desligado">Desligado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Situacao (Apenas para aba ativos) */}
+            {activeTab === 'ativos' && (
+              <div className="w-full sm:w-44">
+                <Select
+                  value={selectedSituacao}
+                  onValueChange={(val) => {
+                    setSelectedSituacao(val)
+                    setPage(1)
+                  }}
+                >
+                  <SelectTrigger className="h-10 text-xs border-slate-200">
+                    <SelectValue placeholder="Situação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos do quadro</SelectItem>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="afastado">Afastado</SelectItem>
+                    <SelectItem value="em_ferias">Em Férias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Departamento */}
             <div className="w-full sm:w-48">
@@ -389,13 +473,19 @@ export default function FuncionariosList() {
             <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
               <Users className="w-8 h-8" />
             </div>
-            <h3 className="text-base font-bold text-slate-800">Nenhum funcionário encontrado.</h3>
+            <h3 className="text-base font-bold text-slate-800">
+              {activeTab === 'desligados'
+                ? 'Nenhum funcionário anterior registrado.'
+                : 'Nenhum funcionário encontrado.'}
+            </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm">
-              {funcionarios.length === 0
-                ? 'Comece cadastrando os colaboradores da empresa no sistema de Recursos Humanos.'
-                : 'Nenhum resultado corresponde aos critérios de busca ou filtros selecionados.'}
+              {activeTab === 'desligados'
+                ? 'Os colaboradores que tiverem desligamento homologado aparecerão nesta seção histórica mantendo todo o histórico de ponto, férias e ficha acessível.'
+                : funcionarios.length === 0
+                  ? 'Comece cadastrando os colaboradores da empresa no sistema de Recursos Humanos.'
+                  : 'Nenhum resultado corresponde aos critérios de busca ou filtros selecionados.'}
             </p>
-            {funcionarios.length === 0 ? (
+            {activeTab === 'ativos' && funcionarios.length === 0 ? (
               <Button
                 onClick={() => navigate('/admin/funcionarios/novo')}
                 className="mt-5 bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold text-xs h-10 px-4 border-0 hover:brightness-110"
@@ -429,7 +519,9 @@ export default function FuncionariosList() {
                     <th className="py-3.5 px-4">Cargo</th>
                     <th className="py-3.5 px-4">Departamento</th>
                     <th className="py-3.5 px-4">Situação</th>
-                    <th className="py-3.5 px-4">Admissão</th>
+                    <th className="py-3.5 px-4">
+                      {activeTab === 'desligados' ? 'Desligamento' : 'Admissão'}
+                    </th>
                     <th className="py-3.5 px-4 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -475,7 +567,11 @@ export default function FuncionariosList() {
                         </td>
                         <td className="py-3 px-4">{getSituacaoPill(func.situacao)}</td>
                         <td className="py-3 px-4 text-slate-600">
-                          {formatBRDate(func.data_admissao)}
+                          {activeTab === 'desligados'
+                            ? func.data_desligamento
+                              ? formatBRDate(func.data_desligamento)
+                              : 'Desligado'
+                            : formatBRDate(func.data_admissao)}
                         </td>
                         <td className="py-3 px-4 text-right">
                           <Link to={`/admin/funcionarios/${func.id}`}>
@@ -485,7 +581,7 @@ export default function FuncionariosList() {
                               className="h-8 px-2.5 text-xs border-slate-200 text-slate-700 hover:text-[#D4AF37] hover:bg-amber-50"
                             >
                               <Eye className="w-3.5 h-3.5 mr-1" />
-                              Ver ficha
+                              Ver histórico / ficha
                             </Button>
                           </Link>
                         </td>
@@ -537,15 +633,23 @@ export default function FuncionariosList() {
                         <span className="font-mono text-slate-700">{maskCPF(func.cpf)}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[10px] uppercase">Admissão</span>
-                        <span className="text-slate-700">{formatBRDate(func.data_admissao)}</span>
+                        <span className="text-slate-400 block text-[10px] uppercase">
+                          {activeTab === 'desligados' ? 'Desligamento' : 'Admissão'}
+                        </span>
+                        <span className="text-slate-700">
+                          {activeTab === 'desligados'
+                            ? func.data_desligamento
+                              ? formatBRDate(func.data_desligamento)
+                              : 'Desligado'
+                            : formatBRDate(func.data_admissao)}
+                        </span>
                       </div>
                     </div>
 
                     <div className="pt-2">
                       <Link to={`/admin/funcionarios/${func.id}`} className="block">
                         <Button variant="outline" className="w-full h-8 text-xs border-slate-200">
-                          Ver ficha completa
+                          Ver histórico / ficha
                         </Button>
                       </Link>
                     </div>

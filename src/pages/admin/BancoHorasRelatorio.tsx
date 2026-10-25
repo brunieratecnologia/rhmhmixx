@@ -893,13 +893,15 @@ export default function BancoHorasRelatorio() {
                               className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
                                 item.origem === 'trabalho_pos_saida'
                                   ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'
-                                  : item.origem === 'dia_folga'
-                                    ? 'bg-purple-950/80 text-purple-300 border border-purple-500/30'
-                                    : item.origem === 'atraso_tolerancia'
-                                      ? 'bg-amber-950/80 text-amber-300 border border-amber-500/30'
-                                      : item.origem === 'ajuste_admin'
-                                        ? 'bg-blue-950/80 text-blue-300 border border-blue-500/30'
-                                        : 'bg-red-950/80 text-red-300 border border-red-500/30'
+                                  : item.origem === 'antecipacao_entrada'
+                                    ? 'bg-teal-950/80 text-teal-300 border border-teal-500/30'
+                                    : item.origem === 'dia_folga'
+                                      ? 'bg-purple-950/80 text-purple-300 border border-purple-500/30'
+                                      : item.origem === 'atraso_tolerancia'
+                                        ? 'bg-amber-950/80 text-amber-300 border border-amber-500/30'
+                                        : item.origem === 'ajuste_admin'
+                                          ? 'bg-blue-950/80 text-blue-300 border border-blue-500/30'
+                                          : 'bg-red-950/80 text-red-300 border border-red-500/30'
                               }`}
                             >
                               {item.origemLabel}

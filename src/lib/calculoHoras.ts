@@ -51,8 +51,10 @@ export interface DiaEspelhoCalculado {
   realizadoFormatado: string // Ex: "08:12"
   diferencaMinutos: number // realizado - previsto
   diferencaFormatada: string // Ex: "+00:12" ou "-00:45" ou "00:00"
-  horasBancoCreditoMinutos: number // Minutos trabalhados além do horário de saída previsto (banco de horas)
+  horasBancoCreditoMinutos: number // Minutos totais de crédito no banco de horas (após saída prevista + antecedência >= 30min + folga/feriado)
   horasBancoCreditoFormatado: string
+  horasBancoCreditoPosSaidaMinutos?: number // Minutos trabalhados após a saída prevista
+  horasBancoCreditoAntecipacaoMinutos?: number // Minutos trabalhados com antecedência >= 30min da entrada prevista
   horasBancoDebitoMinutos: number // Minutos de débito / atraso que excederam a tolerância de 10 min
   horasBancoDebitoFormatado: string
   atrasoMinutos: number // Minutos de atraso além da tolerância de 10 min
@@ -955,37 +957,69 @@ export function construirEspelhoMensal(params: {
       }
     }
 
-    // 2. Crédito de Banco de Horas pós-saída prevista (Regra 2)
-    // Em feriados com trabalho: se houver minutos trabalhados válidos (>0), TODAS as horas trabalhadas
-    // são creditadas no banco de horas (mesma mecânica de dia de folga / DSR).
-    // Em dias de folga com trabalho: se houver minutos trabalhados válidos (>0), vira crédito de banco de horas.
+    // 2. Crédito de Banco de Horas pós-saída prevista e antecedência na entrada (Regra atualizada)
+    // - Trabalho após o horário de saída previsto continua gerando crédito de banco de horas normalmente.
+    // - Chegar antes da entrada prevista NÃO gera crédito por padrão (< 30 min é ignorado no banco).
+    // - EXCEÇÃO: se o colaborador iniciar 30 minutos ou mais antes da entrada prevista (ex: previsto 08:00,
+    //   primeira batida <= 07:30), esse tempo antecipado conta como crédito de banco de horas (do horário da batida até o previsto).
+    // - Em feriados com trabalho: crédito integral de todas as horas trabalhadas.
+    // - Em dias de folga / DSR com trabalho: crédito integral de todas as horas trabalhadas.
+
+    let horasBancoCreditoPosSaidaMinutos = 0
+    let horasBancoCreditoAntecipacaoMinutos = 0
 
     if (ehFeriado && minutosTrabalhados > 0) {
       horasBancoCreditoMinutos = minutosTrabalhados
     } else if (ehDiaFolga && minutosTrabalhados > 0) {
       horasBancoCreditoMinutos = minutosTrabalhados
-    } else if (!ehDiaFolga && !ehFeriado && horaSaidaPrevista && marcacoesValidas.length >= 2) {
-      // Localiza a última batida válida (saída) realizada
-      const ultimaMarcacao = marcacoesValidas[marcacoesValidas.length - 1]
-      let minSaidaReal = timeStringToMinutes(ultimaMarcacao.horario)
-      let minSaidaPrev = timeStringToMinutes(horaSaidaPrevista)
+    } else if (!ehDiaFolga && !ehFeriado && marcacoesValidas.length >= 2) {
       const minEntradaPrev = timeStringToMinutes(horaEntradaPrevista)
+      let minSaidaPrev = timeStringToMinutes(horaSaidaPrevista)
 
-      if (ehNoturno || minSaidaPrev < minEntradaPrev) {
-        minSaidaPrev += 24 * 60
-        if (minSaidaReal < minEntradaPrev) {
-          minSaidaReal += 24 * 60
+      // a) Crédito por Trabalho Pós-Saída Prevista:
+      if (horaSaidaPrevista) {
+        const ultimaMarcacao = marcacoesValidas[marcacoesValidas.length - 1]
+        let minSaidaReal = timeStringToMinutes(ultimaMarcacao.horario)
+
+        if (ehNoturno || minSaidaPrev < minEntradaPrev) {
+          minSaidaPrev += 24 * 60
+          if (minSaidaReal < minEntradaPrev) {
+            minSaidaReal += 24 * 60
+          }
+        }
+
+        if (minSaidaReal > minSaidaPrev) {
+          horasBancoCreditoPosSaidaMinutos = minSaidaReal - minSaidaPrev
         }
       }
 
-      if (minSaidaReal > minSaidaPrev) {
-        const excedenteSaida = minSaidaReal - minSaidaPrev
-        // O tempo após a saída prevista alimenta o banco de horas
-        // Não pode ultrapassar o saldo positivo real trabalhado do dia (ou a diferença total de horas extras)
-        // Se trabalhou além da jornada, creditamos os minutos trabalhados após a saída prevista
-        horasBancoCreditoMinutos = excedenteSaida
+      // b) Crédito por Antecedência na Entrada (Regra dos 30 minutos):
+      // Apenas se primeira marcação for 30 minutos ou mais antes da entrada prevista
+      if (horaEntradaPrevista) {
+        const primeiraMarcacao = marcacoesValidas[0]
+        const minEntradaReal = timeStringToMinutes(primeiraMarcacao.horario)
+
+        if (minEntradaReal < minEntradaPrev) {
+          const minutosAntecipados = minEntradaPrev - minEntradaReal
+          if (minutosAntecipados >= 30) {
+            horasBancoCreditoAntecipacaoMinutos = minutosAntecipados
+            ocorrencias.push({
+              tipo: 'extra',
+              descricao: `Entrada antecipada (${primeiraMarcacao.horario} vs previsto ${horaEntradaPrevista.slice(0, 5)}: +${minutosAntecipados}m) — antecipação ≥30min`,
+              severidade: 'baixo',
+              minutos: minutosAntecipados,
+            })
+          }
+        }
+      }
+
+      const totalCreditoDia = horasBancoCreditoPosSaidaMinutos + horasBancoCreditoAntecipacaoMinutos
+
+      if (totalCreditoDia > 0) {
+        horasBancoCreditoMinutos = totalCreditoDia
       } else if (diferencaMinutos > 0) {
-        // Caso haja horas extras durante a jornada mesmo com saída antes (ex: supressão de intervalo com saldo positivo)
+        // Caso haja saldo positivo de horas extras decorrente de outra dinâmica (ex: supressão de intervalo)
+        // apenas se o saldo do dia for estritamente positivo
         horasBancoCreditoMinutos = diferencaMinutos
       }
     } else if (diferencaMinutos > 0) {
@@ -1074,6 +1108,10 @@ export function construirEspelhoMensal(params: {
         horasBancoCreditoMinutos > 0
           ? `+${minutesToTimeString(horasBancoCreditoMinutos)}`
           : '00:00',
+      horasBancoCreditoPosSaidaMinutos:
+        horasBancoCreditoPosSaidaMinutos > 0 ? horasBancoCreditoPosSaidaMinutos : undefined,
+      horasBancoCreditoAntecipacaoMinutos:
+        horasBancoCreditoAntecipacaoMinutos > 0 ? horasBancoCreditoAntecipacaoMinutos : undefined,
       horasBancoDebitoMinutos,
       horasBancoDebitoFormatado:
         horasBancoDebitoMinutos > 0 ? `-${minutesToTimeString(horasBancoDebitoMinutos)}` : '00:00',

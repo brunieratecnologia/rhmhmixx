@@ -372,12 +372,33 @@ export default function PortalMeuEspelho() {
 
                         <td className="py-2.5 px-4 font-mono">
                           {dia.horasBancoCreditoMinutos > 0 ? (
-                            <span
-                              className="font-bold text-amber-300 bg-amber-950/50 px-1.5 py-0.5 rounded border border-[#D4AF37]/30 text-[11px]"
-                              title="Tempo trabalhado além da saída prevista -> Banco de Horas"
-                            >
-                              {dia.horasBancoCreditoFormatado}
-                            </span>
+                            <div className="inline-flex flex-col items-end gap-0.5">
+                              <span
+                                className="font-bold text-amber-300 bg-amber-950/50 px-1.5 py-0.5 rounded border border-[#D4AF37]/30 text-[11px]"
+                                title={
+                                  dia.ehDiaFolga || dia.ehFeriado
+                                    ? 'Trabalho em folga/feriado -> Crédito Banco de Horas'
+                                    : [
+                                        dia.horasBancoCreditoPosSaidaMinutos
+                                          ? `Pós-saída: +${dia.horasBancoCreditoPosSaidaMinutos}m`
+                                          : null,
+                                        dia.horasBancoCreditoAntecipacaoMinutos
+                                          ? `Antecipação ≥30m: +${dia.horasBancoCreditoAntecipacaoMinutos}m`
+                                          : null,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(' | ') || 'Crédito de Banco de Horas'
+                                }
+                              >
+                                {dia.horasBancoCreditoFormatado}
+                              </span>
+                              {dia.horasBancoCreditoAntecipacaoMinutos &&
+                                dia.horasBancoCreditoAntecipacaoMinutos > 0 && (
+                                  <span className="text-[9px] font-sans font-medium text-teal-300 bg-teal-950/60 px-1 rounded border border-teal-500/30">
+                                    antecipação ≥30min
+                                  </span>
+                                )}
+                            </div>
                           ) : (
                             <span className="text-slate-600">--</span>
                           )}

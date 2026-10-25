@@ -98,6 +98,54 @@ describe('Relatório e Extrato de Banco de Horas MH MIXX', () => {
     expect(itemFolga?.horasFormatadas).toBe('+04:00')
   })
 
+  it('1b. Deve rotular com clareza crédito decorrente de antecipação na entrada >= 30min', () => {
+    // 2026-10-05: entrada às 07:15 (45 min antes do previsto de 08:00) e saída às 18:00
+    const espelho = construirEspelhoMensal({
+      ano: 2026,
+      mes: 10,
+      jornadaAtual: jornadaSegSex, // 08:00 às 18:00
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 'rant1',
+          funcionario: 'f1',
+          data_utc: '2026-10-05',
+          hora_utc: '07:15:00',
+          timestamp_utc: '2026-10-05T10:15:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'rant2',
+          funcionario: 'f1',
+          data_utc: '2026-10-05',
+          hora_utc: '18:00:00',
+          timestamp_utc: '2026-10-05T21:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const extrato = construirExtratoFuncionario({
+      ano: 2026,
+      mes: 10,
+      diasEspelho: espelho.dias,
+      lancamentosManuais: [],
+    })
+
+    const itemAntecipacao = extrato.find((i) => i.origem === 'antecipacao_entrada')
+    expect(itemAntecipacao).toBeDefined()
+    expect(itemAntecipacao?.minutos).toBe(45)
+    expect(itemAntecipacao?.horasFormatadas).toBe('+00:45')
+    expect(itemAntecipacao?.origemLabel).toBe('antecipação ≥30min')
+  })
+
   it('2. Deve registrar ocorrência de atraso quando entrada excede 10 minutos de tolerância', () => {
     // 2026-10-02: entrada às 08:25 (atraso de 25 minutos na jornada de 08:00)
     const espelho = construirEspelhoMensal({

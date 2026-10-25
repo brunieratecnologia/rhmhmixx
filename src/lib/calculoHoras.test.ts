@@ -948,6 +948,7 @@ export function executarTestesIntervaloAutomatico(): {
   // Jornada padrão: 08:00 às 17:00 com almoço 12:00 às 13:00 (8h líquidas)
   // Com a correção: batida de 08:30 anulada via tratamento + nova batida de 07:45 incluída via tratamento vinculado
   // Resultado líquido: entrada 07:45, almoço auto 12:00–13:00, saída 17:00 -> 8h15 trabalhadas (495 min), sem atraso!
+  // Antecedência de 15 min (< 30 min): NÃO gera crédito de banco de horas (horasBancoCreditoMinutos === 0)
   {
     const regTerminalEntrada: RegistroHorario = {
       id: 'reg_rosi_ent',
@@ -1029,6 +1030,7 @@ export function executarTestesIntervaloAutomatico(): {
     // Previsto = 480 min (8h00)
     // Diferença = +15 min
     // Atraso = 0 min
+    // Banco de horas: 0 (antecedência 15min < 30min não gera crédito)
     const passouFluxoCorrecao =
       Boolean(dia8) &&
       Boolean(batidaAnulada) &&
@@ -1039,12 +1041,13 @@ export function executarTestesIntervaloAutomatico(): {
       batidaCorrigida?.horarioOriginal === '08:30' &&
       dia8?.realizadoMinutos === 495 &&
       dia8?.diferencaMinutos === 15 &&
-      dia8?.atrasoMinutos === 0
+      dia8?.atrasoMinutos === 0 &&
+      dia8?.horasBancoCreditoMinutos === 0
 
     resultados.push({
-      nome: 'Teste (k): Correção de horário de batida do terminal anula original, inclui corrigido e calcula com o novo horário',
+      nome: 'Teste (k): Correção de horário de batida do terminal anula original, inclui corrigido e calcula com o novo horário (antecedência <30m sem crédito BH)',
       passou: passouFluxoCorrecao,
-      detalhe: `Trabalhado: ${dia8?.realizadoMinutos}m (esperado 495m), Dif: ${dia8?.diferencaMinutos}m, Atraso: ${dia8?.atrasoMinutos}m, Corrigida: ${batidaCorrigida?.corrigida}, Horário Orig: ${batidaCorrigida?.horarioOriginal}`,
+      detalhe: `Trabalhado: ${dia8?.realizadoMinutos}m (esperado 495m), Dif: ${dia8?.diferencaMinutos}m, Atraso: ${dia8?.atrasoMinutos}m, CreditoBH: ${dia8?.horasBancoCreditoMinutos}m`,
     })
   }
 
@@ -1194,6 +1197,115 @@ export function executarTestesIntervaloAutomatico(): {
       nome: 'Teste (n): Feriado recorrente se propaga corretamente para outros anos (ex: 2027)',
       passou: Boolean(passouRecorrenciaMultiplosAnos),
       detalhe: `2027-10-12 ehFeriado: ${dia12Out2027?.ehFeriado}, previsto: ${dia12Out2027?.previstoFormatado}`,
+    })
+  }
+
+  // TESTE 12: Regra de Antecedência na Entrada para Banco de Horas
+  // Jornada: 08:00 às 17:00.
+  // Caso 1: entrada 15 min antes (07:45) -> SEM crédito de banco de horas (0 min)
+  // Caso 2: entrada 30 min antes (07:30) -> CRÉDITO de 30 min no banco de horas
+  // Caso 3: entrada 45 min antes (07:15) -> CRÉDITO de 45 min no banco de horas
+  {
+    const espelhoRegraAntecedencia = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao, // 08:00 às 17:00
+      historicoJornadas: [],
+      registrosMes: [
+        // Dia 15 (terça): 07:45 às 17:00 (15 min antes -> sem crédito BH)
+        {
+          id: 'ant15_1',
+          funcionario: 'f1',
+          data_utc: '2026-09-15',
+          hora_utc: '07:45:00',
+          timestamp_utc: '2026-09-15T10:45:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'ant15_2',
+          funcionario: 'f1',
+          data_utc: '2026-09-15',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-15T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        // Dia 16 (quarta): 07:30 às 17:00 (30 min antes -> exatamente 30m de crédito BH)
+        {
+          id: 'ant30_1',
+          funcionario: 'f1',
+          data_utc: '2026-09-16',
+          hora_utc: '07:30:00',
+          timestamp_utc: '2026-09-16T10:30:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'ant30_2',
+          funcionario: 'f1',
+          data_utc: '2026-09-16',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-16T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        // Dia 17 (quinta): 07:15 às 17:00 (45 min antes -> 45m de crédito BH)
+        {
+          id: 'ant45_1',
+          funcionario: 'f1',
+          data_utc: '2026-09-17',
+          hora_utc: '07:15:00',
+          timestamp_utc: '2026-09-17T10:15:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'ant45_2',
+          funcionario: 'f1',
+          data_utc: '2026-09-17',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-17T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+
+    const dia15 = espelhoRegraAntecedencia.dias.find((d) => d.data === '2026-09-15')
+    const dia16 = espelhoRegraAntecedencia.dias.find((d) => d.data === '2026-09-16')
+    const dia17 = espelhoRegraAntecedencia.dias.find((d) => d.data === '2026-09-17')
+
+    const passouCaso15 =
+      Boolean(dia15) &&
+      dia15?.horasBancoCreditoMinutos === 0 &&
+      dia15?.horasBancoCreditoAntecipacaoMinutos === undefined
+
+    const passouCaso30 =
+      Boolean(dia16) &&
+      dia16?.horasBancoCreditoMinutos === 30 &&
+      dia16?.horasBancoCreditoAntecipacaoMinutos === 30 &&
+      dia16?.horasBancoCreditoFormatado === '+00:30'
+
+    const passouCaso45 =
+      Boolean(dia17) &&
+      dia17?.horasBancoCreditoMinutos === 45 &&
+      dia17?.horasBancoCreditoAntecipacaoMinutos === 45 &&
+      dia17?.horasBancoCreditoFormatado === '+00:45'
+
+    resultados.push({
+      nome: 'Teste (o): Antecedência na entrada: 15m antes sem crédito; 30m antes com crédito de 30m; 45m antes com crédito de 45m',
+      passou: passouCaso15 && passouCaso30 && passouCaso45,
+      detalhe: `Dia 15 (15m): ${dia15?.horasBancoCreditoMinutos}m (esperado 0m); Dia 16 (30m): ${dia16?.horasBancoCreditoMinutos}m (esperado 30m); Dia 17 (45m): ${dia17?.horasBancoCreditoMinutos}m (esperado 45m)`,
     })
   }
 

@@ -28,6 +28,7 @@ export interface ExtratoItemBancoHoras {
   horasFormatadas: string
   origem:
     | 'trabalho_pos_saida'
+    | 'antecipacao_entrada'
     | 'dia_folga'
     | 'ajuste_admin'
     | 'atraso_tolerancia'
@@ -327,21 +328,70 @@ export function construirExtratoFuncionario(params: {
 
   // 1. Processa os dias do espelho de ponto da competência
   for (const dia of diasEspelho) {
-    // Crédito pós-saída ou dia de folga
+    // Crédito pós-saída, antecipação >= 30min ou dia de folga
     if (dia.horasBancoCreditoMinutos > 0) {
-      const ehFolga = dia.ehDiaFolga
-      itens.push({
-        id: `espelho-cred-${dia.data}`,
-        data: dia.data,
-        tipo: 'credito',
-        minutos: dia.horasBancoCreditoMinutos,
-        horasFormatadas: `+${minutesToTimeString(dia.horasBancoCreditoMinutos)}`,
-        origem: ehFolga ? 'dia_folga' : 'trabalho_pos_saida',
-        origemLabel: ehFolga ? 'Dia de folga / DSR' : 'Trabalho após saída prevista',
-        descricao: ehFolga
-          ? `Trabalho integral em dia de folga (${minutesToHoursText(dia.horasBancoCreditoMinutos)})`
-          : `Crédito por horas trabalhadas após o horário previsto (${dia.horarioPrevistoFormatado})`,
-      })
+      const ehFolga = dia.ehDiaFolga || dia.ehFeriado
+      const temPosSaida = (dia.horasBancoCreditoPosSaidaMinutos || 0) > 0
+      const temAntecipacao = (dia.horasBancoCreditoAntecipacaoMinutos || 0) > 0
+
+      if (ehFolga) {
+        itens.push({
+          id: `espelho-cred-folga-${dia.data}`,
+          data: dia.data,
+          tipo: 'credito',
+          minutos: dia.horasBancoCreditoMinutos,
+          horasFormatadas: `+${minutesToTimeString(dia.horasBancoCreditoMinutos)}`,
+          origem: 'dia_folga',
+          origemLabel: dia.ehFeriado ? 'Feriado trabalhado' : 'Dia de folga / DSR',
+          descricao: dia.ehFeriado
+            ? `Trabalho em feriado (${dia.feriadoDescricao || 'Feriado'}) - crédito integral`
+            : `Trabalho integral em dia de folga (${minutesToHoursText(dia.horasBancoCreditoMinutos)})`,
+        })
+      } else if (temPosSaida && temAntecipacao) {
+        // Se houve ambos no mesmo dia, decompõe em 2 lançamentos auditáveis ou detalha com clareza
+        itens.push({
+          id: `espelho-cred-ant-${dia.data}`,
+          data: dia.data,
+          tipo: 'credito',
+          minutos: dia.horasBancoCreditoAntecipacaoMinutos!,
+          horasFormatadas: `+${minutesToTimeString(dia.horasBancoCreditoAntecipacaoMinutos!)}`,
+          origem: 'antecipacao_entrada',
+          origemLabel: 'antecipação ≥30min',
+          descricao: `Crédito por chegada com antecedência ≥30m antes do previsto (${dia.horarioPrevistoFormatado})`,
+        })
+        itens.push({
+          id: `espelho-cred-pos-${dia.data}`,
+          data: dia.data,
+          tipo: 'credito',
+          minutos: dia.horasBancoCreditoPosSaidaMinutos!,
+          horasFormatadas: `+${minutesToTimeString(dia.horasBancoCreditoPosSaidaMinutos!)}`,
+          origem: 'trabalho_pos_saida',
+          origemLabel: 'Trabalho após saída prevista',
+          descricao: `Crédito por horas trabalhadas após o horário previsto (${dia.horarioPrevistoFormatado})`,
+        })
+      } else if (temAntecipacao) {
+        itens.push({
+          id: `espelho-cred-ant-${dia.data}`,
+          data: dia.data,
+          tipo: 'credito',
+          minutos: dia.horasBancoCreditoMinutos,
+          horasFormatadas: `+${minutesToTimeString(dia.horasBancoCreditoMinutos)}`,
+          origem: 'antecipacao_entrada',
+          origemLabel: 'antecipação ≥30min',
+          descricao: `Crédito por chegada com antecedência ≥30m antes do previsto (${dia.horarioPrevistoFormatado})`,
+        })
+      } else {
+        itens.push({
+          id: `espelho-cred-${dia.data}`,
+          data: dia.data,
+          tipo: 'credito',
+          minutos: dia.horasBancoCreditoMinutos,
+          horasFormatadas: `+${minutesToTimeString(dia.horasBancoCreditoMinutos)}`,
+          origem: 'trabalho_pos_saida',
+          origemLabel: 'Trabalho após saída prevista',
+          descricao: `Crédito por horas trabalhadas após o horário previsto (${dia.horarioPrevistoFormatado})`,
+        })
+      }
     }
 
     // Débitos ou atrasos

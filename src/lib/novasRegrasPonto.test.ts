@@ -240,4 +240,275 @@ describe('Novas Regras de Ponto (Deduplicação, Tolerância 10m e Banco de Hora
     expect(resultado.intervaloAutomaticoAplicado).toBe(false)
     expect(resultado.todasMarcacoes.length).toBe(4)
   })
+
+  it('6. Casos exatos da nova regra de Antecedência na Entrada para Banco de Horas', () => {
+    // (a) entrada 15 min antes (07:45 vs previsto 08:00) -> SEM crédito
+    const espelhoA = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 'ra1',
+          funcionario: 'f1',
+          data_utc: '2026-09-01',
+          hora_utc: '07:45:00',
+          timestamp_utc: '2026-09-01T10:45:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'ra2',
+          funcionario: 'f1',
+          data_utc: '2026-09-01',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-01T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+    const diaA = espelhoA.dias.find((d) => d.data === '2026-09-01')
+    expect(diaA?.horasBancoCreditoMinutos).toBe(0)
+    expect(diaA?.horasBancoCreditoAntecipacaoMinutos).toBeUndefined()
+
+    // (b) entrada 30 min antes (07:30 vs previsto 08:00) -> CRÉDITO de 30 min
+    const espelhoB = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 'rb1',
+          funcionario: 'f1',
+          data_utc: '2026-09-02',
+          hora_utc: '07:30:00',
+          timestamp_utc: '2026-09-02T10:30:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'rb2',
+          funcionario: 'f1',
+          data_utc: '2026-09-02',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-02T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+    const diaB = espelhoB.dias.find((d) => d.data === '2026-09-02')
+    expect(diaB?.horasBancoCreditoMinutos).toBe(30)
+    expect(diaB?.horasBancoCreditoAntecipacaoMinutos).toBe(30)
+    expect(diaB?.horasBancoCreditoFormatado).toBe('+00:30')
+    expect(diaB?.ocorrencias.some((o) => o.descricao.includes('antecipação ≥30min'))).toBe(true)
+
+    // (c) entrada 45 min antes (07:15 vs previsto 08:00) -> CRÉDITO de 45 min
+    const espelhoC = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 'rc1',
+          funcionario: 'f1',
+          data_utc: '2026-09-03',
+          hora_utc: '07:15:00',
+          timestamp_utc: '2026-09-03T10:15:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'rc2',
+          funcionario: 'f1',
+          data_utc: '2026-09-03',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-03T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+    const diaC = espelhoC.dias.find((d) => d.data === '2026-09-03')
+    expect(diaC?.horasBancoCreditoMinutos).toBe(45)
+    expect(diaC?.horasBancoCreditoAntecipacaoMinutos).toBe(45)
+    expect(diaC?.horasBancoCreditoFormatado).toBe('+00:45')
+
+    // (d) saída após previsto -> crédito normal continua
+    const espelhoD = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 'rd1',
+          funcionario: 'f1',
+          data_utc: '2026-09-04',
+          hora_utc: '08:00:00',
+          timestamp_utc: '2026-09-04T11:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'rd2',
+          funcionario: 'f1',
+          data_utc: '2026-09-04',
+          hora_utc: '18:15:00',
+          timestamp_utc: '2026-09-04T21:15:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+    const diaD = espelhoD.dias.find((d) => d.data === '2026-09-04')
+    // Previsto saída 17:00, saiu 18:15 -> +75 min pós-saída
+    expect(diaD?.horasBancoCreditoPosSaidaMinutos).toBe(75)
+    expect(diaD?.horasBancoCreditoMinutos).toBe(75)
+    expect(diaD?.horasBancoCreditoFormatado).toBe('+01:15')
+
+    // (e) dia de folga -> integral continua
+    const espelhoE = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 're1',
+          funcionario: 'f1',
+          data_utc: '2026-09-06', // Domingo
+          hora_utc: '10:00:00',
+          timestamp_utc: '2026-09-06T13:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 're2',
+          funcionario: 'f1',
+          data_utc: '2026-09-06',
+          hora_utc: '14:00:00',
+          timestamp_utc: '2026-09-06T17:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+    const diaE = espelhoE.dias.find((d) => d.data === '2026-09-06')
+    expect(diaE?.ehDiaFolga).toBe(true)
+    expect(diaE?.horasBancoCreditoMinutos).toBe(240) // 4h
+
+    // (f) feriado -> integral continua
+    const feriadoIndependencia = {
+      id: 'fer-0709',
+      data: '2026-09-07',
+      nome: 'Independência do Brasil',
+      tipo: 'nacional' as const,
+      recorrente: true,
+      ativo: true,
+      created: '',
+      updated: '',
+    }
+    const espelhoF = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 'rf1',
+          funcionario: 'f1',
+          data_utc: '2026-09-07',
+          hora_utc: '08:00:00',
+          timestamp_utc: '2026-09-07T11:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'rf2',
+          funcionario: 'f1',
+          data_utc: '2026-09-07',
+          hora_utc: '13:00:00',
+          timestamp_utc: '2026-09-07T16:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+      feriados: [feriadoIndependencia],
+    })
+    const diaF = espelhoF.dias.find((d) => d.data === '2026-09-07')
+    expect(diaF?.ehFeriado).toBe(true)
+    expect(diaF?.horasBancoCreditoMinutos).toBe(300) // 5h
+
+    // (g) tolerância de atraso de 10 min não é afetada
+    const espelhoG = construirEspelhoMensal({
+      ano: 2026,
+      mes: 9,
+      jornadaAtual: jornadaPadrao,
+      historicoJornadas: [],
+      registrosMes: [
+        {
+          id: 'rg1',
+          funcionario: 'f1',
+          data_utc: '2026-09-08',
+          hora_utc: '08:09:00', // 9 min de atraso -> tolerado
+          timestamp_utc: '2026-09-08T11:09:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+        {
+          id: 'rg2',
+          funcionario: 'f1',
+          data_utc: '2026-09-08',
+          hora_utc: '17:00:00',
+          timestamp_utc: '2026-09-08T20:00:00.000Z',
+          origem: 'terminal',
+          created: '',
+          updated: '',
+        },
+      ],
+      tratamentosMes: [],
+      ausenciasMes: [],
+      feriasMes: [],
+    })
+    const diaG = espelhoG.dias.find((d) => d.data === '2026-09-08')
+    expect(diaG?.entradaTolerada).toBe(true)
+    expect(diaG?.atrasoMinutos).toBe(0)
+    expect(diaG?.horasBancoDebitoMinutos).toBe(0)
+  })
 })

@@ -223,7 +223,7 @@ export const jornadasService = {
   async checkVinculos(id: string): Promise<JornadaVinculosInfo> {
     const [funcsLinked, histLinked] = await Promise.all([
       pb.collection('funcionarios').getFullList<Funcionario>({
-        filter: `jornada_atual = "${id}"`,
+        filter: `jornada_atual = "${id}" && situacao != "desligado"`,
       }),
       pb.collection('historico_jornadas').getList(1, 1, {
         filter: `jornada = "${id}"`,
@@ -242,7 +242,7 @@ export const jornadasService = {
 
   async reatribuirFuncionarios(origemId: string, destinoId: string) {
     const funcs = await pb.collection('funcionarios').getFullList<Funcionario>({
-      filter: `jornada_atual = "${origemId}"`,
+      filter: `jornada_atual = "${origemId}" && situacao != "desligado"`,
     })
 
     const hojeStr = new Intl.DateTimeFormat('en-CA', {
@@ -284,13 +284,13 @@ export const jornadasService = {
       await this.reatribuirFuncionarios(id, options.reatribuirPara)
     }
 
-    // 2. Verificar se ainda há funcionários vinculados
+    // 2. Verificar se ainda há funcionários ativos vinculados
     const linked = await pb.collection('funcionarios').getList(1, 1, {
-      filter: `jornada_atual = "${id}"`,
+      filter: `jornada_atual = "${id}" && situacao != "desligado"`,
     })
     if (linked.totalItems > 0) {
       throw new Error(
-        'Não é possível excluir esta jornada: existem colaboradores com ela atribuída atualmente. Reatribua-os ou arquive a jornada.',
+        'Não é possível excluir esta jornada: existem colaboradores ativos com ela atribuída atualmente. Reatribua-os ou arquive a jornada.',
       )
     }
 
@@ -508,6 +508,15 @@ export const feriasService = {
   },
 
   async create(data: Partial<Ferias>) {
+    if (data.funcionario) {
+      const func = await pb
+        .collection('funcionarios')
+        .getOne<Funcionario>(data.funcionario as string)
+      if (func.situacao === 'desligado') {
+        throw new Error('Não é possível cadastrar férias para um colaborador desligado.')
+      }
+    }
+
     const record = await pb.collection('ferias').create<Ferias>(data)
 
     // Verificar se o período de férias engloba o dia de hoje.
@@ -615,6 +624,13 @@ export const ausenciasService = {
     observacoes?: string
     arquivo?: File | null
   }) {
+    if (params.funcionario) {
+      const func = await pb.collection('funcionarios').getOne<Funcionario>(params.funcionario)
+      if (func.situacao === 'desligado') {
+        throw new Error('Não é possível registrar ausência para um colaborador desligado.')
+      }
+    }
+
     let documentoId: string | undefined = undefined
 
     // Se houver arquivo anexo (ex: atestado médico ou comprovante de licença)

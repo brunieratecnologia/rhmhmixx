@@ -45,6 +45,14 @@ routerAdd(
       return e.json(404, { success: false, message: 'Funcionário não encontrado.' })
     }
 
+    if (func.getString('situacao') === 'desligado') {
+      return e.json(400, {
+        success: false,
+        message:
+          'Não é permitido efetuar novos lançamentos de banco de horas para funcionários desligados.',
+      })
+    }
+
     const parts = dataReferencia.split('-')
     const ano = parts.length === 3 ? parseInt(parts[0], 10) : null
     const mes = parts.length === 3 ? parseInt(parts[1], 10) : null

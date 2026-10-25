@@ -62,6 +62,14 @@ routerAdd(
       })
     }
 
+    if (func.getString('situacao') === 'desligado') {
+      return e.json(400, {
+        success: false,
+        message:
+          'Não é permitido incluir ou alterar marcações de ponto para funcionários desligados.',
+      })
+    }
+
     // 2. Extract year and month from dataRegistro (YYYY-MM-DD)
     const parts = dataRegistro.split('-')
     if (parts.length !== 3) {

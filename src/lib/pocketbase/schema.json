@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T14:27:57.258Z",
+  "generatedAt": "2026-10-25T18:17:42.939Z",
   "collections": [
     {
       "name": "users",
@@ -723,7 +723,7 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
         "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
-        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh') && funcionario.situacao != 'desligado'",
         "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
         "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },
@@ -973,7 +973,7 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
         "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
-        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh') && funcionario.situacao != 'desligado'",
         "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
         "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },
@@ -1157,7 +1157,7 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
         "view": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
-        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || funcionario.user = @request.auth.id)",
+        "create": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh' || (funcionario.user = @request.auth.id && funcionario.situacao != 'desligado'))",
         "update": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')",
         "delete": "@request.auth.id != '' && (@request.auth.role = 'admin' || @request.auth.role = 'rh')"
       },

@@ -106,10 +106,11 @@ export default function FeriasPage() {
     setLoading(true)
     try {
       const [funcsRes, feriasRes, ausenciasRes] = await Promise.all([
-        funcionariosService.list(1, 200, '', 'nome'),
+        funcionariosService.list(1, 500, '', 'nome'),
         feriasService.listAll('', '-data_inicio'),
         ausenciasService.listAll('', '-data_inicio'),
       ])
+      // Mantém todos para cálculos/histórico se necessário, mas separa ativos e anteriores
       setFuncionarios(funcsRes.items)
       setTodasFerias(feriasRes)
       setTodasAusencias(ausenciasRes)
@@ -174,7 +175,7 @@ export default function FeriasPage() {
     return map
   }, [funcionarios, todasFerias, todasAusencias])
 
-  // Indicadores Gerais
+  // Indicadores Gerais (apenas funcionários ATIVOS e EM FÉRIAS — desligados não entram nas métricas)
   const resumoGeral = useMemo(() => {
     const hojeStr = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Sao_Paulo',
@@ -182,6 +183,11 @@ export default function FeriasPage() {
       month: '2-digit',
       day: '2-digit',
     }).format(new Date())
+
+    // Conjunto de IDs de funcionários ativos
+    const ativosIds = new Set(
+      (funcionarios || []).filter((f) => f && f.situacao !== 'desligado').map((f) => f.id),
+    )
 
     let totalEmGozo = 0
     let totalProgramadas30d = 0
@@ -194,6 +200,9 @@ export default function FeriasPage() {
 
     for (const f of todasFerias || []) {
       if (!f || f.status === 'cancelada') continue
+      // Desligados não entram nos totais e alertas do dia a dia
+      if (!ativosIds.has(f.funcionario)) continue
+
       const ini = f.data_inicio ? f.data_inicio.split('T')[0].split(' ')[0] : ''
       const fim = f.data_fim ? f.data_fim.split('T')[0].split(' ')[0] : ini
       if (!ini) continue
@@ -205,7 +214,8 @@ export default function FeriasPage() {
       }
     }
 
-    calculosPorFuncionario.forEach((calc) => {
+    calculosPorFuncionario.forEach((calc, funcId) => {
+      if (!ativosIds.has(funcId)) return
       if (!calc || !calc.periodos) return
       for (const p of calc.periodos) {
         if (p.situacao === 'vencido') {
@@ -243,20 +253,28 @@ export default function FeriasPage() {
     return (todasFerias || []).filter((f) => f && f.funcionario === funcionarioSelecionado.id)
   }, [funcionarioSelecionado, todasFerias])
 
+  // Aba ativa: 'ativos' (padrão) ou 'anteriores' (somente consulta histórica)
+  const [abaVisualizacao, setAbaVisualizacao] = useState<'ativos' | 'anteriores'>('ativos')
+
   // Filtragem da lista geral de funcionários
   const funcionariosFiltrados = useMemo(() => {
     return funcionarios.filter((func) => {
+      // Isolamento estrito entre ativos e anteriores
+      const isDesligado = func.situacao === 'desligado'
+      if (abaVisualizacao === 'ativos' && isDesligado) return false
+      if (abaVisualizacao === 'anteriores' && !isDesligado) return false
+
       const calc = calculosPorFuncionario.get(func.id)
 
       // Busca texto (nome ou matrícula)
       if (searchTerm.trim()) {
         const term = searchTerm.toLowerCase()
-        const nomeMatch = func.nome.toLowerCase().includes(term)
-        const matMatch = func.matricula.toLowerCase().includes(term)
+        const nomeMatch = (func.nome || '').toLowerCase().includes(term)
+        const matMatch = (func.matricula || '').toLowerCase().includes(term)
         if (!nomeMatch && !matMatch) return false
       }
 
-      // Filtro de Alerta Concessivo
+      // Filtro de Alerta Concessivo (apenas relevante para ativos)
       if (alertaFilter !== 'todos') {
         if (!calc) return false
         if (alertaFilter === 'com_alerta' && !calc.temAlertaConcessivo) return false
@@ -286,7 +304,14 @@ export default function FeriasPage() {
 
       return true
     })
-  }, [funcionarios, searchTerm, alertaFilter, statusFilter, calculosPorFuncionario])
+  }, [
+    funcionarios,
+    abaVisualizacao,
+    searchTerm,
+    alertaFilter,
+    statusFilter,
+    calculosPorFuncionario,
+  ])
 
   // Validação ao mudar campos no modal
   useEffect(() => {
@@ -332,9 +357,14 @@ export default function FeriasPage() {
     todasFerias,
   ])
 
+  // Lista de funcionários elegíveis para novas férias (somente ativos e em férias, NUNCA desligados)
+  const funcionariosElegiveisFerias = useMemo(() => {
+    return (funcionarios || []).filter((f) => f && f.situacao !== 'desligado')
+  }, [funcionarios])
+
   // Abrir Modal para Novo Cadastro
   const handleOpenNewModal = (funcId?: string) => {
-    const targetId = funcId || selectedFuncId || (funcionarios[0]?.id ?? '')
+    const targetId = funcId || selectedFuncId || (funcionariosElegiveisFerias[0]?.id ?? '')
     setEditingFerias(null)
     setFormFuncId(targetId)
 
@@ -360,6 +390,16 @@ export default function FeriasPage() {
 
   // Abrir Modal para Edição
   const handleOpenEditModal = (ferias: Ferias) => {
+    const fOwner = funcionarios.find((f) => f.id === ferias.funcionario)
+    if (fOwner && fOwner.situacao === 'desligado') {
+      toast({
+        title: 'Operação não permitida',
+        description: 'Não é possível editar férias de um colaborador já desligado.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setEditingFerias(ferias)
     setFormFuncId(ferias.funcionario || '')
     const iniSafe = ferias.data_inicio ? ferias.data_inicio.split('T')[0].split(' ')[0] : ''
@@ -467,6 +507,19 @@ export default function FeriasPage() {
 
   // Cancelar férias
   const handleCancelarFerias = async (feriasId: string) => {
+    const feriasItem = todasFerias.find((f) => f.id === feriasId)
+    if (feriasItem) {
+      const fOwner = funcionarios.find((f) => f.id === feriasItem.funcionario)
+      if (fOwner && fOwner.situacao === 'desligado') {
+        toast({
+          title: 'Operação não permitida',
+          description: 'Não é possível alterar férias de um colaborador já desligado.',
+          variant: 'destructive',
+        })
+        return
+      }
+    }
+
     if (
       !window.confirm(
         'Deseja realmente marcar este período de férias como cancelado? O saldo de dias será restaurado.',
@@ -641,14 +694,23 @@ export default function FeriasPage() {
                     Ver Ficha Completa
                   </Button>
                 </Link>
-                <Button
-                  size="sm"
-                  onClick={() => handleOpenNewModal(funcionarioSelecionado.id)}
-                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-8"
-                >
-                  <Plus className="w-3.5 h-3.5 mr-1" />
-                  Programar Férias
-                </Button>
+                {funcionarioSelecionado.situacao !== 'desligado' ? (
+                  <Button
+                    size="sm"
+                    onClick={() => handleOpenNewModal(funcionarioSelecionado.id)}
+                    className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-8"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Programar Férias
+                  </Button>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="text-slate-500 bg-slate-50 border-slate-200 text-xs py-1 px-2.5"
+                  >
+                    Histórico Arquivado (Desligado)
+                  </Badge>
+                )}
               </div>
             </div>
 
@@ -883,14 +945,16 @@ export default function FeriasPage() {
                 </p>
               </div>
 
-              <Button
-                size="sm"
-                onClick={() => handleOpenNewModal(funcionarioSelecionado.id)}
-                className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-8"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Novo Agendamento
-              </Button>
+              {funcionarioSelecionado.situacao !== 'desligado' && (
+                <Button
+                  size="sm"
+                  onClick={() => handleOpenNewModal(funcionarioSelecionado.id)}
+                  className="bg-gradient-to-r from-[#D4AF37] via-[#E5C07B] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-8"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Novo Agendamento
+                </Button>
+              )}
             </div>
 
             {feriasDoFuncionarioSelecionado.length === 0 ? (
@@ -968,23 +1032,31 @@ export default function FeriasPage() {
                           </td>
                           <td className="py-3 px-3 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenEditModal(f)}
-                                className="h-7 px-2 text-[11px] border-slate-200 text-slate-700"
-                              >
-                                Editar
-                              </Button>
-                              {f.status !== 'cancelada' && f.status !== 'concluida' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCancelarFerias(f.id)}
-                                  className="h-7 px-2 text-[11px] text-red-600 hover:bg-red-50"
-                                >
-                                  Cancelar
-                                </Button>
+                              {funcionarioSelecionado.situacao !== 'desligado' ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenEditModal(f)}
+                                    className="h-7 px-2 text-[11px] border-slate-200 text-slate-700"
+                                  >
+                                    Editar
+                                  </Button>
+                                  {f.status !== 'cancelada' && f.status !== 'concluida' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleCancelarFerias(f.id)}
+                                      className="h-7 px-2 text-[11px] text-red-600 hover:bg-red-50"
+                                    >
+                                      Cancelar
+                                    </Button>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 italic">
+                                  Somente leitura
+                                </span>
                               )}
                             </div>
                           </td>
@@ -1001,228 +1073,278 @@ export default function FeriasPage() {
         /* ============================================================ */
         /* VISÃO GERAL: TABELA DE TODOS OS FUNCIONÁRIOS ATIVOS          */
         /* ============================================================ */
-        <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden space-y-4">
-          {/* Barra de Filtros e Busca */}
-          <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <Input
-                placeholder="Buscar por colaborador ou matrícula..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 text-xs h-9"
-              />
-            </div>
+        <div className="space-y-4">
+          {/* Abas: Funcionários Ativos vs Funcionários Anteriores (Desligados) */}
+          <div className="flex border-b border-slate-200 gap-1 bg-white px-4 pt-3 rounded-t-xl">
+            <button
+              onClick={() => setAbaVisualizacao('ativos')}
+              className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                abaVisualizacao === 'ativos'
+                  ? 'border-[#AA820A] text-[#AA820A]'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span>Funcionários Ativos</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  abaVisualizacao === 'ativos'
+                    ? 'bg-amber-100 text-amber-800 font-bold'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {(funcionarios || []).filter((f) => f && f.situacao !== 'desligado').length}
+              </span>
+            </button>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Filtro Alerta Concessivo */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-slate-500 font-medium">Alerta:</span>
-                <Select value={alertaFilter} onValueChange={setAlertaFilter}>
-                  <SelectTrigger className="text-xs h-9 w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Alertas</SelectItem>
-                    <SelectItem value="com_alerta">Com Qualquer Alerta</SelectItem>
-                    <SelectItem value="urgente_15">Urgente (&lt;15 dias)</SelectItem>
-                    <SelectItem value="alerta_30">Alerta (&lt;30 dias)</SelectItem>
-                    <SelectItem value="vencido">Concessivo Vencido</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Filtro Situação */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-slate-500 font-medium">Situação:</span>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="text-xs h-9 w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todas</SelectItem>
-                    <SelectItem value="ativo">Ativos</SelectItem>
-                    <SelectItem value="em_ferias">Em Férias</SelectItem>
-                    <SelectItem value="com_saldo">Com Saldo &gt; 0</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <button
+              onClick={() => setAbaVisualizacao('anteriores')}
+              className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                abaVisualizacao === 'anteriores'
+                  ? 'border-slate-800 text-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <span>Funcionários Anteriores (Desligados)</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  abaVisualizacao === 'anteriores'
+                    ? 'bg-slate-200 text-slate-800 font-bold'
+                    : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {(funcionarios || []).filter((f) => f && f.situacao === 'desligado').length}
+              </span>
+            </button>
           </div>
 
-          {/* Tabela de Colaboradores */}
-          {loading ? (
-            <div className="py-20 text-center">
-              <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <p className="text-xs text-slate-500">Calculando períodos de férias...</p>
+          <div className="bg-white rounded-b-xl border border-[#E2E8F0] shadow-xs overflow-hidden space-y-4">
+            {/* Barra de Filtros e Busca */}
+            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  placeholder="Buscar por colaborador ou matrícula..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 text-xs h-9"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Filtro Alerta Concessivo */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500 font-medium">Alerta:</span>
+                  <Select value={alertaFilter} onValueChange={setAlertaFilter}>
+                    <SelectTrigger className="text-xs h-9 w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os Alertas</SelectItem>
+                      <SelectItem value="com_alerta">Com Qualquer Alerta</SelectItem>
+                      <SelectItem value="urgente_15">Urgente (&lt;15 dias)</SelectItem>
+                      <SelectItem value="alerta_30">Alerta (&lt;30 dias)</SelectItem>
+                      <SelectItem value="vencido">Concessivo Vencido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Filtro Situação */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-500 font-medium">Situação:</span>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="text-xs h-9 w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todas</SelectItem>
+                      <SelectItem value="ativo">Ativos</SelectItem>
+                      <SelectItem value="em_ferias">Em Férias</SelectItem>
+                      <SelectItem value="com_saldo">Com Saldo &gt; 0</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-          ) : funcionariosFiltrados.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-500">
-              Nenhum funcionário encontrado com os filtros aplicados.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
-                    <th className="py-3 px-4">Colaborador</th>
-                    <th className="py-3 px-3">Admissão</th>
-                    <th className="py-3 px-3 text-center">Saldo Adquirido</th>
-                    <th className="py-3 px-3 text-center">Dias Gozados</th>
-                    <th className="py-3 px-3 text-center">Próximas Férias</th>
-                    <th className="py-3 px-3">Alerta Limite Concessivo</th>
-                    <th className="py-3 px-3">Situação</th>
-                    <th className="py-3 px-4 text-right">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {funcionariosFiltrados.map((func) => {
-                    const calc = calculosPorFuncionario.get(func.id)
-                    const proxFerias = calc?.proximasFerias
 
-                    // Período com maior urgência
-                    const piorPeriodo = calc?.periodos.find(
-                      (p) =>
-                        p.alertaVencimento === 'vencido' ||
-                        p.alertaVencimento === 'urgente_15' ||
-                        p.alertaVencimento === 'alerta_30' ||
-                        p.alertaVencimento === 'alerta_60',
-                    )
+            {/* Tabela de Colaboradores */}
+            {loading ? (
+              <div className="py-20 text-center">
+                <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-xs text-slate-500">Calculando períodos de férias...</p>
+              </div>
+            ) : funcionariosFiltrados.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-500">
+                Nenhum funcionário encontrado com os filtros aplicados.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                      <th className="py-3 px-4">Colaborador</th>
+                      <th className="py-3 px-3">Admissão</th>
+                      <th className="py-3 px-3 text-center">Saldo Adquirido</th>
+                      <th className="py-3 px-3 text-center">Dias Gozados</th>
+                      <th className="py-3 px-3 text-center">Próximas Férias</th>
+                      <th className="py-3 px-3">Alerta Limite Concessivo</th>
+                      <th className="py-3 px-3">Situação</th>
+                      <th className="py-3 px-4 text-right">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {funcionariosFiltrados.map((func) => {
+                      const calc = calculosPorFuncionario.get(func.id)
+                      const proxFerias = calc?.proximasFerias
 
-                    return (
-                      <tr
-                        key={func.id}
-                        className={`hover:bg-slate-50/90 transition-colors ${
-                          piorPeriodo?.alertaVencimento === 'vencido' ||
-                          piorPeriodo?.alertaVencimento === 'urgente_15'
-                            ? 'bg-red-50/20'
-                            : piorPeriodo?.alertaVencimento === 'alerta_30'
-                              ? 'bg-amber-50/20'
-                              : ''
-                        }`}
-                      >
-                        <td className="py-3 px-4">
-                          <button
-                            onClick={() => setSearchParams({ funcionarioId: func.id })}
-                            className="text-left group focus:outline-none"
-                          >
-                            <span className="font-bold text-slate-900 group-hover:text-[#AA820A] group-hover:underline block">
-                              {func.nome || 'Funcionário'}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-mono">
-                              Matrícula: {func.matricula || '?'} •{' '}
-                              {func.expand?.cargo?.nome || 'Cargo'}
-                            </span>
-                          </button>
-                        </td>
+                      // Período com maior urgência
+                      const piorPeriodo = calc?.periodos.find(
+                        (p) =>
+                          p.alertaVencimento === 'vencido' ||
+                          p.alertaVencimento === 'urgente_15' ||
+                          p.alertaVencimento === 'alerta_30' ||
+                          p.alertaVencimento === 'alerta_60',
+                      )
 
-                        <td className="py-3 px-3 font-mono text-slate-700">
-                          {func.data_admissao ? formatBRDate(func.data_admissao) : '-'}
-                        </td>
+                      return (
+                        <tr
+                          key={func.id}
+                          className={`hover:bg-slate-50/90 transition-colors ${
+                            piorPeriodo?.alertaVencimento === 'vencido' ||
+                            piorPeriodo?.alertaVencimento === 'urgente_15'
+                              ? 'bg-red-50/20'
+                              : piorPeriodo?.alertaVencimento === 'alerta_30'
+                                ? 'bg-amber-50/20'
+                                : ''
+                          }`}
+                        >
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => setSearchParams({ funcionarioId: func.id })}
+                              className="text-left group focus:outline-none"
+                            >
+                              <span className="font-bold text-slate-900 group-hover:text-[#AA820A] group-hover:underline block">
+                                {func.nome || 'Funcionário'}
+                              </span>
+                              <span className="text-[11px] text-slate-500 font-mono">
+                                Matrícula: {func.matricula || '?'} •{' '}
+                                {func.expand?.cargo?.nome || 'Cargo'}
+                              </span>
+                            </button>
+                          </td>
 
-                        <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700 text-sm">
-                          {calc?.saldoTotalDisponivel ?? 0}d
-                        </td>
+                          <td className="py-3 px-3 font-mono text-slate-700">
+                            {func.data_admissao ? formatBRDate(func.data_admissao) : '-'}
+                          </td>
 
-                        <td className="py-3 px-3 text-center font-mono text-slate-700">
-                          {(calc?.periodos || []).reduce((acc, p) => acc + (p.diasGozados || 0), 0)}
-                          d
-                        </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-emerald-700 text-sm">
+                            {calc?.saldoTotalDisponivel ?? 0}d
+                          </td>
 
-                        <td className="py-3 px-3 text-center font-mono">
-                          {proxFerias ? (
-                            <span className="text-[#7C3AED] font-semibold">
-                              {formatBRDate(proxFerias.data_inicio)} ({proxFerias.dias || 0}d)
-                            </span>
-                          ) : (
-                            <span className="text-slate-300">—</span>
-                          )}
-                        </td>
+                          <td className="py-3 px-3 text-center font-mono text-slate-700">
+                            {(calc?.periodos || []).reduce(
+                              (acc, p) => acc + (p.diasGozados || 0),
+                              0,
+                            )}
+                            d
+                          </td>
 
-                        <td className="py-3 px-3">
-                          {piorPeriodo ? (
-                            <div className="space-y-0.5">
-                              {piorPeriodo.alertaVencimento === 'vencido' && (
-                                <Badge
-                                  variant="destructive"
-                                  className="flex items-center gap-1 w-fit"
+                          <td className="py-3 px-3 text-center font-mono">
+                            {proxFerias ? (
+                              <span className="text-[#7C3AED] font-semibold">
+                                {formatBRDate(proxFerias.data_inicio)} ({proxFerias.dias || 0}d)
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            {piorPeriodo ? (
+                              <div className="space-y-0.5">
+                                {piorPeriodo.alertaVencimento === 'vencido' && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="flex items-center gap-1 w-fit"
+                                  >
+                                    <AlertCircle className="w-3 h-3" />
+                                    Concessivo Vencido!
+                                  </Badge>
+                                )}
+                                {piorPeriodo.alertaVencimento === 'urgente_15' && (
+                                  <Badge className="bg-red-600 text-white flex items-center gap-1 w-fit">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Vence em &lt;15d ({formatBRDate(piorPeriodo.limiteConcessivo)})
+                                  </Badge>
+                                )}
+                                {piorPeriodo.alertaVencimento === 'alerta_30' && (
+                                  <Badge className="bg-amber-500 text-white flex items-center gap-1 w-fit">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Vence em &lt;30d ({formatBRDate(piorPeriodo.limiteConcessivo)})
+                                  </Badge>
+                                )}
+                                {piorPeriodo.alertaVencimento === 'alerta_60' && (
+                                  <Badge className="bg-amber-100 text-amber-900 border border-amber-300 w-fit">
+                                    Vence em &lt;60d ({formatBRDate(piorPeriodo.limiteConcessivo)})
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-emerald-700 text-[11px] font-semibold flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Regular
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <Badge
+                              className={
+                                func.situacao === 'em_ferias'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : func.situacao === 'ativo'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-slate-100 text-slate-700'
+                              }
+                            >
+                              {func.situacao === 'em_ferias'
+                                ? 'Em Férias'
+                                : func.situacao === 'ativo'
+                                  ? 'Ativo'
+                                  : func.situacao}
+                            </Badge>
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSearchParams({ funcionarioId: func.id })}
+                                className="text-xs h-7 px-2.5 border-slate-200 text-[#AA820A] hover:bg-amber-50"
+                              >
+                                Ver Períodos
+                                <ChevronRight className="w-3 h-3 ml-1" />
+                              </Button>
+                              {func.situacao !== 'desligado' && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleOpenNewModal(func.id)}
+                                  className="bg-gradient-to-r from-[#D4AF37] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-7 px-2"
+                                  title="Agendar Férias"
                                 >
-                                  <AlertCircle className="w-3 h-3" />
-                                  Concessivo Vencido!
-                                </Badge>
-                              )}
-                              {piorPeriodo.alertaVencimento === 'urgente_15' && (
-                                <Badge className="bg-red-600 text-white flex items-center gap-1 w-fit">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  Vence em &lt;15d ({formatBRDate(piorPeriodo.limiteConcessivo)})
-                                </Badge>
-                              )}
-                              {piorPeriodo.alertaVencimento === 'alerta_30' && (
-                                <Badge className="bg-amber-500 text-white flex items-center gap-1 w-fit">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  Vence em &lt;30d ({formatBRDate(piorPeriodo.limiteConcessivo)})
-                                </Badge>
-                              )}
-                              {piorPeriodo.alertaVencimento === 'alerta_60' && (
-                                <Badge className="bg-amber-100 text-amber-900 border border-amber-300 w-fit">
-                                  Vence em &lt;60d ({formatBRDate(piorPeriodo.limiteConcessivo)})
-                                </Badge>
+                                  <Plus className="w-3.5 h-3.5" />
+                                </Button>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-emerald-700 text-[11px] font-semibold flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Regular
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-3">
-                          <Badge
-                            className={
-                              func.situacao === 'em_ferias'
-                                ? 'bg-amber-100 text-amber-800'
-                                : func.situacao === 'ativo'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-slate-100 text-slate-700'
-                            }
-                          >
-                            {func.situacao === 'em_ferias'
-                              ? 'Em Férias'
-                              : func.situacao === 'ativo'
-                                ? 'Ativo'
-                                : func.situacao}
-                          </Badge>
-                        </td>
-
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSearchParams({ funcionarioId: func.id })}
-                              className="text-xs h-7 px-2.5 border-slate-200 text-[#AA820A] hover:bg-amber-50"
-                            >
-                              Ver Períodos
-                              <ChevronRight className="w-3 h-3 ml-1" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleOpenNewModal(func.id)}
-                              className="bg-gradient-to-r from-[#D4AF37] to-[#AA820A] text-slate-950 font-bold hover:brightness-110 border-0 text-xs h-7 px-2"
-                              title="Agendar Férias"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1262,7 +1384,7 @@ export default function FeriasPage() {
                   <SelectValue placeholder="Selecione o funcionário" />
                 </SelectTrigger>
                 <SelectContent>
-                  {funcionarios.map((f) => (
+                  {funcionariosElegiveisFerias.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.nome} ({f.matricula}) — Saldo:{' '}
                       {calculosPorFuncionario.get(f.id)?.saldoTotalDisponivel ?? 0}d

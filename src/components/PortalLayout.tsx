@@ -265,6 +265,24 @@ export default function PortalLayout() {
                 Sair
               </Button>
             </div>
+          ) : funcionario && funcionario.situacao === 'desligado' ? (
+            <div className="bg-[#1a0e0e] border border-red-500/30 rounded-2xl p-6 text-center max-w-md mx-auto my-12">
+              <ShieldAlert className="w-12 h-12 text-red-500 mx-auto mb-3" />
+              <h2 className="text-lg font-bold text-red-200 mb-1">Acesso Indisponível</h2>
+              <p className="text-xs text-slate-300 mb-4">
+                Consta em nosso sistema que seu vínculo empregatício foi encerrado (colaborador
+                desligado). O acesso às rotinas diárias e portal ativo foi desativado. Caso
+                necessite de documentos ou histórico formal, entre em contato diretamente com o
+                setor de Recursos Humanos.
+              </p>
+              <Button
+                onClick={handleSignOut}
+                variant="outline"
+                className="border-red-500/40 text-red-300 hover:bg-red-950/40"
+              >
+                Sair
+              </Button>
+            </div>
           ) : (
             <Outlet
               context={{

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { Badge } from '@/components/ui/badge'
 import {
   funcionariosService,
   fechamentoFolhaService,
@@ -146,10 +147,12 @@ export default function EspelhoPonto() {
   useEffect(() => {
     async function loadFuncs() {
       try {
-        const res = await funcionariosService.list(1, 200, '', 'nome')
+        const res = await funcionariosService.list(1, 500, '', 'nome')
         setFuncionarios(res.items)
         if (!selectedFuncId && res.items.length > 0) {
-          setSelectedFuncId(res.items[0].id)
+          // Selecionar preferencialmente o primeiro ativo por padrão
+          const primeiroAtivo = res.items.find((f) => f.situacao !== 'desligado')
+          setSelectedFuncId(primeiroAtivo ? primeiroAtivo.id : res.items[0].id)
         }
       } catch (err) {
         console.error('Erro ao listar funcionários para o espelho:', err)
@@ -157,6 +160,15 @@ export default function EspelhoPonto() {
     }
     loadFuncs()
   }, [])
+
+  // Separação de funcionários ativos e anteriores para agrupamento no seletor
+  const funcionariosAtivos = useMemo(() => {
+    return (funcionarios || []).filter((f) => f && f.situacao !== 'desligado')
+  }, [funcionarios])
+
+  const funcionariosAnteriores = useMemo(() => {
+    return (funcionarios || []).filter((f) => f && f.situacao === 'desligado')
+  }, [funcionarios])
 
   // Carregar dados do espelho quando funcionário ou competência mudar
   const carregarEspelho = async () => {
@@ -353,6 +365,15 @@ export default function EspelhoPonto() {
     e.preventDefault()
     if (!ajusteDia || !selectedFuncId || !ajusteMotivo.trim()) return
 
+    if (funcionarioAtual?.situacao === 'desligado') {
+      toast({
+        title: 'Operação não permitida',
+        description: 'Não é permitido efetuar novos ajustes de ponto para funcionários desligados.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     if (ajusteModo === 'anular' && !registroParaAnular) {
       toast({
         title: 'Selecione a marcação para anular',
@@ -463,6 +484,15 @@ export default function EspelhoPonto() {
   const handleSalvarAtestado = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!atestadoDia || !selectedFuncId || !atestadoArquivo) return
+
+    if (funcionarioAtual?.situacao === 'desligado') {
+      toast({
+        title: 'Operação não permitida',
+        description: 'Não é permitido anexar atestados para funcionários desligados.',
+        variant: 'destructive',
+      })
+      return
+    }
 
     setSalvandoAtestado(true)
     try {
@@ -603,17 +633,45 @@ export default function EspelhoPonto() {
       <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-xs grid grid-cols-1 md:grid-cols-3 gap-4 items-center print:hidden">
         {/* Funcionário Selector */}
         <div className="space-y-1">
-          <Label className="text-xs font-semibold text-slate-600">Funcionário</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-semibold text-slate-600">Funcionário</Label>
+            {funcionarioAtual?.situacao === 'desligado' && (
+              <Badge
+                variant="outline"
+                className="text-[10px] bg-slate-100 text-slate-700 border-slate-300"
+              >
+                Desligado (Somente Consulta)
+              </Badge>
+            )}
+          </div>
           <Select value={selectedFuncId} onValueChange={setSelectedFuncId}>
             <SelectTrigger className="text-xs h-9">
               <SelectValue placeholder="Selecione o funcionário" />
             </SelectTrigger>
             <SelectContent>
-              {funcionarios.map((f) => (
+              {/* Grupo Ativos (padrão) */}
+              <div className="px-2 py-1 text-[11px] font-bold text-slate-500 uppercase bg-slate-50">
+                Funcionários Ativos ({funcionariosAtivos.length})
+              </div>
+              {funcionariosAtivos.map((f) => (
                 <SelectItem key={f.id} value={f.id}>
                   {f.nome} ({f.matricula})
                 </SelectItem>
               ))}
+
+              {/* Grupo Histórico / Anteriores para Consulta */}
+              {funcionariosAnteriores.length > 0 && (
+                <>
+                  <div className="px-2 py-1 text-[11px] font-bold text-slate-500 uppercase bg-slate-100 border-t border-slate-200 mt-1">
+                    Anteriores / Desligados (Histórico)
+                  </div>
+                  {funcionariosAnteriores.map((f) => (
+                    <SelectItem key={f.id} value={f.id} className="text-slate-600">
+                      {f.nome} ({f.matricula}) — Desligado
+                    </SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -1112,79 +1170,85 @@ export default function EspelhoPonto() {
 
                       {/* Ações (Atestado / Inclusão de Ponto no Fechamento) */}
                       <td className="py-2.5 px-3 text-right print:hidden">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Anexar Atestado */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setAtestadoDia(dia)
-                              setAtestadoDataFim(dia.data)
-                              setAtestadoMotivo('')
-                              setAtestadoArquivo(null)
-                              setAtestadoModalOpen(true)
-                            }}
-                            title="Anexar Atestado Médico"
-                            className="h-7 px-2 text-[11px] border-slate-200 text-purple-700 hover:bg-purple-50"
-                          >
-                            <Paperclip className="w-3 h-3 mr-1" />
-                            Atestado
-                          </Button>
-
-                          {/* Ajustar / Incluir Ponto (Permitido a qualquer momento, exceto competência com folha fechada ou período futuro) */}
-                          {!isFechamentoFechado && !isPeriodoFuturo ? (
+                        {funcionarioAtual?.situacao === 'desligado' ? (
+                          <span className="text-[11px] text-slate-400 italic">Somente Leitura</span>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Anexar Atestado */}
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setAjusteDia(dia)
-                                setAjusteModo('incluir')
-                                setAjusteHora('08:00')
-                                setAjusteTipoMarcacao('entrada')
-                                setAjusteMotivo('')
-                                setRegistroParaAnular('')
-                                setRegistroParaCorrigir('')
-                                setAjustePontoModalOpen(true)
+                                setAtestadoDia(dia)
+                                setAtestadoDataFim(dia.data)
+                                setAtestadoMotivo('')
+                                setAtestadoArquivo(null)
+                                setAtestadoModalOpen(true)
                               }}
-                              className="h-7 px-2 text-[11px] border-amber-300 text-amber-900 bg-amber-50/80 hover:bg-amber-100 font-semibold"
+                              title="Anexar Atestado Médico"
+                              className="h-7 px-2 text-[11px] border-slate-200 text-purple-700 hover:bg-purple-50"
                             >
-                              <PlusCircle className="w-3 h-3 mr-1 text-[#D4AF37]" />
-                              Ajustar
+                              <Paperclip className="w-3 h-3 mr-1" />
+                              Atestado
                             </Button>
-                          ) : (
-                            <TooltipProvider delayDuration={150}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span tabIndex={0} className="inline-block">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      disabled
-                                      className="h-7 px-2 text-[11px] border-slate-200 text-slate-400 opacity-60 cursor-not-allowed"
-                                    >
-                                      <PlusCircle className="w-3 h-3 mr-1" />
-                                      Ajustar
-                                    </Button>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  side="top"
-                                  className="max-w-xs text-xs space-y-2 p-3 bg-slate-900 text-white border-slate-800 shadow-xl"
-                                >
-                                  {isFechamentoFechado ? (
-                                    <p>
-                                      A folha desta competência foi <strong>encerrada</strong>.
-                                      Reabra o fechamento no topo da página para permitir novos
-                                      ajustes.
-                                    </p>
-                                  ) : (
-                                    <p>Não é possível realizar ajustes em competências futuras.</p>
-                                  )}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
+
+                            {/* Ajustar / Incluir Ponto (Permitido a qualquer momento, exceto competência com folha fechada ou período futuro) */}
+                            {!isFechamentoFechado && !isPeriodoFuturo ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setAjusteDia(dia)
+                                  setAjusteModo('incluir')
+                                  setAjusteHora('08:00')
+                                  setAjusteTipoMarcacao('entrada')
+                                  setAjusteMotivo('')
+                                  setRegistroParaAnular('')
+                                  setRegistroParaCorrigir('')
+                                  setAjustePontoModalOpen(true)
+                                }}
+                                className="h-7 px-2 text-[11px] border-amber-300 text-amber-900 bg-amber-50/80 hover:bg-amber-100 font-semibold"
+                              >
+                                <PlusCircle className="w-3 h-3 mr-1 text-[#D4AF37]" />
+                                Ajustar
+                              </Button>
+                            ) : (
+                              <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span tabIndex={0} className="inline-block">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled
+                                        className="h-7 px-2 text-[11px] border-slate-200 text-slate-400 opacity-60 cursor-not-allowed"
+                                      >
+                                        <PlusCircle className="w-3 h-3 mr-1" />
+                                        Ajustar
+                                      </Button>
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    side="top"
+                                    className="max-w-xs text-xs space-y-2 p-3 bg-slate-900 text-white border-slate-800 shadow-xl"
+                                  >
+                                    {isFechamentoFechado ? (
+                                      <p>
+                                        A folha desta competência foi <strong>encerrada</strong>.
+                                        Reabra o fechamento no topo da página para permitir novos
+                                        ajustes.
+                                      </p>
+                                    ) : (
+                                      <p>
+                                        Não é possível realizar ajustes em competências futuras.
+                                      </p>
+                                    )}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )

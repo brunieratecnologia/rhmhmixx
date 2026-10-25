@@ -145,7 +145,7 @@ export default function AusenciasPage() {
     setLoading(true)
     try {
       const [funcsRes, ausenciasRes] = await Promise.all([
-        funcionariosService.list(1, 200, '', 'nome'),
+        funcionariosService.list(1, 500, '', 'nome'),
         ausenciasService.listAll('', '-data_inicio'),
       ])
       setFuncionarios(funcsRes.items)
@@ -281,10 +281,15 @@ export default function AusenciasPage() {
     dataFimFilter,
   ])
 
+  // Lista de funcionários ativos elegíveis para novas ausências (desligados nunca)
+  const funcionariosAtivos = useMemo(() => {
+    return (funcionarios || []).filter((f) => f && f.situacao !== 'desligado')
+  }, [funcionarios])
+
   // Abrir Modal para Nova Ausência
   const handleOpenNewModal = (funcId?: string) => {
     setEditingAusencia(null)
-    setFormFuncId(funcId || (funcionarios[0]?.id ?? ''))
+    setFormFuncId(funcId || (funcionariosAtivos[0]?.id ?? ''))
     setFormCategoria('atestado')
 
     const hojeStr = new Intl.DateTimeFormat('en-CA', {
@@ -549,7 +554,7 @@ export default function AusenciasPage() {
                 <SelectItem value="todos">Todos os Colaboradores</SelectItem>
                 {funcionarios.map((f) => (
                   <SelectItem key={f.id} value={f.id}>
-                    {f.nome}
+                    {f.nome} {f.situacao === 'desligado' ? '(Desligado)' : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -809,7 +814,7 @@ export default function AusenciasPage() {
                   <SelectValue placeholder="Selecione o colaborador" />
                 </SelectTrigger>
                 <SelectContent>
-                  {funcionarios.map((f) => (
+                  {funcionariosAtivos.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.nome} ({f.matricula})
                     </SelectItem>

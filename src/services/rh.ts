@@ -1612,9 +1612,9 @@ export const terminalService = {
 
 export const dashboardService = {
   async getMetrics() {
-    // 1. Total de Funcionários Ativos
+    // 1. Total de Funcionários Ativos (ativos e em férias — excluindo desligados e afastados)
     const ativosRes = await pb.collection('funcionarios').getList(1, 1, {
-      filter: 'situacao = "ativo"',
+      filter: 'situacao = "ativo" || situacao = "em_ferias"',
     })
     const totalAtivos = ativosRes.totalItems
 

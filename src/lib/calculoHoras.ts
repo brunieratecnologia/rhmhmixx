@@ -59,6 +59,8 @@ export interface DiaEspelhoCalculado {
   horasBancoDebitoFormatado: string
   atrasoMinutos: number // Minutos de atraso além da tolerância de 10 min
   entradaTolerada: boolean // Se chegou atrasado mas dentro da tolerância de 10 min (não gera ocorrência)
+  variacoesToleradasMinutos?: number // Cláusula 5 (art. 58 §1º): variações de almoço/saída dentro de 5min/marcação e teto de 10min/dia — abonadas
+  variacoesDebitoMinutos?: number // Cláusula 5: tempo apurado INTEGRALMENTE quando a variação excede 5min/marcação ou o teto de 10min/dia
   ocorrencias: {
     tipo:
       | 'marcacao_incompleta'
@@ -69,6 +71,7 @@ export interface DiaEspelhoCalculado {
       | 'atraso'
       | 'extra'
       | 'folga_trabalhada'
+      | 'variacao_marcacao'
       | 'info'
     descricao: string
     severidade: 'baixo' | 'atencao' | 'alerta'
@@ -95,6 +98,7 @@ export interface ResumoEspelhoMensal {
   horasFaltasMinutos: number // soma das diferenças negativas dos dias de trabalho
   totalBancoCreditoMinutos: number // Total de crédito para Banco de Horas (após saída prevista + folgas/feriados trabalhados)
   totalBancoDebitoMinutos: number // Total de débito para Banco de Horas (atrasos > 10m + faltas)
+  totalVariacoesDebitoMinutos?: number // Cláusula 5: débitos por variações de marcação apuradas integralmente
   totalOcorrencias: number
   totalMarcacoesIncompletas: number
   totalAtestados: number
@@ -753,6 +757,7 @@ export function construirEspelhoMensal(params: {
   let horasFaltasMinutos = 0
   let totalBancoCreditoMinutos = 0
   let totalBancoDebitoMinutos = 0
+  let totalVariacoesDebitoMinutos = 0
   let totalOcorrencias = 0
   let totalMarcacoesIncompletas = 0
   let totalAtestados = 0
@@ -898,6 +903,10 @@ export function construirEspelhoMensal(params: {
     const diaConfig = getHorarioDiaJornada(jornadaVigente, diaSigla)
     const horaEntradaPrevista = diaConfig?.hora_entrada || jornadaVigente?.hora_entrada || ''
     const horaSaidaPrevista = diaConfig?.hora_saida || jornadaVigente?.hora_saida || ''
+    const horaIniIntPrevista =
+      diaConfig?.hora_inicio_intervalo || jornadaVigente?.hora_inicio_intervalo || ''
+    const horaRetIntPrevista =
+      diaConfig?.hora_retorno_intervalo || jornadaVigente?.hora_retorno_intervalo || ''
     const ehNoturno = Boolean(
       diaConfig?.atravessa_meia_noite || jornadaVigente?.atravessa_meia_noite,
     )
@@ -955,6 +964,102 @@ export function construirEspelhoMensal(params: {
           horasBancoDebitoMinutos += diferencaEntrada
         }
       }
+    }
+
+    // 1.b CLÁUSULA 5 DO ACORDO (art. 58 §1º CLT) — variações das DEMAIS marcações
+    // (início do intervalo, retorno do intervalo e saída antecipada):
+    // - até 5 minutos por marcação são tolerados, observado o teto de 10 minutos de variações por dia;
+    // - ultrapassados os limites, o tempo computável é apurado INTEGRALMENTE;
+    // - a saída ALÉM da prevista NUNCA é suprimida (permanece como hora extra/crédito),
+    //   não existindo tolerância geral de 10 minutos na saída para apagar horas extras.
+    let variacoesToleradasMinutos = 0
+    let variacoesDebitoMinutos = 0
+    let ocorrenciasVariacaoCount = 0
+
+    if (
+      !ehDiaFolga &&
+      !ehFeriado &&
+      !ehNoturno &&
+      marcacoesValidas.length >= 2 &&
+      previstoMin > 0
+    ) {
+      const prevIniInt = timeStringToMinutes(horaIniIntPrevista)
+      const prevRetInt = timeStringToMinutes(horaRetIntPrevista)
+      const prevSaida = timeStringToMinutes(horaSaidaPrevista)
+
+      const candidatosVariacao: {
+        rotulo: string
+        variacao: number
+      }[] = []
+
+      for (const m of marcacoesValidas) {
+        if (m.automatico) continue
+        const minReal = timeStringToMinutes(m.horario)
+        if (m.tipo === 'inicio_intervalo' && prevIniInt > 0 && minReal < prevIniInt) {
+          // Antecipou o início do intervalo (parou antes do previsto)
+          candidatosVariacao.push({
+            rotulo: `início do intervalo (${m.horario} vs previsto ${horaIniIntPrevista.slice(0, 5)})`,
+            variacao: prevIniInt - minReal,
+          })
+        } else if (m.tipo === 'retorno_intervalo' && prevRetInt > 0 && minReal > prevRetInt) {
+          // Retornou tarde do intervalo (almoço mais longo que o previsto)
+          candidatosVariacao.push({
+            rotulo: `retorno do intervalo (${m.horario} vs previsto ${horaRetIntPrevista.slice(0, 5)})`,
+            variacao: minReal - prevRetInt,
+          })
+        } else if (m.tipo === 'saida' && prevSaida > 0 && minReal < prevSaida) {
+          // Saiu antes do previsto
+          candidatosVariacao.push({
+            rotulo: `saída (${m.horario} vs previsto ${horaSaidaPrevista.slice(0, 5)})`,
+            variacao: prevSaida - minReal,
+          })
+        }
+      }
+
+      if (candidatosVariacao.length > 0) {
+        const toleradas: { rotulo: string; variacao: number }[] = []
+        let somaToleradas = 0
+
+        for (const candidato of candidatosVariacao) {
+          if (candidato.variacao <= 5) {
+            toleradas.push(candidato)
+            somaToleradas += candidato.variacao
+          } else {
+            // Variação acima de 5 minutos na marcação: apura INTEGRALMENTE
+            variacoesDebitoMinutos += candidato.variacao
+            ocorrenciasVariacaoCount++
+            ocorrencias.push({
+              tipo: 'variacao_marcacao',
+              descricao: `Variação acima da tolerância de 5 min na ${candidato.rotulo} — ${candidato.variacao} min computados integralmente`,
+              severidade: 'atencao',
+              minutos: candidato.variacao,
+            })
+          }
+        }
+
+        if (somaToleradas > 10) {
+          // Teto diário de 10 minutos de variações excedido: tudo vira tempo integral
+          for (const tolerada of toleradas) {
+            variacoesDebitoMinutos += tolerada.variacao
+            ocorrenciasVariacaoCount++
+            ocorrencias.push({
+              tipo: 'variacao_marcacao',
+              descricao: `Limite diário de 10 min de variações excedido — ${tolerada.rotulo}: ${tolerada.variacao} min computados integralmente`,
+              severidade: 'atencao',
+              minutos: tolerada.variacao,
+            })
+          }
+          variacoesToleradasMinutos = 0
+        } else {
+          variacoesToleradasMinutos = somaToleradas
+        }
+      }
+    }
+
+    if (variacoesDebitoMinutos > 0) {
+      horasBancoDebitoMinutos += variacoesDebitoMinutos
+      totalVariacoesDebitoMinutos += variacoesDebitoMinutos
+      totalOcorrencias += ocorrenciasVariacaoCount
     }
 
     // 2. Crédito de Banco de Horas pós-saída prevista e antecedência na entrada (Regra atualizada)
@@ -1117,6 +1222,9 @@ export function construirEspelhoMensal(params: {
         horasBancoDebitoMinutos > 0 ? `-${minutesToTimeString(horasBancoDebitoMinutos)}` : '00:00',
       atrasoMinutos,
       entradaTolerada,
+      variacoesToleradasMinutos:
+        variacoesToleradasMinutos > 0 ? variacoesToleradasMinutos : undefined,
+      variacoesDebitoMinutos: variacoesDebitoMinutos > 0 ? variacoesDebitoMinutos : undefined,
       ocorrencias,
       temAtestado: Boolean(ausenciaMatch && ausenciaMatch.categoria === 'atestado'),
       temFerias: Boolean(feriasMatch),
@@ -1136,6 +1244,8 @@ export function construirEspelhoMensal(params: {
     horasFaltasMinutos,
     totalBancoCreditoMinutos,
     totalBancoDebitoMinutos,
+    totalVariacoesDebitoMinutos:
+      totalVariacoesDebitoMinutos > 0 ? totalVariacoesDebitoMinutos : undefined,
     totalOcorrencias,
     totalMarcacoesIncompletas,
     totalAtestados,

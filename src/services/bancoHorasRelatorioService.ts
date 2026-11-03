@@ -32,6 +32,7 @@ export interface ExtratoItemBancoHoras {
     | 'dia_folga'
     | 'ajuste_admin'
     | 'atraso_tolerancia'
+    | 'variacoes_marcacoes'
     | 'falta_injustificada'
   origemLabel: string
   descricao: string
@@ -39,6 +40,7 @@ export interface ExtratoItemBancoHoras {
   saldoAcumuladoFormatado?: string
   responsavelNome?: string
   atrasoOcorrencia?: string
+  dataLimiteCompensacao?: string // Cláusula 8: data-limite de compensação do crédito (geração + 6 meses)
 }
 
 export interface FuncionarioBancoHorasResumo {
@@ -397,7 +399,9 @@ export function construirExtratoFuncionario(params: {
     // Débitos ou atrasos
     if (dia.horasBancoDebitoMinutos > 0) {
       const ehAtraso = dia.atrasoMinutos > 0
+      const temVariacaoMarcacao = dia.ocorrencias.some((o) => o.tipo === 'variacao_marcacao')
       const descrAtraso = dia.ocorrencias.find((o) => o.tipo === 'atraso')?.descricao
+      const descrVariacao = dia.ocorrencias.find((o) => o.tipo === 'variacao_marcacao')?.descricao
       const descrAusencia = dia.ocorrencias.find((o) => o.tipo === 'ausencia')?.descricao
 
       itens.push({
@@ -406,10 +410,19 @@ export function construirExtratoFuncionario(params: {
         tipo: 'debito',
         minutos: dia.horasBancoDebitoMinutos,
         horasFormatadas: `-${minutesToTimeString(dia.horasBancoDebitoMinutos)}`,
-        origem: ehAtraso ? 'atraso_tolerancia' : 'falta_injustificada',
-        origemLabel: ehAtraso ? 'Atraso excedente (>10m)' : 'Ausência sem marcação',
+        origem: ehAtraso
+          ? 'atraso_tolerancia'
+          : temVariacaoMarcacao
+            ? 'variacoes_marcacoes'
+            : 'falta_injustificada',
+        origemLabel: ehAtraso
+          ? 'Atraso excedente (>10m)'
+          : temVariacaoMarcacao
+            ? 'Variação de marcação (art. 58 §1º)'
+            : 'Ausência sem marcação',
         descricao:
           descrAtraso ||
+          descrVariacao ||
           descrAusencia ||
           (ehAtraso ? `Atraso na entrada excedendo a tolerância` : `Ausência no dia de trabalho`),
         atrasoOcorrencia: ehAtraso
@@ -442,6 +455,13 @@ export function construirExtratoFuncionario(params: {
       descricao: manual.motivo || 'Lançamento manual efetuado pelo administrador',
       responsavelNome: resp,
     })
+  }
+
+  // Cláusula 8: todo crédito recebe a data-limite de compensação (geração + 6 meses)
+  for (const item of itens) {
+    if (item.tipo === 'credito' && item.data) {
+      item.dataLimiteCompensacao = adicionarMesesISOData(item.data, 6)
+    }
   }
 
   // Ordena cronologicamente crescente para calcular saldo acumulado corrente
@@ -551,4 +571,158 @@ export function gerarCsvBancoHoras(
       .join('\r\n')
 
   return csvContent
+}
+
+/**
+ * Cláusula 8: acrescenta meses a uma data ISO (YYYY-MM-DD), ajustando ao último dia do mês destino.
+ * Usada para calcular a data-limite de compensação de cada crédito (geração + 6 meses).
+ */
+export function adicionarMesesISOData(dataISO: string, meses: number): string {
+  const base = dataISO.slice(0, 10)
+  const partes = base.split('-')
+  const ano = parseInt(partes[0], 10)
+  const mes = parseInt(partes[1], 10)
+  const dia = parseInt(partes[2], 10)
+  if (isNaN(ano) || isNaN(mes) || isNaN(dia)) return base
+
+  const totalMeses = mes - 1 + meses
+  const anoDestino = ano + Math.floor(totalMeses / 12)
+  const mesDestino = (totalMeses % 12) + 1
+  const ultimoDiaDestino = new Date(Date.UTC(anoDestino, mesDestino, 0)).getUTCDate()
+  const diaDestino = Math.min(dia, ultimoDiaDestino)
+
+  return `${anoDestino}-${String(mesDestino).padStart(2, '0')}-${String(diaDestino).padStart(2, '0')}`
+}
+
+/** Data de hoje (YYYY-MM-DD) no fuso de São Paulo */
+export function hojeISOBrasil(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
+/** Diferença em dias entre duas datas ISO (YYYY-MM-DD): fim - início */
+export function diasEntreISO(inicioISO: string, fimISO: string): number {
+  const p1 = inicioISO.split('-')
+  const p2 = fimISO.split('-')
+  const a1 = parseInt(p1[0], 10)
+  const m1 = parseInt(p1[1], 10)
+  const d1 = parseInt(p1[2], 10)
+  const a2 = parseInt(p2[0], 10)
+  const m2 = parseInt(p2[1], 10)
+  const d2 = parseInt(p2[2], 10)
+  if ([a1, m1, d1, a2, m2, d2].some((v) => isNaN(v))) return 0
+  return Math.round((Date.UTC(a2, m2 - 1, d2) - Date.UTC(a1, m1 - 1, d1)) / 86400000)
+}
+
+export interface CreditoAbertoBancoHoras {
+  id: string
+  dataGeracao: string
+  dataLimite: string
+  origemLabel: string
+  minutosGerados: number
+  minutosCompensados: number
+  minutosAbertos: number
+  vencido: boolean
+  diasRestantes: number // negativo quando vencido
+}
+
+export interface ResumoCreditosAbertos {
+  creditos: CreditoAbertoBancoHoras[]
+  minutosAbertosNoPrazo: number
+  minutosAbertosVencidos: number
+  proximoVencimentoDias?: number
+}
+
+/**
+ * Cláusula 8: apura os créditos ainda em aberto aplicando FIFO —
+ * cada débito (compensação) consome primeiro os créditos mais antigos.
+ * Créditos cuja data-limite (geração + 6 meses) já passou ficam marcados como vencidos
+ * (a pagar como hora extra com adicional mínimo de 50%).
+ */
+export function calcularCreditosAbertosBancoHoras(
+  itens: ExtratoItemBancoHoras[],
+  hojeISO?: string,
+): ResumoCreditosAbertos {
+  const hoje = hojeISO || hojeISOBrasil()
+
+  const cronologicos = [...itens].sort((a, b) => {
+    if (a.data !== b.data) return a.data.localeCompare(b.data)
+    return a.id.localeCompare(b.id)
+  })
+
+  const filaCreditos: {
+    id: string
+    dataGeracao: string
+    dataLimite: string
+    origemLabel: string
+    gerados: number
+    restante: number
+  }[] = []
+
+  for (const item of cronologicos) {
+    if (item.tipo === 'credito' && item.minutos > 0) {
+      filaCreditos.push({
+        id: item.id,
+        dataGeracao: item.data,
+        dataLimite: item.dataLimiteCompensacao || adicionarMesesISOData(item.data, 6),
+        origemLabel: item.origemLabel,
+        gerados: item.minutos,
+        restante: item.minutos,
+      })
+    } else if (item.tipo === 'debito' && item.minutos > 0) {
+      let restanteDebito = item.minutos
+      for (const credito of filaCreditos) {
+        if (restanteDebito <= 0) break
+        if (credito.restante <= 0) continue
+        const consumido = Math.min(credito.restante, restanteDebito)
+        credito.restante -= consumido
+        restanteDebito -= consumido
+      }
+    }
+  }
+
+  const creditos: CreditoAbertoBancoHoras[] = []
+  let minutosNoPrazo = 0
+  let minutosVencidos = 0
+  let proximoVencimentoDias: number | undefined
+
+  for (const credito of filaCreditos) {
+    if (credito.restante <= 0) continue
+    const vencido = credito.dataLimite < hoje
+    const diasRestantes = diasEntreISO(hoje, credito.dataLimite)
+
+    creditos.push({
+      id: credito.id,
+      dataGeracao: credito.dataGeracao,
+      dataLimite: credito.dataLimite,
+      origemLabel: credito.origemLabel,
+      minutosGerados: credito.gerados,
+      minutosCompensados: credito.gerados - credito.restante,
+      minutosAbertos: credito.restante,
+      vencido,
+      diasRestantes,
+    })
+
+    if (vencido) {
+      minutosVencidos += credito.restante
+    } else {
+      minutosNoPrazo += credito.restante
+      if (proximoVencimentoDias === undefined || diasRestantes < proximoVencimentoDias) {
+        proximoVencimentoDias = diasRestantes
+      }
+    }
+  }
+
+  creditos.sort((a, b) => a.dataGeracao.localeCompare(b.dataGeracao))
+
+  return {
+    creditos,
+    minutosAbertosNoPrazo: minutosNoPrazo,
+    minutosAbertosVencidos: minutosVencidos,
+    proximoVencimentoDias,
+  }
 }

@@ -339,3 +339,36 @@
     animation: spotlight 2s ease forwards;
   }
 }
+
+/* Regras de impressão para Espelho de Ponto / Folha de Ponto */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 8mm 12mm 8mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .avoid-break-inside {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Ocultar elementos interativos */
+  .print\:hidden {
+    display: none !important;
+  }
+}

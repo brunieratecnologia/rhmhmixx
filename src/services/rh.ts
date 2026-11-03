@@ -1438,6 +1438,130 @@ export const espelhoPontoService = {
       fechamento,
     }
   },
+
+  async getDadosEspelhoEmMassa(ano: number, mes: number, apenasAtivos = true) {
+    const padMes = String(mes).padStart(2, '0')
+    const startStr = `${ano}-${padMes}-01`
+    const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate()
+    const endStr = `${ano}-${padMes}-${String(ultimoDia).padStart(2, '0')}`
+    const prevDate = new Date(ano, mes - 1, 0).toISOString().split('T')[0]
+    const nextDate = new Date(ano, mes, 2).toISOString().split('T')[0]
+
+    // 1. Buscar lista de funcionários elegíveis
+    const filterFunc = apenasAtivos ? 'situacao != "desligado"' : ''
+    const funcs = await pb.collection('funcionarios').getFullList<Funcionario>({
+      filter: filterFunc || undefined,
+      expand: 'cargo,departamento,jornada_atual',
+      sort: 'nome',
+    })
+
+    if (funcs.length === 0) {
+      return {
+        funcionarios: [],
+        fechamento: await fechamentoFolhaService.getStatus(ano, mes),
+        dadosPorFuncionario: new Map(),
+      }
+    }
+
+    // 2. Buscar em lote: Histórico de Jornadas, Registros, Tratamentos, Ausências, Férias
+    const [histJornadas, registros, tratamentos, ausencias, ferias, fechamento] = await Promise.all(
+      [
+        pb.collection('historico_jornadas').getFullList<import('@/types/rh').HistoricoJornada>({
+          expand: 'jornada',
+          sort: '-data_inicio',
+        }),
+        pb.collection('registros_horario').getFullList<RegistroHorario>({
+          filter: `(data_utc >= "${startStr}" && data_utc <= "${endStr}") || (timestamp_utc >= "${prevDate} 00:00:00" && timestamp_utc <= "${nextDate} 23:59:59")`,
+          sort: 'timestamp_utc,hora_utc',
+        }),
+        pb.collection('tratamentos_ponto').getFullList<import('@/types/rh').TratamentoPonto>({
+          filter: `data_registro >= "${startStr}" && data_registro <= "${endStr}"`,
+          sort: 'data_registro,hora_registro',
+          expand: 'usuario_responsavel',
+        }),
+        pb.collection('ausencias').getFullList<Ausencia>({
+          filter: `data_inicio <= "${endStr}" && (data_fim >= "${startStr}" || data_fim = "" || data_fim = null)`,
+          expand: 'documentos',
+          sort: 'data_inicio',
+        }),
+        pb.collection('ferias').getFullList<Ferias>({
+          filter: `status != "cancelada" && (data_inicio <= "${endStr}" && data_fim >= "${startStr}")`,
+          sort: 'data_inicio',
+        }),
+        fechamentoFolhaService.getStatus(ano, mes),
+      ],
+    )
+
+    // Agrupar por funcionário em memória
+    const histMap = new Map<
+      string,
+      Array<{ data_inicio: string; data_fim?: string; jornada: Jornada }>
+    >()
+    for (const h of histJornadas) {
+      if (!histMap.has(h.funcionario)) {
+        histMap.set(h.funcionario, [])
+      }
+      const func = funcs.find((f) => f.id === h.funcionario)
+      histMap.get(h.funcionario)!.push({
+        data_inicio: h.data_inicio,
+        data_fim: h.data_fim,
+        jornada: (h.expand?.jornada || func?.expand?.jornada_atual) as Jornada,
+      })
+    }
+
+    const regMap = new Map<string, RegistroHorario[]>()
+    for (const r of registros) {
+      if (!regMap.has(r.funcionario)) regMap.set(r.funcionario, [])
+      regMap.get(r.funcionario)!.push(r)
+    }
+
+    const tratMap = new Map<string, import('@/types/rh').TratamentoPonto[]>()
+    for (const t of tratamentos) {
+      if (!tratMap.has(t.funcionario)) tratMap.set(t.funcionario, [])
+      tratMap.get(t.funcionario)!.push(t)
+    }
+
+    const ausMap = new Map<string, Ausencia[]>()
+    for (const a of ausencias) {
+      if (!ausMap.has(a.funcionario)) ausMap.set(a.funcionario, [])
+      ausMap.get(a.funcionario)!.push(a)
+    }
+
+    const ferMap = new Map<string, Ferias[]>()
+    for (const f of ferias) {
+      if (!ferMap.has(f.funcionario)) ferMap.set(f.funcionario, [])
+      ferMap.get(f.funcionario)!.push(f)
+    }
+
+    const dadosPorFuncionario = new Map<
+      string,
+      {
+        funcionario: Funcionario
+        historicoJornadas: Array<{ data_inicio: string; data_fim?: string; jornada: Jornada }>
+        registros: RegistroHorario[]
+        tratamentos: import('@/types/rh').TratamentoPonto[]
+        ausencias: Ausencia[]
+        ferias: Ferias[]
+      }
+    >()
+
+    for (const f of funcs) {
+      dadosPorFuncionario.set(f.id, {
+        funcionario: f,
+        historicoJornadas: histMap.get(f.id) || [],
+        registros: regMap.get(f.id) || [],
+        tratamentos: tratMap.get(f.id) || [],
+        ausencias: ausMap.get(f.id) || [],
+        ferias: ferMap.get(f.id) || [],
+      })
+    }
+
+    return {
+      funcionarios: funcs,
+      fechamento,
+      dadosPorFuncionario,
+    }
+  },
 }
 
 export const empresaService = {

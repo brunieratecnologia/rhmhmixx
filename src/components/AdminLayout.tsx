@@ -146,7 +146,7 @@ export default function AdminLayout() {
 
       {/* Sidebar (Desktop 250px, Tablet 72px icon-only, Mobile Slide-in Drawer) */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#070B11] border-r border-[#D4AF37]/20 transition-all duration-200 ease-in-out
+        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[#070B11] border-r border-[#D4AF37]/20 transition-all duration-200 ease-in-out print:hidden
           ${mobileOpen ? 'translate-x-0 w-[250px]' : '-translate-x-full lg:translate-x-0'}
           w-[250px] md:w-[72px] lg:w-[250px]
         `}
@@ -237,9 +237,9 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main Container */}
-      <div className="flex-1 flex flex-col min-w-0 transition-all duration-200 lg:pl-[250px] md:pl-[72px]">
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-200 lg:pl-[250px] md:pl-[72px] print:pl-0">
         {/* Top bar */}
-        <header className="h-16 bg-[#070B11]/90 backdrop-blur-md border-b border-[#D4AF37]/15 sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6">
+        <header className="h-16 bg-[#070B11]/90 backdrop-blur-md border-b border-[#D4AF37]/15 sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 print:hidden">
           <div className="flex items-center gap-3 min-w-0">
             {/* Hamburger Button (Mobile Only) */}
             <button
@@ -327,12 +327,12 @@ export default function AdminLayout() {
         </header>
 
         {/* Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto print:p-0 print:max-w-none print:w-full">
           <Outlet />
         </main>
 
         {/* Footer */}
-        <footer className="hidden sm:block py-4 px-6 border-t border-[#D4AF37]/15 bg-[#070B11] text-center text-xs text-slate-400">
+        <footer className="hidden sm:block py-4 px-6 border-t border-[#D4AF37]/15 bg-[#070B11] text-center text-xs text-slate-400 print:hidden">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-[1400px] mx-auto">
             <span className="text-amber-100/80">{companyName} • Gestão de Recursos Humanos</span>
             <div className="flex items-center gap-3">

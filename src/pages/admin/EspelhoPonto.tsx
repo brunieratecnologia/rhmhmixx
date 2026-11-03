@@ -8,8 +8,9 @@ import {
   atestadosService,
   espelhoPontoService,
   feriadosService,
+  empresaService,
 } from '@/services/rh'
-import type { Funcionario, FechamentoFolha, Feriado } from '@/types/rh'
+import type { Funcionario, FechamentoFolha, Feriado, Empresa } from '@/types/rh'
 import {
   construirEspelhoMensal,
   DiaEspelhoCalculado,
@@ -76,6 +77,12 @@ const MESES = [
   'Dezembro',
 ]
 
+interface FolhaFuncionarioLote {
+  funcionario: Funcionario
+  dias: DiaEspelhoCalculado[]
+  resumo: ResumoEspelhoMensal
+}
+
 export default function EspelhoPonto() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { user, role } = useAuth()
@@ -96,6 +103,12 @@ export default function EspelhoPonto() {
   const [diasEspelho, setDiasEspelho] = useState<DiaEspelhoCalculado[]>([])
   const [resumo, setResumo] = useState<ResumoEspelhoMensal | null>(null)
   const [loading, setLoading] = useState(false)
+
+  // Estado para impressão em lote (Folhas do mês de todos os funcionários ativos)
+  const [modoImpressaoLote, setModoImpressaoLote] = useState(false)
+  const [folhasLote, setFolhasLote] = useState<FolhaFuncionarioLote[]>([])
+  const [carregandoLote, setCarregandoLote] = useState(false)
+  const [empresaInfo, setEmpresaInfo] = useState<Empresa | null>(null)
 
   // Modais
   // 1. Fechamento de Folha Modal
@@ -326,9 +339,76 @@ export default function EspelhoPonto() {
     document.body.removeChild(link)
   }
 
-  // Exportar / Imprimir PDF
+  // Exportar / Imprimir PDF Individual (do funcionário selecionado)
   const handlePrintPDF = () => {
-    window.print()
+    setModoImpressaoLote(false)
+    // Garantir que a renderização saia do modo lote antes de chamar window.print()
+    setTimeout(() => {
+      window.print()
+    }, 50)
+  }
+
+  // Imprimir Folhas do Mês em Lote (Todos os funcionários ativos da competência)
+  const handleImprimirFolhasMesLote = async () => {
+    setCarregandoLote(true)
+    try {
+      toast({
+        title: 'Gerando folhas do mês em lote...',
+        description:
+          'Compilando os dados e apurações de todos os funcionários ativos para impressão.',
+      })
+
+      const [dadosLote, feriadosList, emp] = await Promise.all([
+        espelhoPontoService.getDadosEspelhoEmMassa(ano, mes, true),
+        feriadosService.listByAno(ano, true).catch(() => [] as Feriado[]),
+        empresaService.get().catch(() => null),
+      ])
+
+      setEmpresaInfo(emp)
+
+      const compilados: FolhaFuncionarioLote[] = []
+
+      for (const func of dadosLote.funcionarios) {
+        const d = dadosLote.dadosPorFuncionario.get(func.id)
+        if (!d) continue
+
+        const calc = construirEspelhoMensal({
+          ano,
+          mes,
+          jornadaAtual: func.expand?.jornada_atual || null,
+          historicoJornadas: d.historicoJornadas,
+          registrosMes: d.registros,
+          tratamentosMes: d.tratamentos,
+          ausenciasMes: d.ausencias,
+          feriasMes: d.ferias,
+          feriados: feriadosList,
+        })
+
+        compilados.push({
+          funcionario: func,
+          dias: calc.dias,
+          resumo: calc.resumo,
+        })
+      }
+
+      setFolhasLote(compilados)
+      setModoImpressaoLote(true)
+
+      // Dar um tempo para o React montar todos os componentes de impressão antes de disparar o diálogo nativo
+      setTimeout(() => {
+        window.print()
+        setCarregandoLote(false)
+      }, 350)
+    } catch (err: any) {
+      console.error('Erro ao gerar impressão em lote das folhas:', err)
+      toast({
+        title: 'Erro ao gerar folhas para impressão',
+        description: err?.message || 'Falha ao compilar folhas dos colaboradores.',
+        variant: 'destructive',
+      })
+      setCarregandoLote(false)
+      setModoImpressaoLote(false)
+    }
   }
 
   // Controle de Fechamento da Folha
@@ -610,21 +690,43 @@ export default function EspelhoPonto() {
             variant="outline"
             onClick={handleExportCSV}
             disabled={!funcionarioAtual}
-            className="text-xs h-9 border-slate-200 text-slate-700"
+            className="text-xs h-9 border-slate-200 text-slate-700 hover:bg-slate-50"
+            title="Exportar espelho de ponto do colaborador em CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
             CSV
           </Button>
 
-          {/* Imprimir / PDF */}
+          {/* Imprimir / PDF Individual */}
           <Button
             variant="outline"
             onClick={handlePrintPDF}
             disabled={!funcionarioAtual}
-            className="text-xs h-9 border-slate-200 text-slate-700"
+            className="text-xs h-9 border-slate-200 text-slate-700 hover:bg-slate-50"
+            title="Imprimir folha de ponto do colaborador selecionado"
           >
             <Printer className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-            Imprimir / PDF
+            Imprimir Folha
+          </Button>
+
+          {/* Imprimir Folhas do Mês (Todos os funcionários em lote para assinatura) */}
+          <Button
+            onClick={handleImprimirFolhasMesLote}
+            disabled={carregandoLote || funcionariosAtivos.length === 0}
+            className="text-xs h-9 font-semibold bg-[#D4AF37] hover:bg-[#b89528] text-slate-950 shadow-xs border border-[#b89528]"
+            title="Imprimir folhas de ponto de todos os funcionários ativos da competência para assinatura"
+          >
+            {carregandoLote ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin mr-1.5" />
+                Gerando Folhas...
+              </>
+            ) : (
+              <>
+                <FileText className="w-3.5 h-3.5 mr-1.5 text-slate-950" />
+                Imprimir Folhas do Mês
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -749,25 +851,53 @@ export default function EspelhoPonto() {
         </div>
       )}
 
-      {/* Cabeçalho de Impressão (Visível apenas em impressão/PDF) */}
-      <div className="hidden print:block border-b border-slate-300 pb-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">ESPELHO DE PONTO MENSAL</h1>
-            <p className="text-xs text-slate-600">
-              Competência: {MESES[mes - 1]} / {ano}
-            </p>
+      {/* Cabeçalho de Impressão Individual (Visível apenas em impressão/PDF quando NÃO estiver em modo lote) */}
+      {!modoImpressaoLote && (
+        <div className="hidden print:block border-b-2 border-black pb-3 mb-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-lg font-black text-black tracking-tight uppercase">
+                {empresaInfo?.razao_social ||
+                  empresaInfo?.nome_fantasia ||
+                  'MH MIXX AÇAÍ E FRUTAS CONGELADAS'}
+              </h1>
+              <p className="text-xs text-black font-semibold">
+                FOLHA DE PONTO / ESPELHO MENSAL — {MESES[mes - 1].toUpperCase()} / {ano}
+              </p>
+              {empresaInfo?.cnpj && (
+                <p className="text-[10px] text-black">CNPJ: {empresaInfo.cnpj}</p>
+              )}
+            </div>
+            <div className="text-right text-xs text-black">
+              <p className="font-bold text-sm">{funcionarioAtual?.nome}</p>
+              <p>
+                Matrícula: <strong className="font-mono">{funcionarioAtual?.matricula}</strong>
+              </p>
+              <p>Cargo: {funcionarioAtual?.expand?.cargo?.nome || 'Não definido'}</p>
+              <p>Departamento: {funcionarioAtual?.expand?.departamento?.nome || 'Geral'}</p>
+            </div>
           </div>
-          <div className="text-right text-xs">
-            <p className="font-bold">{funcionarioAtual?.nome}</p>
-            <p className="text-slate-600">Matrícula: {funcionarioAtual?.matricula}</p>
-            <p className="text-slate-600">Cargo: {funcionarioAtual?.expand?.cargo?.nome}</p>
+          <div className="mt-2 pt-2 border-t border-dashed border-slate-400 flex items-center justify-between text-[10px] text-black">
+            <span>
+              <strong>Jornada Contratada:</strong>{' '}
+              {funcionarioAtual?.expand?.jornada_atual?.nome || 'Jornada Padrão'} (
+              {funcionarioAtual?.expand?.jornada_atual?.hora_entrada || '08:00'} às{' '}
+              {funcionarioAtual?.expand?.jornada_atual?.hora_saida || '18:00'})
+            </span>
+            <span>
+              Emissão:{' '}
+              {new Intl.DateTimeFormat('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                dateStyle: 'short',
+                timeStyle: 'short',
+              }).format(new Date())}
+            </span>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Summary Cards */}
-      {resumo && (
+      {/* Summary Cards (Ocultos na impressão em lote pois cada folha impressa tem seus próprios totais) */}
+      {resumo && !modoImpressaoLote && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-3 shadow-xs">
             <span className="text-[11px] font-semibold text-slate-500 uppercase block">
@@ -841,8 +971,10 @@ export default function EspelhoPonto() {
         </div>
       )}
 
-      {/* Main Table: Espelho de Ponto Diário */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden">
+      {/* Main Table: Espelho de Ponto Diário (Oculta na impressão quando em modo lote) */}
+      <div
+        className={`bg-white rounded-xl border border-[#E2E8F0] shadow-xs overflow-hidden ${modoImpressaoLote ? 'print:hidden' : ''}`}
+      >
         <div className="p-4 border-b border-slate-200 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-[#2563EB]" />
@@ -864,19 +996,21 @@ export default function EspelhoPonto() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs table-auto">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold text-[11px]">
-                  <th className="py-3 px-3 w-28">Data</th>
-                  <th className="py-3 px-3 w-24">Previsto</th>
-                  <th className="py-3 px-4 min-w-[260px]">
+                  <th className="py-2 px-2 w-[72px] whitespace-nowrap">Data</th>
+                  <th className="py-2 px-2 w-[90px]">Previsto</th>
+                  <th className="py-2 px-2 min-w-[190px]">
                     Marcações Realizadas (Entrada / Intervalos / Saída)
                   </th>
-                  <th className="py-3 px-3 w-20 text-right">Realizado</th>
-                  <th className="py-3 px-3 w-24 text-right">Banco Horas</th>
-                  <th className="py-3 px-3 w-20 text-right">Diferença</th>
-                  <th className="py-3 px-3 min-w-[220px]">Ocorrências e Atestados</th>
-                  <th className="py-3 px-3 w-28 text-right print:hidden">Ações</th>
+                  <th className="py-2 px-2 w-[65px] text-right whitespace-nowrap">Realizado</th>
+                  <th className="py-2 px-2 w-[75px] text-right whitespace-nowrap">Banco Horas</th>
+                  <th className="py-2 px-2 w-[65px] text-right whitespace-nowrap">Diferença</th>
+                  <th className="py-2 px-2 min-w-[150px]">Ocorrências e Atestados</th>
+                  <th className="py-2 px-2 w-[150px] min-w-[145px] text-right print:hidden whitespace-nowrap">
+                    Ações
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -899,13 +1033,13 @@ export default function EspelhoPonto() {
                       } ${temIncompleto ? 'bg-amber-50/20' : ''}`}
                     >
                       {/* Data e Dia da Semana */}
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-bold text-slate-800">
+                      <td className="py-2 px-2 whitespace-nowrap">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="font-mono font-bold text-slate-800 text-xs">
                             {formatBRDate(dia.data).slice(0, 5)}
                           </span>
                           <span
-                            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                            className={`text-[9px] font-semibold uppercase px-1 py-0.2 rounded ${
                               dia.ehFeriado
                                 ? 'bg-amber-100 text-amber-900 border border-amber-300 font-bold'
                                 : isFimDeSemana
@@ -917,7 +1051,7 @@ export default function EspelhoPonto() {
                           </span>
                           {dia.ehFeriado && (
                             <span
-                              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#D4AF37]/15 text-[#996515] border border-[#D4AF37]/40 shadow-xs"
+                              className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.2 rounded bg-[#D4AF37]/15 text-[#996515] border border-[#D4AF37]/40 shadow-xs"
                               title={dia.feriadoDescricao || 'Feriado'}
                             >
                               Feriado
@@ -927,26 +1061,26 @@ export default function EspelhoPonto() {
                       </td>
 
                       {/* Jornada Prevista */}
-                      <td className="py-2.5 px-3 font-mono">
+                      <td className="py-2 px-2 font-mono">
                         {dia.ehFeriado ? (
                           <div className="flex flex-col">
-                            <span className="font-semibold text-amber-900 text-xs flex items-center gap-1">
+                            <span className="font-semibold text-amber-900 text-[11px] flex items-center gap-1">
                               <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
                               {dia.previstoFormatado}
                             </span>
-                            <span className="text-[10px] text-amber-700 font-sans tracking-tight">
-                              Sem obrigatoriedade de jornada
+                            <span className="text-[9px] text-amber-700 font-sans tracking-tight leading-tight">
+                              Sem obrigação
                             </span>
                           </div>
                         ) : dia.ehDiaFolga ? (
-                          <span className="text-slate-400 italic text-xs">Folga</span>
+                          <span className="text-slate-400 italic text-[11px]">Folga</span>
                         ) : (
                           <div className="flex flex-col">
-                            <span className="font-medium text-slate-800 text-xs">
+                            <span className="font-medium text-slate-800 text-[11px] whitespace-nowrap">
                               {dia.previstoFormatado}
                             </span>
                             {dia.cargaPrevistaFormatada && (
-                              <span className="text-[10px] text-slate-500 font-sans tracking-tight">
+                              <span className="text-[9px] text-slate-500 font-sans tracking-tight">
                                 {dia.cargaPrevistaFormatada}
                               </span>
                             )}
@@ -955,12 +1089,12 @@ export default function EspelhoPonto() {
                       </td>
 
                       {/* Batidas Realizadas */}
-                      <td className="py-2.5 px-4">
+                      <td className="py-2 px-2">
                         {dia.todasMarcacoes.length === 0 ? (
                           <span className="text-slate-300 italic text-[11px]">Sem batidas</span>
                         ) : (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 flex-wrap font-mono">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1 flex-wrap font-mono">
                               {dia.todasMarcacoes.map((m, idx) => {
                                 const ehAjuste = m.origem === 'tratamento_fechamento'
                                 const ehAuto = m.origem === 'intervalo_automatico'
@@ -984,7 +1118,7 @@ export default function EspelhoPonto() {
                                                     : 'Terminal Coletivo Imutável'
                                             })`
                                     }
-                                    className={`px-2 py-0.5 rounded text-xs font-semibold border flex items-center gap-1 ${
+                                    className={`px-1.5 py-0.5 rounded text-[11px] font-semibold border flex items-center gap-0.5 ${
                                       ehAnulado
                                         ? 'bg-red-50 text-red-700/80 border-red-200 line-through opacity-75'
                                         : m.corrigida
@@ -1001,7 +1135,7 @@ export default function EspelhoPonto() {
                                     {m.horario}
                                     {ehAuto && (
                                       <span
-                                        className="text-[9px] bg-purple-200 text-purple-950 font-bold px-1 rounded uppercase tracking-wider"
+                                        className="text-[8px] bg-purple-200 text-purple-950 font-bold px-0.5 rounded uppercase tracking-wider"
                                         title="Intervalo automático da jornada"
                                       >
                                         Auto
@@ -1009,19 +1143,19 @@ export default function EspelhoPonto() {
                                     )}
                                     {m.corrigida && !ehAnulado && (
                                       <span
-                                        className="text-[9px] bg-amber-300 text-amber-950 px-1 rounded font-bold uppercase tracking-wider"
+                                        className="text-[8px] bg-amber-300 text-amber-950 px-0.5 rounded font-bold uppercase tracking-wider"
                                         title={
                                           m.horarioOriginal
                                             ? `Horário corrigido de ${m.horarioOriginal} para ${m.horario}${m.motivoCorrecao ? ` (${m.motivoCorrecao})` : ''}`
                                             : `Marcação corrigida pelo gestor${m.motivoCorrecao ? `: ${m.motivoCorrecao}` : ''}`
                                         }
                                       >
-                                        CORRIGIDA
+                                        CORR
                                       </span>
                                     )}
                                     {ehAjuste && !ehAnulado && !m.corrigida && (
                                       <span
-                                        className="text-[9px] bg-amber-200 text-amber-900 px-1 rounded font-bold"
+                                        className="text-[8px] bg-amber-200 text-amber-900 px-0.5 rounded font-bold"
                                         title="Incluído pelo gestor no fechamento"
                                       >
                                         AJ
@@ -1029,18 +1163,18 @@ export default function EspelhoPonto() {
                                     )}
                                     {ehOffline && !ehAnulado && (
                                       <span
-                                        className="text-[9px] bg-amber-200 text-amber-950 px-1 rounded font-bold uppercase tracking-wider"
+                                        className="text-[8px] bg-amber-200 text-amber-950 px-0.5 rounded font-bold uppercase tracking-wider"
                                         title="Registrado offline e sincronizado automaticamente"
                                       >
-                                        Offline
+                                        Off
                                       </span>
                                     )}
                                     {ehAnulado && (
                                       <span
-                                        className="text-[9px] bg-red-200 text-red-900 px-1 rounded font-bold"
+                                        className="text-[8px] bg-red-200 text-red-900 px-0.5 rounded font-bold"
                                         title={m.motivoAnulacao || 'Marcação anulada'}
                                       >
-                                        ANULADA
+                                        ANUL
                                       </span>
                                     )}
                                   </span>
@@ -1050,12 +1184,12 @@ export default function EspelhoPonto() {
 
                             {/* Indicador auditável de intervalo automático */}
                             {dia.intervaloAutomaticoAplicado && dia.intervaloInfo && (
-                              <div className="flex items-center gap-1 text-[10px] text-purple-700 font-medium">
-                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
+                              <div className="flex items-center gap-1 text-[9px] text-purple-700 font-medium leading-tight">
+                                <span className="inline-block w-1 h-1 rounded-full bg-purple-600 shrink-0" />
                                 <span>
-                                  Intervalo automático da jornada:{' '}
+                                  Auto:{' '}
                                   <strong className="font-mono text-purple-900">
-                                    {dia.intervaloInfo.inicio} às {dia.intervaloInfo.retorno}
+                                    {dia.intervaloInfo.inicio}-{dia.intervaloInfo.retorno}
                                   </strong>{' '}
                                   (-{dia.intervaloInfo.duracaoMinutos}m)
                                 </span>
@@ -1066,16 +1200,16 @@ export default function EspelhoPonto() {
                       </td>
 
                       {/* Horas Trabalhadas */}
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800">
+                      <td className="py-2 px-2 text-right font-mono font-semibold text-slate-800 text-[11px] whitespace-nowrap">
                         {dia.realizadoFormatado !== '00:00' ? dia.realizadoFormatado : '--'}
                       </td>
 
                       {/* Banco de Horas (Crédito pós-saída prevista e antecipação >= 30min) */}
-                      <td className="py-2.5 px-3 text-right font-mono">
+                      <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
                         {dia.horasBancoCreditoMinutos > 0 ? (
                           <div className="inline-flex flex-col items-end gap-0.5">
                             <span
-                              className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 text-[11px]"
+                              className="font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200 text-[10px]"
                               title={
                                 dia.ehDiaFolga || dia.ehFeriado
                                   ? 'Trabalho em folga/feriado -> Crédito integral Banco de Horas'
@@ -1095,8 +1229,8 @@ export default function EspelhoPonto() {
                             </span>
                             {dia.horasBancoCreditoAntecipacaoMinutos &&
                               dia.horasBancoCreditoAntecipacaoMinutos > 0 && (
-                                <span className="text-[9px] font-sans font-medium text-teal-700 bg-teal-50 px-1 rounded border border-teal-200">
-                                  antecipação ≥30min
+                                <span className="text-[8px] font-sans font-medium text-teal-700 bg-teal-50 px-0.5 rounded border border-teal-200 leading-none">
+                                  antec.≥30m
                                 </span>
                               )}
                           </div>
@@ -1106,7 +1240,7 @@ export default function EspelhoPonto() {
                       </td>
 
                       {/* Diferença */}
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                      <td className="py-2 px-2 text-right font-mono font-semibold text-[11px] whitespace-nowrap">
                         {dia.diferencaMinutos > 0 ? (
                           <span className="text-emerald-600">+{dia.diferencaFormatada}</span>
                         ) : dia.diferencaMinutos < 0 && !dia.ehDiaFolga ? (
@@ -1117,18 +1251,21 @@ export default function EspelhoPonto() {
                       </td>
 
                       {/* Ocorrências e Atestados */}
-                      <td className="py-2.5 px-3">
+                      <td className="py-2 px-2">
                         {dia.ocorrencias.length === 0 ? (
                           <span className="text-slate-300 text-[11px]">—</span>
                         ) : (
-                          <div className="space-y-1">
+                          <div className="space-y-0.5">
                             {dia.ocorrencias.map((o, idx) => {
                               const ehAtestado = o.tipo === 'atestado'
                               const ehIncompleto = o.tipo === 'marcacao_incompleta'
                               return (
-                                <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                                <div
+                                  key={idx}
+                                  className="flex items-start gap-1 flex-wrap break-words"
+                                >
                                   <span
-                                    className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 ${
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-medium inline-flex items-center gap-1 max-w-full text-left leading-tight ${
                                       ehAtestado
                                         ? 'bg-purple-50 text-purple-800 border border-purple-200'
                                         : ehIncompleto
@@ -1139,12 +1276,12 @@ export default function EspelhoPonto() {
                                     }`}
                                   >
                                     {ehAtestado && (
-                                      <Paperclip className="w-3 h-3 text-purple-600" />
+                                      <Paperclip className="w-2.5 h-2.5 text-purple-600 shrink-0" />
                                     )}
                                     {ehIncompleto && (
-                                      <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                      <AlertTriangle className="w-2.5 h-2.5 text-amber-600 shrink-0" />
                                     )}
-                                    {o.descricao}
+                                    <span className="break-words">{o.descricao}</span>
                                   </span>
 
                                   {/* Link para visualização do arquivo do atestado se houver */}
@@ -1156,9 +1293,9 @@ export default function EspelhoPonto() {
                                       )}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className="text-[11px] text-[#2563EB] hover:underline font-semibold flex items-center gap-0.5"
+                                      className="text-[10px] text-[#2563EB] hover:underline font-semibold inline-flex items-center gap-0.5 shrink-0"
                                     >
-                                      Ver Anexo ↗
+                                      Anexo ↗
                                     </a>
                                   )}
                                 </div>
@@ -1169,9 +1306,9 @@ export default function EspelhoPonto() {
                       </td>
 
                       {/* Ações (Atestado / Inclusão de Ponto no Fechamento) */}
-                      <td className="py-2.5 px-3 text-right print:hidden">
+                      <td className="py-2 px-2 text-right print:hidden whitespace-nowrap">
                         {funcionarioAtual?.situacao === 'desligado' ? (
-                          <span className="text-[11px] text-slate-400 italic">Somente Leitura</span>
+                          <span className="text-[10px] text-slate-400 italic">Somente Leitura</span>
                         ) : (
                           <div className="flex items-center justify-end gap-1">
                             {/* Anexar Atestado */}
@@ -1186,13 +1323,13 @@ export default function EspelhoPonto() {
                                 setAtestadoModalOpen(true)
                               }}
                               title="Anexar Atestado Médico"
-                              className="h-7 px-2 text-[11px] border-slate-200 text-purple-700 hover:bg-purple-50"
+                              className="h-6 px-1.5 text-[10px] border-slate-200 text-purple-700 hover:bg-purple-50 shrink-0"
                             >
-                              <Paperclip className="w-3 h-3 mr-1" />
+                              <Paperclip className="w-2.5 h-2.5 mr-0.5" />
                               Atestado
                             </Button>
 
-                            {/* Ajustar / Incluir Ponto (Permitido a qualquer momento, exceto competência com folha fechada ou período futuro) */}
+                            {/* Ajustar / Incluir Ponto */}
                             {!isFechamentoFechado && !isPeriodoFuturo ? (
                               <Button
                                 variant="outline"
@@ -1207,9 +1344,9 @@ export default function EspelhoPonto() {
                                   setRegistroParaCorrigir('')
                                   setAjustePontoModalOpen(true)
                                 }}
-                                className="h-7 px-2 text-[11px] border-amber-300 text-amber-900 bg-amber-50/80 hover:bg-amber-100 font-semibold"
+                                className="h-6 px-1.5 text-[10px] border-amber-300 text-amber-900 bg-amber-50/80 hover:bg-amber-100 font-semibold shrink-0"
                               >
-                                <PlusCircle className="w-3 h-3 mr-1 text-[#D4AF37]" />
+                                <PlusCircle className="w-2.5 h-2.5 mr-0.5 text-[#D4AF37]" />
                                 Ajustar
                               </Button>
                             ) : (
@@ -1221,9 +1358,9 @@ export default function EspelhoPonto() {
                                         variant="outline"
                                         size="sm"
                                         disabled
-                                        className="h-7 px-2 text-[11px] border-slate-200 text-slate-400 opacity-60 cursor-not-allowed"
+                                        className="h-6 px-1.5 text-[10px] border-slate-200 text-slate-400 opacity-60 cursor-not-allowed shrink-0"
                                       >
-                                        <PlusCircle className="w-3 h-3 mr-1" />
+                                        <PlusCircle className="w-2.5 h-2.5 mr-0.5" />
                                         Ajustar
                                       </Button>
                                     </span>
@@ -1257,7 +1394,310 @@ export default function EspelhoPonto() {
             </table>
           </div>
         )}
+
+        {/* Rodapé e Linhas de Assinatura para Impressão Individual (Aparece apenas na impressão quando NÃO estiver em modo lote) */}
+        {!modoImpressaoLote && (
+          <div className="hidden print:block p-4 border-t-2 border-black mt-4 avoid-break-inside text-black text-xs">
+            <div className="grid grid-cols-2 gap-4 mb-3 pb-3 border-b border-slate-300">
+              <div>
+                <p className="font-bold text-[11px] uppercase tracking-wider mb-1">
+                  Resumo da Competência
+                </p>
+                <p>
+                  Dias Trabalhados: <strong>{resumo?.totalDiasTrabalhados || 0}</strong> de{' '}
+                  {resumo?.totalDiasNoMes || 0} dias
+                </p>
+                <p>
+                  Carga Prevista:{' '}
+                  <strong>{resumo ? minutesToHoursText(resumo.previstoTotalMinutos) : '0h'}</strong>
+                </p>
+                <p>
+                  Horas Trabalhadas:{' '}
+                  <strong>
+                    {resumo ? minutesToHoursText(resumo.realizadoTotalMinutos) : '0h'}
+                  </strong>
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-[11px] uppercase tracking-wider mb-1">
+                  Apuração de Banco de Horas
+                </p>
+                <p>
+                  Crédito do Mês (após saída / antecipações):{' '}
+                  <strong>
+                    +{resumo ? minutesToHoursText(resumo.totalBancoCreditoMinutos) : '0h'}
+                  </strong>
+                </p>
+                <p>
+                  Saldo Líquido da Competência:{' '}
+                  <strong className="font-mono">
+                    {resumo && resumo.saldoTotalMinutos >= 0 ? '+' : ''}
+                    {resumo ? minutesToHoursText(resumo.saldoTotalMinutos) : '0h'}
+                  </strong>
+                </p>
+                <p className="text-[10px] text-slate-600">
+                  Total de ocorrências: {resumo?.totalOcorrencias || 0} ({resumo?.totalAtrasos || 0}{' '}
+                  atrasos)
+                </p>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-justify text-slate-700 leading-tight mb-8">
+              Reconheço a exatidão das marcações de ponto, horas trabalhadas, ocorrências e saldo do
+              banco de horas registrados neste espelho mensal, em cumprimento às normas trabalhistas
+              vigentes (CLT e Portaria MTP nº 671/2021).
+            </p>
+
+            {/* Linhas de Assinatura */}
+            <div className="grid grid-cols-2 gap-12 pt-6">
+              <div className="text-center">
+                <div className="border-t border-black w-4/5 mx-auto mb-1.5" />
+                <p className="font-bold text-xs uppercase">{funcionarioAtual?.nome}</p>
+                <p className="text-[10px] text-slate-600">
+                  Assinatura do Colaborador — Matrícula: {funcionarioAtual?.matricula}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">Data: ____/____/________</p>
+              </div>
+              <div className="text-center">
+                <div className="border-t border-black w-4/5 mx-auto mb-1.5" />
+                <p className="font-bold text-xs uppercase">
+                  {empresaInfo?.razao_social ||
+                    empresaInfo?.nome_fantasia ||
+                    'MH MIXX AÇAÍ E FRUTAS CONGELADAS'}
+                </p>
+                <p className="text-[10px] text-slate-600">Responsável Recursos Humanos / Gestão</p>
+                <p className="text-[10px] text-slate-500 mt-1">Data: ____/____/________</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* DOCUMENTO DE IMPRESSÃO EM LOTE (Todas as folhas de ponto do mês — 1 por página por funcionário ativo) */}
+      {modoImpressaoLote && folhasLote.length > 0 && (
+        <div className="hidden print:block w-full">
+          {folhasLote.map((item, idx) => {
+            const func = item.funcionario
+            const dias = item.dias
+            const res = item.resumo
+            const isLast = idx === folhasLote.length - 1
+
+            return (
+              <div
+                key={func.id}
+                className={`bg-white text-black p-0 w-full ${!isLast ? 'page-break-after' : ''}`}
+                style={{
+                  breakAfter: isLast ? 'auto' : 'page',
+                  pageBreakAfter: isLast ? 'auto' : 'always',
+                }}
+              >
+                {/* Cabeçalho da Folha de Ponto */}
+                <div className="border-b-2 border-black pb-2 mb-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h1 className="text-base font-black tracking-tight uppercase">
+                        {empresaInfo?.razao_social ||
+                          empresaInfo?.nome_fantasia ||
+                          'MH MIXX AÇAÍ E FRUTAS CONGELADAS'}
+                      </h1>
+                      <p className="text-xs font-bold">
+                        FOLHA DE PONTO / ESPELHO MENSAL — {MESES[mes - 1].toUpperCase()} / {ano}
+                      </p>
+                      {empresaInfo?.cnpj && (
+                        <p className="text-[9px] text-slate-700">CNPJ: {empresaInfo.cnpj}</p>
+                      )}
+                    </div>
+                    <div className="text-right text-xs">
+                      <p className="font-bold text-sm leading-tight">{func.nome}</p>
+                      <p className="text-[11px]">
+                        Matrícula: <strong className="font-mono">{func.matricula}</strong>
+                      </p>
+                      <p className="text-[10px] text-slate-700">
+                        Cargo: {func.expand?.cargo?.nome || 'Geral'}
+                      </p>
+                      <p className="text-[10px] text-slate-700">
+                        Depto: {func.expand?.departamento?.nome || 'Geral'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-1.5 pt-1.5 border-t border-dashed border-slate-400 flex items-center justify-between text-[9px] text-slate-700">
+                    <span>
+                      <strong>Jornada Contratada:</strong>{' '}
+                      {func.expand?.jornada_atual?.nome || 'Padrão'} (
+                      {func.expand?.jornada_atual?.hora_entrada || '08:00'} às{' '}
+                      {func.expand?.jornada_atual?.hora_saida || '18:00'})
+                    </span>
+                    <span>
+                      Emissão:{' '}
+                      {new Intl.DateTimeFormat('pt-BR', {
+                        timeZone: 'America/Sao_Paulo',
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(new Date())}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tabela Diária */}
+                <table className="w-full text-left text-[10px] border-collapse mb-3">
+                  <thead>
+                    <tr className="border-b-2 border-black bg-slate-100 font-bold text-[9px] uppercase">
+                      <th className="py-1 px-1 w-[45px]">Data</th>
+                      <th className="py-1 px-1 w-[32px]">Dia</th>
+                      <th className="py-1 px-1 w-[85px]">Previsto</th>
+                      <th className="py-1 px-1">Marcações Realizadas</th>
+                      <th className="py-1 px-1 w-[55px] text-right">Realizado</th>
+                      <th className="py-1 px-1 w-[60px] text-right">Banco Horas</th>
+                      <th className="py-1 px-1 w-[55px] text-right">Diferença</th>
+                      <th className="py-1 px-1 w-[160px]">Ocorrências</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {dias.map((d) => {
+                      const batidasStr = d.todasMarcacoes
+                        .map((m) => {
+                          const tag = m.anulado
+                            ? '[ANULADA]'
+                            : m.corrigida
+                              ? '[CORR]'
+                              : m.origem === 'tratamento_fechamento'
+                                ? '[AJ]'
+                                : m.origem === 'intervalo_automatico'
+                                  ? '[AUTO]'
+                                  : ''
+                          return `${m.horario}${tag ? ` ${tag}` : ''}`
+                        })
+                        .join('  ')
+
+                      const ocorrenciasStr = [
+                        ...(d.ehFeriado ? [`Feriado: ${d.feriadoDescricao || 'Feriado'}`] : []),
+                        ...d.ocorrencias.map((o) => o.descricao),
+                      ].join('; ')
+
+                      return (
+                        <tr key={d.data} className="leading-tight">
+                          <td className="py-0.5 px-1 font-mono font-semibold">
+                            {formatBRDate(d.data).slice(0, 5)}
+                          </td>
+                          <td className="py-0.5 px-1 uppercase font-semibold text-[9px]">
+                            {d.diaSemana}
+                          </td>
+                          <td className="py-0.5 px-1 font-mono text-[9px]">
+                            {d.ehFeriado ? (
+                              <span className="italic">Feriado</span>
+                            ) : d.ehDiaFolga ? (
+                              <span className="italic text-slate-500">Folga</span>
+                            ) : (
+                              d.previstoFormatado
+                            )}
+                          </td>
+                          <td className="py-0.5 px-1 font-mono text-[9px]">
+                            {batidasStr || <span className="text-slate-400 italic">--</span>}
+                          </td>
+                          <td className="py-0.5 px-1 text-right font-mono font-semibold">
+                            {d.realizadoFormatado !== '00:00' ? d.realizadoFormatado : '--'}
+                          </td>
+                          <td className="py-0.5 px-1 text-right font-mono">
+                            {d.horasBancoCreditoMinutos > 0 ? (
+                              `+${d.horasBancoCreditoFormatado}`
+                            ) : (
+                              <span className="text-slate-400">--</span>
+                            )}
+                          </td>
+                          <td className="py-0.5 px-1 text-right font-mono font-semibold">
+                            {d.diferencaMinutos > 0
+                              ? `+${d.diferencaFormatada}`
+                              : d.diferencaMinutos < 0 && !d.ehDiaFolga
+                                ? d.diferencaFormatada
+                                : '00:00'}
+                          </td>
+                          <td className="py-0.5 px-1 text-[9px] text-slate-700 truncate max-w-[160px]">
+                            {ocorrenciasStr || <span className="text-slate-300">—</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Resumo dos Totais e Saldo do Banco de Horas */}
+                <div className="border border-slate-300 rounded p-2 mb-3 text-[10px] bg-slate-50/50 avoid-break-inside">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="font-bold uppercase tracking-wider block text-[9px] text-slate-600 mb-0.5">
+                        Totais da Competência
+                      </span>
+                      <p>
+                        Dias Trabalhados: <strong>{res.totalDiasTrabalhados}</strong> /{' '}
+                        {res.totalDiasNoMes} dias
+                      </p>
+                      <p>
+                        Carga Prevista:{' '}
+                        <strong>{minutesToHoursText(res.previstoTotalMinutos)}</strong>
+                      </p>
+                      <p>
+                        Horas Trabalhadas:{' '}
+                        <strong>{minutesToHoursText(res.realizadoTotalMinutos)}</strong>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold uppercase tracking-wider block text-[9px] text-slate-600 mb-0.5">
+                        Apuração e Saldo do Banco de Horas
+                      </span>
+                      <p>
+                        Crédito do Mês (Pós-saída / Antecipações):{' '}
+                        <strong>+{minutesToHoursText(res.totalBancoCreditoMinutos)}</strong>
+                      </p>
+                      <p className="text-xs">
+                        Saldo Líquido do Mês (Faltantes / Sobras):{' '}
+                        <strong className="font-mono font-bold">
+                          {res.saldoTotalMinutos >= 0 ? '+' : ''}
+                          {minutesToHoursText(res.saldoTotalMinutos)}
+                        </strong>
+                      </p>
+                      <p className="text-[9px] text-slate-600">
+                        Ocorrências: {res.totalOcorrencias} ({res.totalAtrasos} atrasos)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Termo de Reconhecimento e Assinaturas */}
+                <div className="avoid-break-inside pt-1">
+                  <p className="text-[9px] text-justify text-slate-700 leading-tight mb-6">
+                    Reconheço a exatidão das marcações de ponto, horas trabalhadas, ocorrências e
+                    saldo do banco de horas registrados nesta folha de ponto mensal, em estrito
+                    cumprimento às normas da CLT e da Portaria MTP nº 671/2021.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-10 pt-4">
+                    <div className="text-center">
+                      <div className="border-t border-black w-4/5 mx-auto mb-1" />
+                      <p className="font-bold text-[10px] uppercase">{func.nome}</p>
+                      <p className="text-[9px] text-slate-600">
+                        Assinatura do Colaborador — Matrícula: {func.matricula}
+                      </p>
+                      <p className="text-[9px] text-slate-500 mt-0.5">Data: ____/____/________</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="border-t border-black w-4/5 mx-auto mb-1" />
+                      <p className="font-bold text-[10px] uppercase">
+                        {empresaInfo?.razao_social ||
+                          empresaInfo?.nome_fantasia ||
+                          'MH MIXX AÇAÍ E FRUTAS CONGELADAS'}
+                      </p>
+                      <p className="text-[9px] text-slate-600">
+                        Responsável Recursos Humanos / Gestão
+                      </p>
+                      <p className="text-[9px] text-slate-500 mt-0.5">Data: ____/____/________</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Modal Fechamento da Folha */}
       <Dialog open={fechamentoModalOpen} onOpenChange={setFechamentoModalOpen}>

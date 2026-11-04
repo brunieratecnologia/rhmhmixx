@@ -26,6 +26,7 @@ import Configuracoes from '@/pages/admin/Configuracoes'
 import TerminalPonto from '@/pages/terminal/TerminalPonto'
 import EspelhoPonto from '@/pages/admin/EspelhoPonto'
 import BancoHorasRelatorio from '@/pages/admin/BancoHorasRelatorio'
+import HorasExtrasRelatorio from '@/pages/admin/HorasExtrasRelatorio'
 import Ferias from '@/pages/admin/Ferias'
 import { FeriasErrorBoundary } from '@/components/admin/FeriasErrorBoundary'
 import Ausencias from '@/pages/admin/Ausencias'
@@ -78,6 +79,7 @@ export default function App() {
               <Route path="funcionarios/:id/editar" element={<FuncionarioForm />} />
               <Route path="espelho-ponto" element={<EspelhoPonto />} />
               <Route path="banco-horas" element={<BancoHorasRelatorio />} />
+              <Route path="horas-extras" element={<HorasExtrasRelatorio />} />
               <Route path="documentos" element={<DocumentosPage />} />
               <Route path="holerites" element={<HoleritesPage />} />
               <Route

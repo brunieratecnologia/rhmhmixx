@@ -21,6 +21,7 @@ import {
   FolderOpen,
   FileText,
   Clock,
+  TrendingUp,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -92,6 +93,7 @@ export default function AdminLayout() {
     { name: 'Funcionários', path: '/admin/funcionarios', icon: Users },
     { name: 'Espelho de Ponto', path: '/admin/espelho-ponto', icon: FileCheck2 },
     { name: 'Banco de Horas', path: '/admin/banco-horas', icon: Clock },
+    { name: 'Horas Extras', path: '/admin/horas-extras', icon: TrendingUp },
     { name: 'Férias', path: '/admin/ferias', icon: Palmtree },
     { name: 'Ausências', path: '/admin/ausencias', icon: UserX },
     { name: 'Documentos', path: '/admin/documentos', icon: FolderOpen },
@@ -110,6 +112,7 @@ export default function AdminLayout() {
       return 'Ficha do Funcionário'
     if (p.startsWith('/admin/espelho-ponto')) return 'Espelho de Ponto'
     if (p.startsWith('/admin/banco-horas')) return 'Relatório de Banco de Horas'
+    if (p.startsWith('/admin/horas-extras')) return 'Relatório de Horas Extras'
     if (p.startsWith('/admin/documentos')) return 'Central de Documentos'
     if (p.startsWith('/admin/holerites')) return 'Central de Holerites'
     if (p.startsWith('/admin/ferias')) return 'Gestão de Férias'

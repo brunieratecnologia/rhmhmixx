@@ -4,7 +4,9 @@ import { construirExtratoFuncionario } from './bancoHorasRelatorioService'
 import {
   construirLancamentosHorasExtras,
   construirItensCreditoExpirado,
+  calcularResumoHorasExtras,
   gerarCsvHorasExtras,
+  gerarCsvExtratoIndividual,
   DIVISOR_CLT,
   ADICIONAL_HE,
   type FuncionarioHorasExtras,
@@ -67,10 +69,7 @@ function espelho(mes: number, registros: RegistroHorario[]) {
 describe('(a) Tolerância de entrada — 10 min, atraso integral acima', () => {
   it('previsto 08:00, batida 08:13 → atraso integral de 13 min como débito de banco de horas', () => {
     // 2026-10-05 é segunda-feira (dia de trabalho)
-    const e = espelho(10, [
-      reg('r1', '2026-10-05', '08:13'),
-      reg('r2', '2026-10-05', '18:00'),
-    ])
+    const e = espelho(10, [reg('r1', '2026-10-05', '08:13'), reg('r2', '2026-10-05', '18:00')])
     const dia = e.dias.find((d) => d.data === '2026-10-05')!
     expect(dia.entradaTolerada).toBe(false)
     expect(dia.atrasoMinutos).toBe(13)
@@ -81,17 +80,14 @@ describe('(a) Tolerância de entrada — 10 min, atraso integral acima', () => {
   })
 
   it('batida 08:08 → dentro da tolerância de 10 min, sem atraso, sem débito, sem HE', () => {
-    const e = espelho(10, [
-      reg('r1', '2026-10-06', '08:08'),
-      reg('r2', '2026-10-06', '18:00'),
-    ])
+    const e = espelho(10, [reg('r1', '2026-10-06', '08:08'), reg('r2', '2026-10-06', '18:00')])
     const dia = e.dias.find((d) => d.data === '2026-10-06')!
     expect(dia.entradaTolerada).toBe(true)
     expect(dia.atrasoMinutos).toBe(0)
     expect(dia.horasBancoDebitoMinutos).toBe(0)
-    expect(construirLancamentosHorasExtras({ ano: 2026, mes: 10, diasEspelho: e.dias })).toHaveLength(
-      0,
-    )
+    expect(
+      construirLancamentosHorasExtras({ ano: 2026, mes: 10, diasEspelho: e.dias }),
+    ).toHaveLength(0)
   })
 })
 
@@ -197,7 +193,11 @@ describe('(c) Ciclo de 6 meses — vencidos como HE +50% com FIFO', () => {
 
     // Crédito de 01/10 deve estar totalmente consumido; o de 02/10 com 50 min em aberto
     const abertos = construirItensCreditoExpirado(extrato, '2027-05-01')
-    const cred02 = abertos.find((c) => c.id === 'he-expirado-' + extrato.find((i) => i.data === '2026-10-02' && i.tipo === 'credito')!.id)
+    const cred02 = abertos.find(
+      (c) =>
+        c.id ===
+        'he-expirado-' + extrato.find((i) => i.data === '2026-10-02' && i.tipo === 'credito')!.id,
+    )
     expect(cred02).toBeDefined()
     expect(cred02!.minutos).toBe(50)
     // Nenhum lançamento expirado vindo do crédito de 01/10 (consumido pelo FIFO)
@@ -333,6 +333,7 @@ describe('CSV pt-BR (separador ";")', () => {
       totalCreditoVencidoFormatado: '01:30',
       valorTotalEstimadoPagar: 22.5,
       totalFuncionariosAtivos: 1,
+      totalFuncionariosComHE: 1,
     }
 
     const csv = gerarCsvHorasExtras(relatorio, [funcionario])
@@ -347,7 +348,73 @@ describe('CSV pt-BR (separador ";")', () => {
     expect(csv).toContain('Valor Estimado a Pagar (R$)')
 
     // Versão RH (não-admin): sem colunas monetárias
-    const csvRH = gerarCsvHorasExtras({ ...relatorio, isAdmin: false, valorTotalEstimadoPagar: undefined }, [funcionario])
+    const csvRH = gerarCsvHorasExtras(
+      { ...relatorio, isAdmin: false, valorTotalEstimadoPagar: undefined },
+      [funcionario],
+    )
     expect(csvRH).not.toContain('Valor Estimado a Pagar')
+  })
+
+  it('gera CSV de extrato individual com separador ";" e lançamentos de HE e créditos vencidos', () => {
+    const funcionario: FuncionarioHorasExtras = {
+      funcionario: {
+        id: 'f1',
+        nome: 'João Santos',
+        matricula: '002',
+        cpf: '12345678901',
+        situacao: 'ativo',
+        created: '',
+        updated: '',
+      } as any,
+      matricula: '002',
+      nome: 'João Santos',
+      departamentoNome: 'Logística',
+      cargoNome: 'Conferente',
+      jornadaNome: 'Seg a Sex',
+      situacao: 'ativo',
+      horasExtrasPeriodoMinutos: 90,
+      horasExtrasPeriodoFormatado: '01:30',
+      creditoVencidoMinutos: 60,
+      creditoVencidoFormatado: '01:00',
+      valorHora: 12,
+      valorEstimadoPagar: 18,
+      extrato: [
+        {
+          id: 'he-1',
+          data: '2026-10-05',
+          origem: 'trabalho_pos_saida',
+          origemLabel: 'HE - Saída',
+          descricao: 'Trabalho extraordinário além da jornada prevista (08:00 às 17:00)',
+          minutos: 90,
+          horasFormatadas: '01:30',
+          vencido: false,
+          valorEstimado: 27,
+        },
+        {
+          id: 'venc-1',
+          data: '2026-04-01',
+          origem: 'credito_expirado',
+          origemLabel: 'Crédito Vencido',
+          descricao: 'Crédito de banco de horas não compensado dentro de 6 meses',
+          minutos: 60,
+          horasFormatadas: '01:00',
+          vencido: true,
+          dataLimiteCompensacao: '2026-10-01',
+          valorEstimado: 18,
+        },
+      ],
+    }
+
+    const csvAdmin = gerarCsvExtratoIndividual(funcionario, 2026, 10, true)
+    expect(csvAdmin.startsWith('\uFEFF')).toBe(true)
+    expect(csvAdmin).toContain('EXTRATO INDIVIDUAL DE HORAS EXTRAS')
+    expect(csvAdmin).toContain('João Santos')
+    expect(csvAdmin).toContain('05/10/2026')
+    expect(csvAdmin).toContain('HE - Saída')
+    expect(csvAdmin).toContain('Vencido — a pagar HE +50%')
+    expect(csvAdmin).toContain('Valor Sugerido (+50%)')
+
+    const csvRH = gerarCsvExtratoIndividual(funcionario, 2026, 10, false)
+    expect(csvRH).not.toContain('Valor Sugerido (+50%)')
   })
 })
